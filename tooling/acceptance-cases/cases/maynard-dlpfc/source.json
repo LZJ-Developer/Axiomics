@@ -1,0 +1,8 @@
+{
+  "dataset": "Maynard human dorsolateral prefrontal cortex spatial transcriptomics",
+  "section": "151673",
+  "source_url": "https://huggingface.co/datasets/han-shu/st_datasets/resolve/main/DLPFC/DLPFC_151673.h5ad",
+  "source_sha256": "fd2a6e8e4622337bc2c3a79c5f908fe3c7bd0212ed7922dc157de37a5fac172b",
+  "source_bytes": 120068315,
+  "preparation": "prepare.py removes the paper-derived cluster labels and precomputed layers, assigns a neutral sample alias, and preserves raw counts, spot coordinates, tissue images, and technical metadata."
+}

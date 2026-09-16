@@ -1,0 +1,167 @@
+{
+  "time": "2026-09-13T14:30:01.188400+00:00",
+  "ranking": {
+    "partition_ari": 1.0,
+    "cross_scores": [
+      {
+        "prediction": "formal",
+        "partition": "scout",
+        "method": "GLUE",
+        "camus": 0.7975203246535837
+      },
+      {
+        "prediction": "formal",
+        "partition": "scout",
+        "method": "scJoint",
+        "camus": 0.7982247452085224
+      },
+      {
+        "prediction": "formal",
+        "partition": "formal",
+        "method": "GLUE",
+        "camus": 0.7975203246535837
+      },
+      {
+        "prediction": "formal",
+        "partition": "formal",
+        "method": "scJoint",
+        "camus": 0.7982247452085224
+      },
+      {
+        "prediction": "scout",
+        "partition": "scout",
+        "method": "GLUE",
+        "camus": 0.8246261927012494
+      },
+      {
+        "prediction": "scout",
+        "partition": "scout",
+        "method": "scJoint",
+        "camus": 0.7972103609435506
+      },
+      {
+        "prediction": "scout",
+        "partition": "formal",
+        "method": "GLUE",
+        "camus": 0.8246261927012494
+      },
+      {
+        "prediction": "scout",
+        "partition": "formal",
+        "method": "scJoint",
+        "camus": 0.7972103609435506
+      }
+    ],
+    "prediction_agreement": {
+      "GLUE": 0.8700166112956811,
+      "scJoint": 0.9941860465116279
+    },
+    "note": "Post-hoc diagnostic using frozen predictions; not a new blind evaluation."
+  },
+  "transfer": {
+    "rows": [
+      {
+        "embedding": "scout",
+        "transfer": "cosine-knn15",
+        "camus": 0.8246261927012494,
+        "accuracy": 0.9140365448504983,
+        "macro_f1": 0.7958695599120381
+      },
+      {
+        "embedding": "scout",
+        "transfer": "scglue-snn30",
+        "camus": 0.8327536832936423,
+        "accuracy": 0.9140365448504983,
+        "macro_f1": 0.7750939851111699
+      },
+      {
+        "embedding": "formal",
+        "transfer": "cosine-knn15",
+        "camus": 0.7850971438942211,
+        "accuracy": 0.8544435215946844,
+        "macro_f1": 0.669643589419404
+      },
+      {
+        "embedding": "formal",
+        "transfer": "scglue-snn30",
+        "camus": 0.7975203246535837,
+        "accuracy": 0.8610880398671097,
+        "macro_f1": 0.663629182763756
+      }
+    ],
+    "note": "Post-hoc 2x2 diagnostic with frozen embeddings; no retraining or test-label-driven parameter search."
+  },
+  "conclusion": "Identical ATAC partitions; score changes trace to different GLUE embeddings rather than label transfer alone. Individual training-setting effects remain unresolved.",
+  "official_method": "https://scglue.readthedocs.io/en/latest/training.html",
+  "next": "Scoring verified; freeze a standard method-selection protocol before a new prospective run. Do not present the existing formal result as CAMUS successful selection.",
+  "score_verification": {
+    "checks": {
+      "unique_barcodes": true,
+      "identical_cell_sets": true,
+      "cells": 4816,
+      "direct_prioritize_formula_parity": true,
+      "label_name_invariance": true
+    },
+    "decomposition": [
+      {
+        "method": "GLUE",
+        "predicted_types": 18,
+        "clusters": 10,
+        "entropy_prediction": 2.2017078109261514,
+        "entropy_partition": 2.106656626650885,
+        "mutual_information": 1.721293002395314,
+        "expected_mutual_information": 0.016243111307297504,
+        "adjusted_numerator": 1.7050498910880163,
+        "adjusted_denominator": 2.137939107481221,
+        "CAMUS": 0.7975203246535837,
+        "author_label_agreement": 0.8610880398671097,
+        "homogeneity_wrt_partition": 0.8170733571952761,
+        "completeness_wrt_partition": 0.781799017041798
+      },
+      {
+        "method": "scJoint",
+        "predicted_types": 17,
+        "clusters": 10,
+        "entropy_prediction": 2.0126817704724758,
+        "entropy_partition": 2.106656626650885,
+        "mutual_information": 1.6471431026891878,
+        "expected_mutual_information": 0.015186111184029316,
+        "adjusted_numerator": 1.6319569915051586,
+        "adjusted_denominator": 2.044483087377651,
+        "CAMUS": 0.7982247452085224,
+        "author_label_agreement": 0.7940199335548173,
+        "homogeneity_wrt_partition": 0.78187545224576,
+        "completeness_wrt_partition": 0.8183822832074056
+      }
+    ],
+    "paired_resampling": {
+      "samples": 200,
+      "seed": 20260913,
+      "margin": "scJoint minus GLUE",
+      "observed": 0.0007044205549386895,
+      "percentiles_2_5_50_97_5": [
+        -0.009979453161172694,
+        0.0017649653013953603,
+        0.011165754851894995
+      ],
+      "fraction_scJoint_higher": 0.635,
+      "scope": "Conditional sensitivity only; fixed fitted labels and clustering, no biological-replicate confidence claim."
+    }
+  },
+  "selection_validation": {
+    "scope": "Post-hoc verification on already frozen runs, not new prospective validation",
+    "scout": {
+      "selected": "GLUE",
+      "selected_accuracy": 0.9140365448504983,
+      "best_accuracy": 0.9140365448504983,
+      "selection_regret": 0.0
+    },
+    "formal": {
+      "selected_by_strict_argmax": "scJoint",
+      "selected_accuracy": 0.7940199335548173,
+      "best_accuracy": 0.8610880398671097,
+      "selection_regret": 0.0670681063122924,
+      "interpretation": "Near tie with unstable ranking; no reliable method-selection claim."
+    }
+  }
+}

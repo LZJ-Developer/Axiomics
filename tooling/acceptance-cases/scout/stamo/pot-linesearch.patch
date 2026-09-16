@@ -1,0 +1,13 @@
+--- a/ot/gromov/_semirelaxed.py
++++ b/ot/gromov/_semirelaxed.py
+@@ -831,8 +831,8 @@
+     dot = nx.dot(nx.dot(C1, deltaG), C2.T)
+     if fC2t is None:
+         fC2t = C2.T**2
+-    dot_qG = nx.dot(nx.outer(ones_p, qG), fC2t)
+-    dot_qdeltaG = nx.dot(nx.outer(ones_p, qdeltaG), fC2t)
++    dot_qG = nx.outer(ones_p, nx.dot(qG, fC2t))
++    dot_qdeltaG = nx.outer(ones_p, nx.dot(qdeltaG, fC2t))
+ 
+     a = reg * nx.sum((dot_qdeltaG - dot) * deltaG)
+     b = nx.sum(M * deltaG) + reg * (

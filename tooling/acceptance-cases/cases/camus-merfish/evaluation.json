@@ -1,0 +1,164 @@
+{
+  "status": "published",
+  "paper": "10.1101/gr.280821.125",
+  "figure": "4B",
+  "sample": "MERFISH_hypothalamic_8",
+  "publication_ready": true,
+  "pending": [],
+  "scout": "/disk1/dabiao/axiomics-projects/_tracer/camus-merfish",
+  "reference_shape": [
+    30370,
+    20320
+  ],
+  "query_shape": [
+    31340,
+    160
+  ],
+  "user_approved": true,
+  "environment": {
+    "status": "compatibility-and-training-probes-passed",
+    "runtimes": [
+      "/disk1/dabiao/axiomics-envs/omics-stamapper-0.0.2",
+      "/disk1/dabiao/axiomics-envs/omics-scvi-1.3.3"
+    ],
+    "pip_check": "passed-both",
+    "gpu": "RTX 5090; real training and DGL backward passed",
+    "plan": "docs/acceptance/camus-merfish-environment-plan.md",
+    "evidence": "tooling/acceptance-cases/cases/camus-merfish/environment-probes.json",
+    "patches": [
+      "stamapper-numpy-int.patch",
+      "stamapper-array-comparison.patch"
+    ],
+    "scientific_input_validation": "User approved preserving supplied fractional expression; disclose model assumption as a limitation, not a blocker"
+  },
+  "projectID": "prj_d3e4e4c028744b129068a94c5ecbdaa3",
+  "sessionID": "ses_f6488517dffepZvDqQu5Zjfb7j",
+  "author_precomputed_probe": {
+    "source": "Author precomputed predictions; scoring probe only, not new annotation training",
+    "raw_and_annotated_barcodes_equal": true,
+    "raw_and_annotated_features_equal": true,
+    "matrix_differences": 0,
+    "shape": [
+      31340,
+      160
+    ],
+    "types": 9,
+    "scores": {
+      "STAMapper": 0.7188664366639954,
+      "scANVI": 0.5912788549129605,
+      "RCTD": 0.515303717055099,
+      "Tangram": 0.2407444157981377
+    },
+    "author_label_agreement": {
+      "STAMapper": 0.9175813656668794,
+      "scANVI": 0.806509253350351,
+      "RCTD": 0.7664007657945118,
+      "Tangram": 0.34700063816209314
+    }
+  },
+  "fresh_run": {
+    "source": "Fresh Axiomics annotations; held-out author labels opened after CAMUS scores were written",
+    "camus": {
+      "camus_scores": {
+        "STAMapper": 0.6718725839317358,
+        "scANVI": 0.5949066554451435
+      },
+      "camus_prioritize": {
+        "STAMapper": 0.6718725839317358,
+        "scANVI": 0.5949066554451435
+      },
+      "agreement": {
+        "ARI_STAMapper_scanvi": 0.7799903899686669,
+        "NMI_STAMapper_scanvi": 0.7604832640051511
+      },
+      "n_preclusters": 13,
+      "clust_col": "leiden"
+    },
+    "methods": {
+      "STAMapper": {
+        "n": 31340,
+        "author_label_agreement": 0.9117102744097001,
+        "ARI": 0.8168285778160996,
+        "macro_f1": 0.6395070372987515,
+        "predicted_counts": {
+          "Inhibitory": 12642,
+          "Excitatory": 6701,
+          "Astrocytes": 3853,
+          "OD Mature": 2444,
+          "Endothelial": 1998,
+          "Ependymal": 1278,
+          "OD Immature": 1014,
+          "Mural": 804,
+          "Microglia": 578,
+          "Macrophage": 16,
+          "Fibroblast": 8,
+          "OD Newly formed": 4
+        },
+        "expression_values_preserved": true,
+        "barcodes_preserved": true
+      },
+      "scANVI": {
+        "n": 31340,
+        "author_label_agreement": 0.8564773452456924,
+        "ARI": 0.7467171654873358,
+        "macro_f1": 0.5454102345604211,
+        "predicted_counts": {
+          "Inhibitory": 11427,
+          "Excitatory": 7292,
+          "Astrocytes": 5533,
+          "OD Mature": 2387,
+          "Endothelial": 2096,
+          "OD Immature": 1013,
+          "Mural": 766,
+          "Microglia": 666,
+          "Macrophage": 84,
+          "OD Newly formed": 58,
+          "Fibroblast": 10,
+          "Ependymal": 8
+        },
+        "expression_values_preserved": true,
+        "barcodes_preserved": true
+      }
+    }
+  },
+  "replay": {
+    "status": "passed",
+    "frames": 679,
+    "messages": 316,
+    "users": 10,
+    "finalAnswers": 6,
+    "results": 38,
+    "pdf": {
+      "id": "art_1248f95f-4f54-45b2-b6b8-852b8ff63f8e",
+      "versionID": "ver_52052427-062b-4568-810e-35b1ae436e1e",
+      "version": 7,
+      "title": "完整报告 PDF（8 页，A4）：少见细胞是否被归入常见大类？——STAMapper vs scANVI 下丘脑空间注释比较",
+      "kind": "report",
+      "path": "/disk1/dabiao/axiomics-projects/08-camus-merfish/report/report.pdf",
+      "mimeType": "application/pdf",
+      "size": 1656095,
+      "sha256": "fd9fc5d3d266a91774708a54a1cf6e18f5aae9822659d4e0b0cbc7c10a497e9f"
+    },
+    "checks": [
+      "first frame hides future turns",
+      "all recorded final answers preserved",
+      "last turn has final answer",
+      "seek snapshots isolate nested tool inputs",
+      "PDF/tex/bib/h5ad/source archive saved in Results",
+      "latest PDF size matches saved version",
+      "frozen h5ad and per-cell table unchanged"
+    ],
+    "note": "Earlier interrupted/steered turns preserved exactly; no invented final answers."
+  },
+  "report": {
+    "pages": 8,
+    "overfull": 0,
+    "undefined_citations": false,
+    "standalone_source_compile": "passed",
+    "source_archive": "report/report_source.tar.gz",
+    "format": "A4",
+    "version": 7,
+    "typography": "Question-led title, consistent section hierarchy and teal emphasis",
+    "figures": "Three redrawn figures; PDF text/axes retained, scatter points rasterized"
+  }
+}

@@ -1,0 +1,7 @@
+# Provision in an independent runtime with torch 2.7.1+cu128.
+scCAMUS==1.0.1
+scglue==0.4.0
+snapatac2==2.6.4
+autogluon.tabular==1.1.0
+# scJoint source: cbbfa5d7e7faa35f3d725bd5257507a01a22810f
+# Complete resolved inventory: backend/cli/src/science/capability/locks/camus-requirements.txt

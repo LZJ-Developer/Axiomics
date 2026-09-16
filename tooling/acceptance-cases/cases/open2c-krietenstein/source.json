@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "case_id": "open2c-krietenstein",
+  "title": "干细胞与成纤维细胞三维基因组边界探索",
+  "genome": "hg38",
+  "source": {
+    "name": "Open2C bundled example data from Krietenstein et al.",
+    "description": "Public multi-resolution Micro-C contact maps for chromosomes 2 and 17 from H1-hESC and HFF cells.",
+    "reference": "https://github.com/open2c/cooltools",
+    "files": [
+      {
+        "name": "test.mcool",
+        "sample": "HFF",
+        "url": "https://osf.io/3h9js/download",
+        "md5": "e4a0fc25c8dc3d38e9065fd74c565dd1"
+      },
+      {
+        "name": "test_hESC.mcool",
+        "sample": "hESC",
+        "url": "https://osf.io/3kdyj/download",
+        "md5": "ac0e636605505fb76fac25fa08784d5b"
+      }
+    ]
+  },
+  "analysis": {
+    "tool": "Open2C pairtools + cooler + cooltools",
+    "capability": "open2c",
+    "question": "从胚胎干细胞到成纤维细胞后，染色体接触距离衰减、区室和局部边界是否发生可重复的变化？",
+    "blind_policy": "The Agent receives sample identities and file provenance but no paper conclusions, expected loci, boundary counts, or figure targets."
+  }
+}

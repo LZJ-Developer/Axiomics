@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 2,
+  "id": "open2c-krietenstein",
+  "tool": {
+    "name": "Open2C",
+    "version": "pairtools 1.1.3 / cooler 0.10.4 / cooltools 0.7.1",
+    "capability": "open2c",
+    "lockDigest": "10115fc31cc3c3ba7210c156295474906443cbf663e0c7a0139676b2c6314854"
+  },
+  "dataset": {
+    "name": "Krietenstein H1-hESC and HFF Micro-C tutorial subset",
+    "assay": "Micro-C chromosome conformation capture",
+    "organism": "Homo sapiens",
+    "genome": "hg38",
+    "chromosomes": ["chr2", "chr17"],
+    "resolutions": [1000, 10000, 100000, 1000000],
+    "samples": [
+      {
+        "id": "HFF",
+        "source": "human foreskin fibroblasts",
+        "file": "data/test.mcool",
+        "md5": "e4a0fc25c8dc3d38e9065fd74c565dd1"
+      },
+      {
+        "id": "hESC",
+        "source": "H1 human embryonic stem cells",
+        "file": "data/test_hESC.mcool",
+        "md5": "ac0e636605505fb76fac25fa08784d5b"
+      }
+    ]
+  },
+  "question": "人胚胎干细胞与成纤维细胞的染色体空间结构有何共同特征和状态相关变化？",
+  "exploration": "候选差异边界能否在不同尺度和两条染色体上稳定出现，而不是覆盖度、平衡权重或窗口选择造成的假象？"
+}

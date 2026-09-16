@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "id": "open2c-krietenstein",
+  "paper": {
+    "title": "Ultrastructural Details of Mammalian Chromosome Architecture",
+    "authors": "Krietenstein et al.",
+    "journal": "Molecular Cell",
+    "year": 2020,
+    "doi": "10.1016/j.molcel.2020.03.003",
+    "baseline": "Micro-C in human ESCs and fibroblasts recovers compartments and topological domains while resolving fine boundaries, loops, dots and extrusion stripes with greater dynamic range than Hi-C.",
+    "figures": ["Figure 1A-F", "Figure 4A-C"]
+  },
+  "checks": {
+    "inputMd5": [
+      "e4a0fc25c8dc3d38e9065fd74c565dd1",
+      "ac0e636605505fb76fac25fa08784d5b"
+    ],
+    "minimumEvidence": [
+      "contact-map QC includes resolution, coverage, sparsity and balancing status",
+      "distance-decay behavior is compared between cell states",
+      "compartment or insulation evidence is evaluated on both chromosomes",
+      "candidate state differences are checked across scale or window choices",
+      "strong structural claims include an alternative technical explanation and validation plan"
+    ],
+    "reportSections": ["Title", "Abstract", "Introduction", "Results", "Discussion", "Methods", "References"]
+  },
+  "requiredResults": [
+    "contact-map overview",
+    "distance-decay QC figure and table",
+    "insulation or boundary comparison",
+    "reusable cooler-derived tables or objects",
+    "provenance manifest",
+    "TeX source, BibTeX and paper-style PDF"
+  ],
+  "comparisonOutcomes": ["consistent", "different", "new-candidate", "indeterminate"]
+}

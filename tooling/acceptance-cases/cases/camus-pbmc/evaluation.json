@@ -1,0 +1,114 @@
+{
+  "id": "camus-pbmc",
+  "status": "archived-not-published",
+  "project": "/disk1/dabiao/axiomics-projects/07-camus",
+  "projectID": "prj_7a41d7b1b3ba42b898fdb4e7068001ec",
+  "question": "同一批免疫细胞，为什么不同方法给出的名字不一样？哪些可以相信，哪些应该暂缓判断？",
+  "input": {
+    "reference_cells": 4815,
+    "query_cells": 4816,
+    "overlap": 0,
+    "split_seed": 20260913,
+    "reference_types": 19,
+    "source": "CAMUS PBMC.zip and official 10x pbmc_granulocyte_sorted_10k cell-arc 1.0.0",
+    "identity": "All 9,631 author RNA barcodes and all 29,095 shared-gene counts match official data exactly"
+  },
+  "methods": [
+    "GLUE",
+    "scJoint",
+    "CAMUS"
+  ],
+  "invariants": [
+    "Run annotation methods from RNA reference and ATAC measurements, not precomputed predictions",
+    "Never load query labels or query-cell RNA in annotation or method ranking",
+    "Freeze ranking before evaluating with held-out author annotations",
+    "CAMUS scores are not accuracy or individual-cell probabilities",
+    "Use measured ATAC evidence and distinguish it from gene activity or predicted RNA",
+    "Record real disagreements; allow zero improvement over baseline",
+    "Preserve all original session turns and execution records",
+    "Deliver source data objects, figures, uncertainty list, tex, bib and PDF in Results"
+  ],
+  "metrics": [
+    "accuracy",
+    "macro_f1",
+    "per_type_recall",
+    "method_disagreement",
+    "review_fraction",
+    "error_rate_among_accepted_labels"
+  ],
+  "limitations": [
+    "Same-donor cell split is not cross-donor validation",
+    "Author labels are evaluation references, not independent experimental ground truth",
+    "Reference split differs from paper and can change performance",
+    "Rare types with few reference cells require separate reporting"
+  ],
+  "independent": {
+    "camus": {
+      "GLUE": 0.8246261927012494,
+      "scJoint": 0.7972103609435506
+    },
+    "accuracy": {
+      "GLUE": 0.9140365448504983,
+      "scJoint": 0.7967192691029901
+    },
+    "disagreement": 0.19019933554817275,
+    "note": "Independent scout only; not formal Agent results"
+  },
+  "sessionID": "ses_f655d0740ffeAzBj1V0pSyFaW6",
+  "excluded_attempts": [
+    "ses_f656057e4ffevNT6elJolCNkhW"
+  ],
+  "formal": {
+    "agreement": {
+      "cells": 3937,
+      "fraction": 0.8174833887043189,
+      "accuracy": 0.9123698247396494
+    },
+    "disagreement": {
+      "cells": 879,
+      "fraction": 0.18251661129568106
+    },
+    "camus": {
+      "GLUE": 0.7975203246535837,
+      "scJoint": 0.7982247452085224
+    },
+    "note": "Post-hoc comparison with author annotations, never supplied to the formal Agent. Not experimental ground truth.",
+    "methods": {
+      "GLUE": {
+        "accuracy": 0.8610880398671097,
+        "macro_f1": 0.663629182763756
+      },
+      "scJoint": {
+        "accuracy": 0.7940199335548173,
+        "macro_f1": 0.5002437744993545
+      }
+    }
+  },
+  "publication": {
+    "approved_focus": "CAMUS method selection effectiveness",
+    "hold": true,
+    "reason": "Explain score differences before deciding showcase; current report may finish but is not published as CAMUS success."
+  },
+  "delivery_review": {
+    "completed_turns": 3,
+    "replay_frames": 587,
+    "saved_artifact_calls": 25,
+    "pdf_pages": 10,
+    "browser_final_pdf_canvas_pages": 10,
+    "replay_invariants": "passed",
+    "publication_ready": false,
+    "issues": [
+      "Current CAMUS near-tie does not support reliable method-selection benefit",
+      "Report uses confirmed/independent confirmation for same-reference heuristic support",
+      "query_analysis.h5ad is 4816x1, not the original count matrix described in final answer; obs index and CSV cell column use row numbers",
+      "PDF has overfull boxes requiring layout review"
+    ],
+    "posthoc_A_tier": {
+      "cells": 1998,
+      "author_label_agreement": 0.9519519519519519,
+      "note": "Selected subset with reduced coverage; neither independent truth nor CAMUS contribution."
+    },
+    "recommendation": "Retain as internal audit; validate a standard workflow on the same dataset before selecting a new formal CAMUS demonstration."
+  },
+  "superseded_by": "camus-merfish"
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "id": "mcmicro-luad",
+  "tool": {
+    "name": "MCMICRO",
+    "version": "nf-core/mcmicro 2.0.0 / Nextflow 25.04.8 / mccellpose 1.0.3",
+    "capability": "mcmicro",
+    "lockDigest": "7032cbd6c3aadd3871d2cce6406ac541e1c02f274926bfb6d84548b5623c63e7"
+  },
+  "dataset": {
+    "name": "MCMICRO exemplar-001 lung adenocarcinoma CyCIF",
+    "assay": "12-channel cyclic immunofluorescence imaging",
+    "organism": "Homo sapiens",
+    "tissue": "lung adenocarcinoma",
+    "file": "data/exemplar-001/exemplar-001",
+    "archiveMd5": "9823cbf6b375bfca922b3cbc8f4557cf",
+    "cycles": 3,
+    "tilesPerCycle": 6,
+    "markers": ["DNA", "ELANE", "CD57", "CD45", "CD11B", "SMA", "CD16", "ECAD", "FOXP3", "NCAM"]
+  },
+  "question": "肺腺癌组织中的上皮、免疫与基质成分如何空间组织，免疫细胞是否在肿瘤边界形成可解释的分区？",
+  "exploration": "候选免疫富集或排斥关系能否在分割质控、阈值扰动和空间置换检验后保持，而不是通道串色、局部密度或单一阈值造成的假象？"
+}

@@ -1,0 +1,25 @@
+{
+  "patients": 43,
+  "regulons": 260,
+  "exact_label_allocations": 19448,
+  "exact_permutation_significant": 0,
+  "min_exact_q": 0.8155080213903744,
+  "mann_whitney_significant": 0,
+  "candidates": {
+    "MSX2": {
+      "mean_difference_Bone_minus_Brain": 0.013271101565162695,
+      "exact_permutation_q": 0.8155080213903744,
+      "mann_whitney_q": 0.40106951871657753
+    },
+    "HOXA1": {
+      "mean_difference_Bone_minus_Brain": 0.01066725315268923,
+      "exact_permutation_q": 0.8941112041749886,
+      "mann_whitney_q": 0.8782394076511724
+    },
+    "ELF4": {
+      "mean_difference_Bone_minus_Brain": 0.0062169678096235855,
+      "exact_permutation_q": 0.8155080213903744,
+      "mann_whitney_q": 0.40106951871657753
+    }
+  }
+}

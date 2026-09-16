@@ -1,0 +1,13 @@
+,Astrocytes,Endothelial,Ependymal,Excitatory,Fibroblast,Inhibitory,Macrophage,Microglia,Mural,OD Immature,OD Mature,OD Newly formed
+Astrocytes,3728,24,2,10,0,17,0,1,23,14,5,1
+Endothelial,48,1919,1,6,9,10,2,1,463,2,4,1
+Ependymal,1181,9,3,10,0,18,2,1,25,5,3,8
+Excitatory,139,11,0,6156,0,354,4,12,6,16,14,2
+Fibroblast,0,0,0,0,0,0,0,0,0,0,0,0
+Inhibitory,339,47,2,1070,1,10996,65,52,47,25,6,1
+Macrophage,0,0,0,0,0,0,0,0,0,0,0,0
+Microglia,38,49,0,6,0,4,2,584,2,1,16,1
+Mural,4,4,0,2,0,1,0,1,185,0,1,0
+OD Immature,26,11,0,15,0,9,8,9,8,947,14,14
+OD Mature,30,22,0,17,0,18,1,5,7,3,2324,30
+OD Newly formed,0,0,0,0,0,0,0,0,0,0,0,0

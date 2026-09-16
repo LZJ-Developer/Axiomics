@@ -1,0 +1,9 @@
+{
+  "rule": "largest coordinate block by cell count; gaps >500 source-coordinate units",
+  "region": [
+    0,
+    2
+  ],
+  "cells": 5666,
+  "all_cells": 31340
+}

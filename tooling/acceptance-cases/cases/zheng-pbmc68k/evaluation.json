@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "id": "zheng-pbmc68k",
+  "tool": {
+    "name": "Scanpy",
+    "version": "1.11.4"
+  },
+  "paper": {
+    "title": "Massively parallel digital transcriptional profiling of single cells",
+    "authors": "Zheng et al.",
+    "journal": "Nature Communications",
+    "year": 2017,
+    "doi": "10.1038/ncomms14049",
+    "pmcid": "PMC5241818",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5241818/",
+    "baseline": "The 68k fresh PBMC data resolve ten transcriptional clusters covering the major expected PBMC subpopulations, supported by canonical marker expression.",
+    "figures": [
+      {
+        "id": "Figure 3a",
+        "evidence": "per-cell detected gene and UMI distributions"
+      },
+      {
+        "id": "Figure 3b-c",
+        "evidence": "cell embedding, clusters, marker heatmap, and inferred identities"
+      },
+      {
+        "id": "Figure 3d-i",
+        "evidence": "CD3D, CD8A, NKG7, FCER1A, FCGR3A/CD16, and S100A8 expression on the embedding"
+      }
+    ]
+  },
+  "dataset": {
+    "name": "Fresh 68k PBMCs from a healthy donor",
+    "relationship": "a deterministic 60,000-cell discovery split from the public dataset analyzed in Zheng et al. Figure 3; 8,579 cells are held out from the Agent for post-freeze evaluation",
+    "url": "https://cf.10xgenomics.com/samples/cell-exp/1.1.0/fresh_68k_pbmc_donor_a/fresh_68k_pbmc_donor_a_filtered_gene_bc_matrices.tar.gz",
+    "sha256": "3f35f37ff344bc9b32f97cd003ac986ebb9b5d7f31006c53dff4cb38da267931",
+    "discoverySha256": "29af59e4fdc85109c23fc664020b096ae924d0f98bc3fe9e6f0497a69a3bd6d8",
+    "holdoutSha256": "773dc70abcca81ffc38477b7aa67eaec1d1cf136c4c5409860a0281e879deaad",
+    "splitSeed": 20260906
+  },
+  "question": "健康供者 PBMC 中有哪些主要免疫亚群，它们由哪些 marker 支持？",
+  "exploration": {
+    "question": "主要免疫亚群内部是否存在跨聚类分辨率与抽样仍稳定的活化梯度或低丰度亚群？",
+    "minimumEvidence": [
+      "the signal is stable across at least two clustering resolutions or bootstrap subsamples",
+      "the signal is supported by a coherent multi-gene program rather than one marker",
+      "technical covariates do not explain the leading association"
+    ],
+    "wetLab": "在独立健康供者 PBMC 队列中用预注册 marker 面板进行流式分选，并对候选群体进行靶向表达或单细胞转录组验证。"
+  },
+  "requiredResults": [
+    "pbmc68k_annotated.h5ad",
+    "pbmc68k_atlas.png",
+    "pbmc68k_marker_dotplot.png",
+    "pbmc68k_marker_panels.png",
+    "pbmc68k_qc.png",
+    "pbmc68k_cluster_summary.csv",
+    "pbmc68k_literature_comparison.csv",
+    "pbmc68k_manifest.json",
+    "pbmc68k_report.pdf"
+  ],
+  "checks": {
+    "cellsAfterQc": {
+      "min": 50000,
+      "max": 70000
+    },
+    "clusters": {
+      "min": 8
+    },
+    "markerGroups": ["CD3D", "CD8A", "MS4A1", "NKG7", "FCER1A", "FCGR3A", "S100A8"],
+    "stability": {
+      "adjustedRandIndexMin": 0.7
+    },
+    "reportPages": {
+      "min": 8
+    }
+  },
+  "comparisonOutcomes": ["consistent", "different", "new-candidate", "indeterminate"]
+}

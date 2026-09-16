@@ -1,0 +1,18 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "tasks": {
+    "typecheck": {},
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "@axiomics/axiomics#test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@axiomics/workspace#test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    }
+  }
+}

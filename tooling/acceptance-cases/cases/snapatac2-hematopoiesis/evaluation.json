@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 2,
+  "id": "snapatac2-hematopoiesis",
+  "paper": {
+    "title": "ArchR is a scalable software package for integrative single-cell chromatin accessibility analysis",
+    "authors": "Granja et al.",
+    "journal": "Nature Genetics",
+    "year": 2021,
+    "doi": "10.1038/s41588-021-00790-6",
+    "baseline": "The tutorial subset spans hematopoietic progenitors and differentiated blood cells; accessibility, gene activity, motif evidence and trajectories resolve B-cell and myeloid differentiation programs.",
+    "figures": ["Figure 4d-h", "Extended Data Figure 10c-e"]
+  },
+  "checks": {
+    "inputMd5": [
+      "77502e1f195e21d2f7a4e8ac9c96e65e",
+      "618613b486e4f8c0101f4c05c69723b0",
+      "a8d5ae747841055ef230ba496bcfe937"
+    ],
+    "paperTutorialCellsAfterQc": 10251,
+    "minimumEvidence": [
+      "QC includes fragment depth, TSS enrichment and doublet handling",
+      "embedding is checked against sample source and technical covariates",
+      "candidate biological labels use gene activity plus peak or motif evidence",
+      "strong regulatory claims include an explicit alternative explanation and validation plan"
+    ],
+    "reportSections": ["Title", "Abstract", "Introduction", "Results", "Discussion", "Methods", "References"]
+  },
+  "requiredResults": [
+    "QC figure and table",
+    "cell embedding with sample and biological interpretation",
+    "peak or accessibility marker table",
+    "gene activity evidence",
+    "motif or regulatory evidence",
+    "backed H5AD or AnnDataSet",
+    "TeX source, BibTeX and paper-style PDF"
+  ],
+  "comparisonOutcomes": ["consistent", "different", "new-candidate", "indeterminate"]
+}

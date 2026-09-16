@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "case_id": "snapatac2-hematopoiesis",
+  "title": "造血系统单细胞染色质可及性与谱系调控探索",
+  "genome": "hg19",
+  "source": {
+    "name": "ArchR Hematopoiesis tutorial dataset",
+    "description": "Public scATAC-seq fragments from peripheral blood, bone marrow, and CD34+ sorted bone marrow.",
+    "reference": "https://www.archrproject.com/articles/Articles/tutorial.html",
+    "files": [
+      {
+        "name": "scATAC_BMMC_R1.fragments.tsv.gz",
+        "url": "https://jeffgranja.s3.amazonaws.com/ArchR/TestData/HemeFragments/scATAC_BMMC_R1.fragments.tsv.gz",
+        "md5": "77502e1f195e21d2f7a4e8ac9c96e65e"
+      },
+      {
+        "name": "scATAC_CD34_BMMC_R1.fragments.tsv.gz",
+        "url": "https://jeffgranja.s3.amazonaws.com/ArchR/TestData/HemeFragments/scATAC_CD34_BMMC_R1.fragments.tsv.gz",
+        "md5": "618613b486e4f8c0101f4c05c69723b0"
+      },
+      {
+        "name": "scATAC_PBMC_R1.fragments.tsv.gz",
+        "url": "https://jeffgranja.s3.amazonaws.com/ArchR/TestData/HemeFragments/scATAC_PBMC_R1.fragments.tsv.gz",
+        "md5": "a8d5ae747841055ef230ba496bcfe937"
+      }
+    ]
+  },
+  "analysis": {
+    "tool": "SnapATAC2",
+    "version": "2.10.0",
+    "capability": "snapatac2",
+    "question": "这三批骨髓、CD34 富集骨髓和外周血样本中，细胞的染色质开放状态如何组织，哪些调控信号值得后续验证？",
+    "blind_policy": "The Agent receives dataset metadata but no paper conclusions, target clusters, marker answers, or figure expectations."
+  }
+}

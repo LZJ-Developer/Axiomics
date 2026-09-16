@@ -1,0 +1,20 @@
+diff --git a/STAMO/utils.py b/STAMO/utils.py
+index a9bbad9..38f0035 100644
+--- a/STAMO/utils.py
++++ b/STAMO/utils.py
+@@ -1290,11 +1290,11 @@ def cross_predict(input_adata, ref_adata, model, guidance, OT_pair=("H3K27ac", "
+     """
+ 
+     knn_ind = nn_approx(input_adata.obsm["X_STAMO"], ref_adata.obsm["X_STAMO"], knn=15)
+-    target_pool = ref_adata.X.toarray()
+-    p_q = target_pool[knn_ind.ravel()].reshape(*(knn_ind.shape), ref_adata.X.shape[1])  # p_q.shape = (9548, 10, 19588)
+-    imps = np.mean(p_q, axis=1)
++    # Only the mean neighbor library size is needed, not a spots x neighbors x genes tensor.
++    libraries = np.asarray(ref_adata.X.sum(axis=1)).ravel()
++    libsize = libraries[knn_ind].mean(axis=1)
+ 
+-    predict_X = model.cross_predict(OT_pair, input_adata, guidance, target_libsize=imps.sum(axis=1))
++    predict_X = model.cross_predict(OT_pair, input_adata, guidance, target_libsize=libsize)
+ 
+     predict_adata = sc.AnnData(predict_X)
+     predict_adata.X = sp.csr_matrix(predict_adata.X)

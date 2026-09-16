@@ -1,0 +1,22 @@
+diff --git a/STAMapper/utils/preprocess.py b/STAMapper/utils/preprocess.py
+index 2e66370..643f82e 100644
+--- a/STAMapper/utils/preprocess.py
++++ b/STAMapper/utils/preprocess.py
+@@ -1542,7 +1542,7 @@ def normalize_col(X, scale_factor=1., by='sum'):
+         raise ValueError(f'`by` should be either "sum" or "max", got {by}')
+     if hasattr(norms, 'A'):
+         norms = norms.A.flatten()
+-    is_zero = -_eps <= norms <= _eps
++    is_zero = (-_eps <= norms) & (norms <= _eps)
+     if scale_factor is None:
+         scale_factor = np.median(norms[~ is_zero])
+     norms /= scale_factor
+@@ -1585,7 +1585,7 @@ def normalize_row(X, scale_factor=1, by='sum'):
+         raise ValueError(f'`by` should be either "sum" or "max", got {by}')
+     if hasattr(norms, 'A'):
+         norms = norms.A.flatten()
+-    is_zero = -_eps <= norms <= _eps
++    is_zero = (-_eps <= norms) & (norms <= _eps)
+     if scale_factor is None:
+         scale_factor = np.median(norms[~ is_zero])
+     norms /= scale_factor

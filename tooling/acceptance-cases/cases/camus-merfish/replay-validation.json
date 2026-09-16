@@ -1,0 +1,29 @@
+{
+  "status": "passed",
+  "frames": 679,
+  "messages": 316,
+  "users": 10,
+  "finalAnswers": 6,
+  "results": 38,
+  "pdf": {
+    "id": "art_1248f95f-4f54-45b2-b6b8-852b8ff63f8e",
+    "versionID": "ver_52052427-062b-4568-810e-35b1ae436e1e",
+    "version": 7,
+    "title": "完整报告 PDF（8 页，A4）：少见细胞是否被归入常见大类？——STAMapper vs scANVI 下丘脑空间注释比较",
+    "kind": "report",
+    "path": "/disk1/dabiao/axiomics-projects/08-camus-merfish/report/report.pdf",
+    "mimeType": "application/pdf",
+    "size": 1656095,
+    "sha256": "fd9fc5d3d266a91774708a54a1cf6e18f5aae9822659d4e0b0cbc7c10a497e9f"
+  },
+  "checks": [
+    "first frame hides future turns",
+    "all recorded final answers preserved",
+    "last turn has final answer",
+    "seek snapshots isolate nested tool inputs",
+    "PDF/tex/bib/h5ad/source archive saved in Results",
+    "latest PDF size matches saved version",
+    "frozen h5ad and per-cell table unchanged"
+  ],
+  "note": "Earlier interrupted/steered turns preserved exactly; no invented final answers."
+}

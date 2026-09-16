@@ -1,0 +1,13 @@
+diff --git a/STAMapper/utils/analyze.py b/STAMapper/utils/analyze.py
+index 54ee0ca..5e82b6f 100644
+--- a/STAMapper/utils/analyze.py
++++ b/STAMapper/utils/analyze.py
+@@ -1741,7 +1741,7 @@ def wrapper_contingency_mat(y_true, y_pred,
+     # Currently, coo_matrix is faster than histogram2d for simple cases
+     mat = sparse.coo_matrix(
+         (np.ones(class_idx.shape[0]), (class_idx, cluster_idx)),
+-        shape=(n_classes, n_clusters), dtype=np.int
++        shape=(n_classes, n_clusters), dtype=int
+     )
+     if assparse:
+         mat = mat.tocsr()

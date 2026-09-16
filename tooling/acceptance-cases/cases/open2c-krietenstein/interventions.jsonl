@@ -1,0 +1,4 @@
+{"turn":1,"kind":"initial-question","observation":"仅提供 hESC/HFF 样本身份和 Micro-C 数据，不提供论文结果。","decision":"先检查数据可靠性、接触图与距离衰减，由 Agent 判断最值得追的现象。"}
+{"turn":2,"kind":"scientific-challenge","observation":"第一版结果显示 hESC 在 2—10 Mb 中程接触低于 HFF，但 HFF 总接触数更高。","decision":"要求先排除测序深度造成的比例偏差，并核对差异方向，避免把归一化或解释错误写成生物学结论。"}
+{"turn":3,"kind":"result-driven-followup","observation":"深度自锚定和 balanced 结果支持中程差异，但整体与局部结构关系仍不清楚。","decision":"要求补做 A/B compartment、边界与 insulation，对差异所在结构尺度作出可证伪的定位。"}
+{"turn":4,"kind":"delivery-followup","observation":"粗粒度 compartment 与边界总体保守，中程差异定位到兆碱基级折叠。","decision":"在不扩大因果解释的前提下，交付含图表、方法、局限和验证路线的 LaTeX 论文式 PDF。"}

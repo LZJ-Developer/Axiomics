@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "id": "pbmc-donor-a",
+  "tool": {
+    "name": "Scanpy",
+    "version": "1.11.4",
+    "environment": "project-local .venv",
+    "lock": "requirements.lock"
+  },
+  "dataset": {
+    "name": "Healthy donor A",
+    "assay": "3-prime single-cell RNA sequencing",
+    "organism": "Homo sapiens",
+    "tissue": "peripheral blood mononuclear cells",
+    "reference": "hg19-compatible gene symbols",
+    "cells": 60000,
+    "genes": 32738,
+    "file": "data/counts.h5ad",
+    "sha256": "29af59e4fdc85109c23fc664020b096ae924d0f98bc3fe9e6f0497a69a3bd6d8"
+  },
+  "question": "健康供者 PBMC 中存在哪些主要细胞群，它们的转录特征和相对组成是什么？",
+  "exploration": "主要细胞群内部是否存在值得后续实验检查的细分状态或连续变化？",
+  "requiredResults": [
+    "pbmc_discovery_annotated.h5ad",
+    "pbmc_discovery_atlas.png",
+    "pbmc_discovery_marker_dotplot.png",
+    "pbmc_discovery_qc.png",
+    "pbmc_discovery_cluster_summary.csv",
+    "pbmc_discovery_findings.md",
+    "pbmc_discovery_manifest.json",
+    "pbmc_discovery_report.pdf"
+  ]
+}

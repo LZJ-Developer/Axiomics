@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 2,
+  "id": "snapatac2-hematopoiesis",
+  "tool": {
+    "name": "SnapATAC2",
+    "version": "2.10.0",
+    "capability": "snapatac2",
+    "lockDigest": "39a366eb09f1459daccb20c2f05af8045f58be27b5e7a8357cec598765be9d1a"
+  },
+  "dataset": {
+    "name": "Hematopoiesis tutorial scATAC-seq fragments",
+    "assay": "single-cell ATAC sequencing",
+    "organism": "Homo sapiens",
+    "genome": "hg19",
+    "samples": [
+      {
+        "id": "BMMC",
+        "source": "bone marrow mononuclear cells",
+        "rawBarcodes": 5000,
+        "file": "input/scATAC_BMMC_R1.fragments.tsv.gz",
+        "md5": "77502e1f195e21d2f7a4e8ac9c96e65e"
+      },
+      {
+        "id": "CD34_BMMC",
+        "source": "CD34+ enriched bone marrow",
+        "rawBarcodes": 3723,
+        "file": "input/scATAC_CD34_BMMC_R1.fragments.tsv.gz",
+        "md5": "618613b486e4f8c0101f4c05c69723b0"
+      },
+      {
+        "id": "PBMC",
+        "source": "peripheral blood mononuclear cells",
+        "rawBarcodes": 3000,
+        "file": "input/scATAC_PBMC_R1.fragments.tsv.gz",
+        "md5": "a8d5ae747841055ef230ba496bcfe937"
+      }
+    ]
+  },
+  "question": "三类造血来源样本中的染色质开放状态如何组织，哪些调控信号值得后续验证？",
+  "exploration": "候选谱系调控信号是否由多种可及性证据共同支持，并能排除测序深度和样本来源的主导影响？"
+}

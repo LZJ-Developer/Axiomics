@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 2,
+  "theme": "沿经典论文证据链，解析从细胞组成、组织空间、染色质调控、三维基因组到蛋白表型的五类生命信息",
+  "cases": [
+    {
+      "id": "zheng-pbmc68k",
+      "order": 1,
+      "omics": "单细胞转录组",
+      "tool": "Scanpy",
+      "question": "健康供者 PBMC 中有哪些主要免疫亚群，它们由哪些 marker 支持？",
+      "claim": "主要淋巴与髓系亚群可被独立聚类识别，并由谱系 marker 的一致表达支持。",
+      "dataset": "Zheng et al. fresh 68k PBMCs",
+      "paper": "10.1038/ncomms14049",
+      "figures": [
+        "Figure 3a",
+        "Figure 3b-c",
+        "Figure 3d-i"
+      ],
+      "project": "/disk1/dabiao/axiomics-projects/01-pbmc",
+      "status": "scouting"
+    },
+    {
+      "id": "maynard-dlpfc",
+      "order": 2,
+      "omics": "空间转录组",
+      "tool": "Squidpy + SpatialData",
+      "question": "DLPFC 灰质—白质交界只是两端细胞组成的混合，还是存在界面富集程序？",
+      "claim": "灰质—白质之间呈连续梯度，同时存在区域性、幅度有限的界面富集分子程序。",
+      "dataset": "Maynard et al. DLPFC, section 151673",
+      "paper": "10.1038/s41593-020-00787-0",
+      "figures": [
+        "Figure 1",
+        "Figure 2",
+        "Figure 3",
+        "Extended Data Figure 6"
+      ],
+      "project": "/disk1/dabiao/axiomics-projects/02-dlpfc",
+      "status": "analysis-complete"
+    },
+    {
+      "id": "snapatac2-hematopoiesis",
+      "order": 3,
+      "omics": "单细胞表观组",
+      "tool": "SnapATAC2",
+      "question": "CD34 富集骨髓形成的集中群是真实谱系差异，还是测序深度与质控造成的？",
+      "claim": "CD34 优势群不由测序深度或质控差异解释；GATA2 启动子及邻近区域的连贯开放提示可验证的造血干/祖细胞调控状态。",
+      "dataset": "ArchR hematopoiesis tutorial BMMC/CD34_BMMC/PBMC, 10,886 post-QC cells",
+      "paper": "10.1038/s41588-021-00790-6",
+      "figures": [
+        "Figure 4d-h",
+        "Extended Data Figure 10c-e"
+      ],
+      "project": "/disk1/dabiao/axiomics-projects/03-scatac",
+      "status": "analysis-complete"
+    },
+    {
+      "id": "open2c-krietenstein",
+      "order": 4,
+      "omics": "三维基因组",
+      "tool": "Open2C pairtools + cooler + cooltools",
+      "question": "人胚胎干细胞与成纤维细胞的染色体空间结构有何共同特征和状态相关变化？",
+      "claim": "hESC 在 chr2 与 chr17 的 2—10 Mb 中程接触均低于 HFF；深度自锚定与 balanced 矩阵复核后差异仍存在，而 A/B 大格局和边界数量总体保守，指向兆碱基级亚区室折叠差异。",
+      "dataset": "Krietenstein et al. H1-hESC and HFF Micro-C, chromosomes 2 and 17",
+      "paper": "10.1016/j.molcel.2020.03.003",
+      "figures": [
+        "Figure 1a-f",
+        "Figure 4a-c"
+      ],
+      "project": "/disk1/dabiao/axiomics-projects/04-hic",
+      "status": "analysis-complete"
+    },
+    {
+      "id": "mcmicro-luad",
+      "order": 5,
+      "omics": "空间蛋白组",
+      "tool": "MCMICRO + Scanpy/Squidpy",
+      "question": "肺腺癌组织中的上皮、免疫与基质成分如何空间组织？",
+      "claim": "15,509 个细胞的原图叠加、阈值与半径扰动、随机基线共同支持该肺腺癌切片中的肿瘤邻近免疫排斥。",
+      "dataset": "MCMICRO exemplar-001 lung adenocarcinoma CyCIF, 3 cycles and 12 channels",
+      "paper": "10.1038/s41592-021-01308-y",
+      "figures": [
+        "Figure 2c",
+        "Figure 2d"
+      ],
+      "project": "/disk1/dabiao/axiomics-projects/05-spatial-proteomics",
+      "status": "analysis-complete"
+    },
+    {
+      "id": "stamo-p22",
+      "order": 6,
+      "omics": "空间多组学（RNA + H3K27ac）",
+      "tool": "STAMO",
+      "question": "小鼠脑切片不同区域的表达差异能否得到 H3K27ac 空间证据支持？",
+      "claim": "两层共同支持白质/髓鞘区域，深度校正后相关性仍为 0.415；表达程序校正提示组成影响，尚不能据此推断区域内共调控。",
+      "dataset": "P22 mouse brain spatial CUT&Tag–RNA, 9,370 co-measured pixels",
+      "paper": "10.1038/s41586-023-05795-1",
+      "figures": [
+        "Figure 3b",
+        "Supplementary Figure 6",
+        "Extended Data Figure 7"
+      ],
+      "project": "/disk1/dabiao/axiomics-projects/06-stamo",
+      "status": "analysis-complete",
+      "sessionID": "ses_f65f4d24dffegXvAXYEbiD4tee"
+    },
+    {
+      "id": "camus-merfish",
+      "order": 7,
+      "omics": "空间转录组方法选择",
+      "tool": "CAMUS + STAMapper + scANVI",
+      "question": "不同方法给同一个脑细胞不同的名字，怎样避免把少见细胞归进常见的大类？",
+      "claim": "CAMUS 无标签排序优先 STAMapper；事后与作者注释核对，总体一致率 91.17% 对 85.65%，室管膜细胞召回 96.92% 对 0.24%。",
+      "dataset": "Moffitt mouse hypothalamus MERFISH, Animal 8; 31,340 cells and 160 genes",
+      "paper": "10.1101/gr.280821.125",
+      "figures": [
+        "Figure 4B"
+      ],
+      "status": "published",
+      "project": "/disk1/dabiao/axiomics-projects/08-camus-merfish",
+      "projectCreated": true,
+      "projectID": "prj_d3e4e4c028744b129068a94c5ecbdaa3",
+      "sessionID": "ses_f6488517dffepZvDqQu5Zjfb7j",
+      "frames": 679
+    }
+  ]
+}

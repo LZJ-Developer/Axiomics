@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "id": "mcmicro-luad",
+  "paper": {
+    "title": "MCMICRO: a scalable, modular image-processing pipeline for multiplexed tissue imaging",
+    "authors": "Schapiro et al.",
+    "journal": "Nature Methods",
+    "year": 2022,
+    "doi": "10.1038/s41592-021-01308-y",
+    "baseline": "MCMICRO reproducibly converts multiplexed tissue images into registered mosaics, segmentation masks and spatial feature tables suitable for downstream phenotyping and spatial analysis.",
+    "figures": ["Figure 1", "Figure 2"]
+  },
+  "checks": {
+    "inputMd5": ["9823cbf6b375bfca922b3cbc8f4557cf"],
+    "minimumEvidence": [
+      "registration and channel identity are checked before phenotyping",
+      "segmentation quality is quantified and visually inspected",
+      "cell phenotypes are supported by marker combinations rather than one threshold",
+      "spatial enrichment is compared with a density-preserving or permutation baseline",
+      "single-specimen findings are reported as candidates with a validation plan"
+    ],
+    "reportSections": ["Title", "Abstract", "Introduction", "Results", "Discussion", "Methods", "References"]
+  },
+  "requiredResults": [
+    "registered multi-channel image overview",
+    "segmentation QC figure and table",
+    "cell phenotype and spatial-neighborhood figures",
+    "reusable spatial feature table or AnnData object",
+    "provenance manifest",
+    "TeX source, BibTeX and paper-style PDF"
+  ],
+  "comparisonOutcomes": ["consistent", "different", "new-candidate", "indeterminate"]
+}

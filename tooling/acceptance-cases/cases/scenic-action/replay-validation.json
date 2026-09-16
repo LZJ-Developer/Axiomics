@@ -1,0 +1,29 @@
+{
+  "status": "passed",
+  "projectID": "prj_43d0f54efd544a10b12037ba5ad35891",
+  "frames": 313,
+  "messages": 141,
+  "users": 4,
+  "finalAnswers": 3,
+  "results": 11,
+  "pdf": {
+    "id": "art_72f98ab9-b3a7-47c4-baee-ce3f98ac8615",
+    "versionID": "ver_ab3fafde-c377-44e6-ae45-259fac9b5bdd",
+    "version": 2,
+    "title": "报告完整 PDF（最终版，7页，回放直接打开）",
+    "kind": "report",
+    "path": "/disk1/dabiao/axiomics-projects/09-scenic-action/report/regulon_site_report.pdf",
+    "mimeType": "application/pdf",
+    "size": 481617,
+    "sha256": "d7b1e21a0c2edaf307a9292f135dc47f7551490b6d708563442109b795127562"
+  },
+  "checks": [
+    "first frame hides future turns",
+    "all recorded final answers preserved",
+    "last turn has final answer",
+    "seek snapshots isolate nested tool inputs",
+    "PDF/tex/bib/CSV saved in Results",
+    "latest PDF size matches saved version"
+  ],
+  "note": "Earlier interrupted/steered turns preserved exactly; no invented final answers."
+}

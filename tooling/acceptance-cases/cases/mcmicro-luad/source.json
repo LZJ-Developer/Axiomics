@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "mcmicro-luad",
+  "title": "肺腺癌多重成像中的肿瘤—免疫—基质空间组织探索",
+  "source": {
+    "name": "MCMICRO exemplar-001",
+    "description": "A public three-cycle, 12-channel CyCIF lung adenocarcinoma specimen distributed as the minimal end-to-end MCMICRO exemplar.",
+    "reference": "https://mcmicro.org/datasets/",
+    "archive": {
+      "name": "exemplar-001.zip",
+      "url": "https://mcmicro.s3.amazonaws.com/exemplars/exemplar-001.zip",
+      "size": 253510808,
+      "md5": "9823cbf6b375bfca922b3cbc8f4557cf"
+    },
+    "markers": ["DNA", "ELANE", "CD57", "CD45", "CD11B", "SMA", "CD16", "ECAD", "FOXP3", "NCAM"]
+  },
+  "analysis": {
+    "tool": "nf-core/mcmicro + mccellpose + MCQuant + Scanpy/Squidpy",
+    "capability": "mcmicro",
+    "question": "肺腺癌小组织芯中，上皮、免疫和基质成分是否形成稳定且可解释的空间邻域？",
+    "blind_policy": "The Agent receives tissue identity, channel metadata and file provenance but no expected cell fractions, spatial neighborhoods, thresholds, or paper conclusions."
+  }
+}

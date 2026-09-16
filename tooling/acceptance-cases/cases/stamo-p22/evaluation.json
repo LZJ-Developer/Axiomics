@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 2,
+  "id": "stamo-p22",
+  "status": "showcase-ready",
+  "checks": {
+    "minimumEvidence": [
+      "Verify shared barcodes and coordinates, count distributions and modality-specific QC",
+      "Compare independent RNA and H3K27ac spatial partitions with joint STAMO domains",
+      "Support interpretations with measured RNA and measured H3K27ac signals; label inferred quantities separately",
+      "Assess disagreements and depth/spatial confounding without treating shared coordinates as independent validation",
+      "Single slice and spatial pixels are not biological replicates; no causal claim from correlation"
+    ],
+    "reportSections": [
+      "Title",
+      "Abstract",
+      "Introduction",
+      "Results",
+      "Discussion",
+      "Methods",
+      "References"
+    ]
+  },
+  "requiredResults": [
+    "QC figures and table",
+    "Independent and joint spatial domains",
+    "Cross-modal molecular evidence and disagreements",
+    "Reusable annotated data objects and provenance",
+    "TeX source, BibTeX and paper-style PDF"
+  ],
+  "replayInvariants": [
+    "Real session messages in original order",
+    "Every completed turn has final response",
+    "Figures and PDF open from Results",
+    "Final replay frame opens available PDF"
+  ],
+  "sessionID": "ses_f65f4d24dffegXvAXYEbiD4tee",
+  "projectID": "prj_6ecffd7e2b7848e4a3c65c57dd563890",
+  "replayFrames": 512,
+  "completedTurns": 4,
+  "reportPages": 10,
+  "validation": {
+    "caseTests": 16,
+    "liveReplayInvariants": "passed",
+    "browserViewports": [
+      "1920x1080",
+      "2560x1440"
+    ],
+    "finalPdfCanvasPages": 10,
+    "texErrors": 0,
+    "undefinedReferences": 0,
+    "missingGlyphs": 0,
+    "sourceBundleCrc": "passed",
+    "followupRowsPerModality": 9370
+  },
+  "interpretation": "Regional RNA/H3K27ac support for white matter persists after depth adjustment; expression-program sensitivity does not establish composition-independent regulation. NMF weights are not true cell fractions.",
+  "blindness": "Application demonstration, not a strict answer-isolated benchmark. Method notebook code exposed example gene Tspan2; notebook image outputs and original-paper result lookup were not observed before analysis. Canonical markers were used to interpret computed domains."
+}

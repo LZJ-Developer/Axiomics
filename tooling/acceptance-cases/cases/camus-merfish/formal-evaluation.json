@@ -1,0 +1,65 @@
+{
+  "source": "Fresh Axiomics annotations; held-out author labels opened after CAMUS scores were written",
+  "camus": {
+    "camus_scores": {
+      "STAMapper": 0.6718725839317358,
+      "scANVI": 0.5949066554451435
+    },
+    "camus_prioritize": {
+      "STAMapper": 0.6718725839317358,
+      "scANVI": 0.5949066554451435
+    },
+    "agreement": {
+      "ARI_STAMapper_scanvi": 0.7799903899686669,
+      "NMI_STAMapper_scanvi": 0.7604832640051511
+    },
+    "n_preclusters": 13,
+    "clust_col": "leiden"
+  },
+  "methods": {
+    "STAMapper": {
+      "n": 31340,
+      "author_label_agreement": 0.9117102744097001,
+      "ARI": 0.8168285778160996,
+      "macro_f1": 0.6395070372987515,
+      "predicted_counts": {
+        "Inhibitory": 12642,
+        "Excitatory": 6701,
+        "Astrocytes": 3853,
+        "OD Mature": 2444,
+        "Endothelial": 1998,
+        "Ependymal": 1278,
+        "OD Immature": 1014,
+        "Mural": 804,
+        "Microglia": 578,
+        "Macrophage": 16,
+        "Fibroblast": 8,
+        "OD Newly formed": 4
+      },
+      "expression_values_preserved": true,
+      "barcodes_preserved": true
+    },
+    "scANVI": {
+      "n": 31340,
+      "author_label_agreement": 0.8564773452456924,
+      "ARI": 0.7467171654873358,
+      "macro_f1": 0.5454102345604211,
+      "predicted_counts": {
+        "Inhibitory": 11427,
+        "Excitatory": 7292,
+        "Astrocytes": 5533,
+        "OD Mature": 2387,
+        "Endothelial": 2096,
+        "OD Immature": 1013,
+        "Mural": 766,
+        "Microglia": 666,
+        "Macrophage": 84,
+        "OD Newly formed": 58,
+        "Fibroblast": 10,
+        "Ependymal": 8
+      },
+      "expression_values_preserved": true,
+      "barcodes_preserved": true
+    }
+  }
+}

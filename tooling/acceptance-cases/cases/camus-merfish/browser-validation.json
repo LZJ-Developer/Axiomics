@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "gallery": "/cases",
+  "cases": 7,
+  "camus_images_loaded": 3,
+  "lab_methods_visible": [
+    "STAMapper",
+    "CAMUS"
+  ],
+  "replay_frames": 679,
+  "keyboard": {
+    "ArrowRight": "1 -> 2",
+    "ArrowLeft": "2 -> 1",
+    "Space": "starts playback",
+    "Enter": "pauses playback"
+  },
+  "final_inspector": {
+    "pdf_version": 7,
+    "pages": 8,
+    "rendered_canvases": 8,
+    "alerts": []
+  },
+  "method": "Chrome DevTools MCP; real running service at 3000/4096",
+  "gallery_image_fit": "contain",
+  "gallery_viewports": [
+    [
+      1920,
+      1080
+    ],
+    [
+      2560,
+      1440
+    ],
+    [
+      3840,
+      2160
+    ]
+  ]
+}

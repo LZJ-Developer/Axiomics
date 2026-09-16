@@ -1,0 +1,86 @@
+{
+  "dgl": {
+    "status": "passed",
+    "torch": "2.7.1+cu128",
+    "dgl": "1.1.3+cu121",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "forward_backward_finite": true
+  },
+  "stamapper": {
+    "status": "passed",
+    "seconds": 14.182707687956281,
+    "torch": "2.7.1+cu128",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "reference": [
+      384,
+      20320
+    ],
+    "query": [
+      512,
+      160
+    ],
+    "epochs": 3,
+    "gpu_training": true,
+    "observed_model_devices": [
+      "cuda:0"
+    ],
+    "weights_reload_equal": true,
+    "barcodes_equal": true,
+    "expression_equal": true,
+    "plots_present": true,
+    "purpose": "Compatibility only, not scientific accuracy"
+  },
+  "scvi": {
+    "status": "passed",
+    "seconds": 1.9569802009500563,
+    "torch": "2.7.1+cu128",
+    "scvi": "1.3.3",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "shape": [
+      896,
+      153
+    ],
+    "query": [
+      512,
+      160
+    ],
+    "epochs": {
+      "SCVI": 3,
+      "SCANVI": 3
+    },
+    "gpu_training": true,
+    "reload_predictions_equal": true,
+    "finite_latent": true,
+    "barcodes_equal": true,
+    "purpose": "Compatibility only, not scientific accuracy",
+    "expression_equal": true,
+    "query_contains_nonintegers": true,
+    "scientific_input_validation": "pending: supplied MERFISH values violate integer count support"
+  },
+  "scvi_integer_control": {
+    "status": "passed",
+    "seconds": 1.309991450048983,
+    "torch": "2.7.1+cu128",
+    "scvi": "1.3.3",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "shape": [
+      384,
+      153
+    ],
+    "query": [
+      192,
+      153
+    ],
+    "epochs": {
+      "SCVI": 3,
+      "SCANVI": 3
+    },
+    "gpu_training": true,
+    "reload_predictions_equal": true,
+    "finite_latent": true,
+    "barcodes_equal": true,
+    "expression_equal": true,
+    "query_contains_nonintegers": false,
+    "purpose": "Compatibility only, not scientific accuracy"
+  }
+}
