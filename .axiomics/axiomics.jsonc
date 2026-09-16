@@ -1,0 +1,21 @@
+{
+  "$schema": "https://axiomics.ai/config.json",
+  "model": "deepseek/deepseek-v4-flash-vision-exp",
+  "small_model": "deepseek/deepseek-v4-flash-vision-exp",
+  // "plugin": ["axiomics-openai-codex-auth"],
+  "provider": {
+    "axiomics": {
+      "options": {},
+    },
+  },
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+    },
+  },
+  "tools": {
+    "github-triage": false,
+    "github-pr-search": false,
+  },
+}

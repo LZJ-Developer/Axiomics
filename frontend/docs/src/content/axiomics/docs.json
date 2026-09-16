@@ -1,0 +1,31 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Axiomics",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Start",
+            "pages": ["index", "quickstart", "workspace"]
+          },
+          {
+            "group": "Use the agent",
+            "pages": ["agents", "models", "local-models", "skills", "sessions"]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "CLI",
+            "pages": ["commands", "security", "sandbox"]
+          }
+        ]
+      }
+    ],
+    "global": {}
+  }
+}

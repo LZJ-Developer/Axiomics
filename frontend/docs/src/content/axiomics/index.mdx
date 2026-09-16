@@ -1,0 +1,72 @@
+---
+title: "Axiomics"
+description: "The AI workbench for scientific research. Give it a goal — it reads the literature, writes and runs code, runs the experiments, and writes up what it found."
+icon: "flask-conical"
+---
+
+Axiomics is an AI workbench for scientific research. You give it a goal, and it works through the research loop the way a capable collaborator would: it reads the papers that matter, forms a hypothesis, writes and runs code, runs experiments on real compute, queries the major scientific databases, and writes up the result.
+
+It runs as a workspace in your browser and works with frontier or open-weight models through your own API keys, provider subscriptions, or local endpoints. No Axiomics product account is required. It is model-agnostic and built to do real work in machine learning, biology, physics, and chemistry.
+
+```bash
+bun install
+bun run setup
+bun dev
+```
+
+`bun dev` opens the workspace in your browser. See [Quickstart](/axiomics/quickstart) for the full path from a checkout to a running session.
+
+## What we built
+
+Everything below runs from the same source tree — no gated tiers, no server-side magic you can't read.
+
+<Columns cols={2}>
+  <Card title="The whole research loop" icon="workflow" href="/axiomics/sessions">
+    Literature review, hypothesis, code, experiment, analysis, and write-up in one continuous session. Queue follow-up prompts while it streams; rewind with undo-from-here.
+  </Card>
+  <Card title="One adaptive Research agent" icon="bot" href="/axiomics/agents">
+    One user-facing harness owns the task end to end, loads domain skills lazily, and delegates independent research work when useful. Delegation and independence stay separate from Normal/Ultra effort and read-only plan mode.
+  </Card>
+  <Card title="Bundled skills" icon="book-open" href="/axiomics/skills">
+    Training (DeepSpeed, PEFT, TRL), evaluation, dataset work, molecular and clinical biology, cheminformatics, papers and LaTeX, figures, and user-configured scientific runtimes.
+  </Card>
+  <Card title="Scientific databases as tools" icon="search" href="/axiomics/skills">
+    UniProt, PDB, Ensembl, ChEMBL, PubChem, arXiv, OpenAlex, Semantic Scholar, and around 30 more, queryable directly by the agent.
+  </Card>
+  <Card title="A real workspace" icon="layers" href="/axiomics/workspace">
+    A browser UI with a file tree, an editor, session history, and inline rendering for molecules, structures, genomes, and plots.
+  </Card>
+  <Card title="Extensible everywhere" icon="package-check" href="/axiomics/commands">
+    LSP integration, MCP servers, plugins, custom agents and commands, and a TypeScript SDK.
+  </Card>
+</Columns>
+
+## Any model, your keys
+
+Set an API key from any provider and start working. Keys stay on your machine.
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...   # or OPENAI_API_KEY, GEMINI_API_KEY, ...
+bun dev
+```
+
+Axiomics routes to frontier and open-weight models from Anthropic, OpenAI, Google, and dozens of other providers. Reasoning-effort tiers are first-class: `--variant high|max|minimal` on any run. See [Models](/axiomics/models).
+
+## Nothing leaves your machine
+
+The agent loop, skills, database tools, and workspace all run from the same checkout. Projects, sessions, settings, credentials, results, and provenance stay on your device, and the local server binds to loopback only.
+
+## Local by default
+
+Connect only the providers and scientific services you want. Axiomics does not proxy model traffic or upload research traces.
+
+## Start here
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/axiomics/quickstart">
+    Build it, set a key, and run your first research session.
+  </Card>
+  <Card title="The workspace" icon="layers" href="/axiomics/workspace">
+    A tour of the browser workspace and the local server behind it.
+  </Card>
+</Columns>

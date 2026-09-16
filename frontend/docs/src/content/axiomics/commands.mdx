@@ -1,0 +1,137 @@
+---
+title: "Command reference"
+description: "Every axiomics subcommand: workspace, run, sessions, models, agents, skills, and lifecycle."
+icon: "terminal"
+---
+
+The Axiomics command surface. For live help, run `axiomics --help` and `axiomics <command> --help`.
+
+The bare `axiomics` (no arguments) starts the local server and opens the **browser workspace** in your working directory. Everything else is grouped below.
+
+## Global flags
+
+| Flag | Use |
+| --- | --- |
+| `-v, --version` | Print the installed version. |
+| `-h, --help` | Print help for a command. |
+| `--print-logs` | Stream agent diagnostics to stderr. |
+| `--log-level <DEBUG\|INFO\|WARN\|ERROR>` | Override the log threshold. |
+
+## Workspace and runs
+
+| Command | Use |
+| --- | --- |
+| `axiomics` | Start the server and open the browser workspace. |
+| `axiomics run [message..]` | One-shot prompt in the terminal; streams, then exits. |
+| `axiomics session list` | List recent sessions (`-n`, `--format`). |
+
+`run` flags: `-c/--continue`, `-s/--session <id>`, `-m/--model <provider/model>`, `--agent <name>`, `--variant <high|max|minimal>` (provider-specific reasoning effort), `--effort <normal|ultra>` (Research breadth), `--format <default|json>`, `-f/--file <path>`, `--auto-approve` / `--deny-prompts` (non-interactive permission policy; deny is the default when stdin is not a terminal), `--attach <url>` (attach to a running server, e.g. `http://localhost:4096`), `--title <text>`. Exit codes, JSON events, and the container environment contract are on [Sessions](/axiomics/sessions).
+
+```bash
+axiomics run "Plot the attention entropy across layers for this checkpoint"
+axiomics run -c "Now sweep the temperature and re-plot"
+axiomics run --format json "Summarize the experiment in results/" > summary.json
+```
+
+## Setup
+
+Axiomics runs without a product account. Provider sign-ins and API keys are stored on this device.
+
+| Command | Use |
+| --- | --- |
+| `axiomics init` | First-run setup wizard — connect a provider, configure a local model, or skip. Rerun anytime (alias `onboard`). |
+| `axiomics doctor` | Report local configuration, provider access, and runtime health. |
+
+## Providers and routing
+
+| Command | Use |
+| --- | --- |
+| `axiomics keys add` | Add a provider API key (BYOK; OAuth sign-in where supported). Alias: `auth`. |
+| `axiomics keys signin` | Sign in with ChatGPT / Codex (subscription). |
+| `axiomics keys list` | List saved provider keys and active env vars. |
+| `axiomics keys rm` | Remove a saved provider key. |
+| `axiomics models` | List configured providers and their models. |
+
+## Sandbox
+
+| Command | Use |
+| --- | --- |
+| `axiomics sandbox` | Show sandbox status: OS backend + current policy. |
+| `axiomics sandbox enable` | Confine local execution to approved paths (`--network deny`, `--allow <path>`, `--on-unavailable <warn\|error\|allow>`, `--[no-]require-project-trust`). |
+| `axiomics sandbox disable` | Turn the sandbox off. |
+| `axiomics sandbox test` | Prove containment on this machine (writes inside/outside the workspace, network egress). |
+
+Enabled in the default **Approve for me** preset. Use the composer’s **Research tools → Action approval** menu to change the trust/containment preset, or `sandbox enable` and `sandbox disable` to manage containment directly; an administrator policy can require it. See [Sandbox and project trust](/axiomics/sandbox).
+
+## Agent profiles
+
+| Command | Use |
+| --- | --- |
+| `axiomics agent list` | Print the agent roster on this install. |
+| `axiomics agent create` | Scaffold a custom agent (system prompt + tool set + routing policy). |
+
+Flags: `--path`, `--description`, `--mode <all\|primary\|subagent>`, `--tools`, `--model`. See [Agents](/axiomics/agents).
+
+## Skills
+
+| Command | Use |
+| --- | --- |
+| `axiomics skill list` | Show installed skills (`--all` for the bundled set). |
+| `axiomics skill show <name>` | Print a skill's metadata and entrypoints. |
+| `axiomics skill add <url-or-name>` | Install a skill (URL or `gh:owner/repo`). |
+| `axiomics skill new` / `edit` / `validate` | Author, edit, and check user skills. |
+| `axiomics skill remove <name>` | Uninstall a skill. |
+| `axiomics skill set-entries <name>` | Update which skills surface in the `/` picker. |
+
+## Local server and protocols
+
+| Command | Use |
+| --- | --- |
+| `axiomics web` | Start the server and open the browser workspace (prints the URL, e.g. `http://localhost:4096`). |
+| `axiomics serve` | Headless local server — loopback-only (`127.0.0.1`), no browser. |
+| `axiomics acp` | Start an Agent Client Protocol server for editors like Zed. |
+| `axiomics mcp` | Manage MCP servers (`list`, `add`, `remove`, `auth`). |
+
+`web` and `serve` take `--port` and `--cors`. See [Workspace](/axiomics/workspace).
+
+## GitHub and PRs
+
+| Command | Use |
+| --- | --- |
+| `axiomics github` | GitHub agent for CI/Actions (`install`, `run`). |
+| `axiomics pr <number>` | Check out a PR branch, then launch the agent on it. |
+
+## Project and lifecycle
+
+| Command | Use |
+| --- | --- |
+| `axiomics project` | Pin the Axiomics research-graph root for this folder (`merge`). |
+| `axiomics export` / `axiomics import` | Export or import a session as JSON. |
+| `axiomics generate` | Emit the OpenAPI spec for the local server to stdout. |
+| `axiomics stats` | Local token-usage and cost stats. |
+| `axiomics debug` | Structured diagnostics for support (`debug paths` shows data/config dirs). |
+| `axiomics upgrade` | Update to the latest version. |
+| `axiomics uninstall` | Remove the binary and local config. |
+| `axiomics completion` | Shell completion for bash, zsh, or fish. |
+
+```bash
+axiomics upgrade
+axiomics completion zsh > ~/.zsh/completions/_axiomics
+```
+
+## What's next
+
+<CardGroup cols={2}>
+  <Card title="Workspace" icon="layers" href="/axiomics/workspace">
+    The browser workspace: files, editor, sessions, and inline scientific rendering.
+  </Card>
+  <Card title="Security" icon="shield-check" href="/axiomics/security">
+    Credential boundary, env hygiene, the trust boundary.
+  </Card>
+  <Card title="Skills" icon="book-open" href="/axiomics/skills">
+    312 bundled research skills and the scientific databases.
+  </Card>
+  <Card title="Agents" icon="bot" href="/axiomics/agents">
+    The Research harness, effort levels, plan mode, and custom profiles.
+  </Card>
+</CardGroup>
