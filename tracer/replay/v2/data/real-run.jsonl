@@ -1,0 +1,16 @@
+{"kind":"meta","goal":"real-run drill: bash 写 CSV + 失败命令","model":"none (bash)","seq":0,"wall":1}
+{"kind":"tool_start","span":"s-real-ok","tool":"bash","cmd":"for i in 1 2 3 4 5 6; do echo \"step $i: cells=6281 pca_ok=1\"; sleep 0.2; done\nprintf 'gene,mean\nGAPDH,12.3\nCD3D,4.1\n' > out/real_matrix.csv\necho 'wrote out/real_matrix.csv'","seq":1,"wall":1}
+{"kind":"tool_out","span":"s-real-ok","text":"step 1: cells=6281 pca_ok=1\n","seq":2,"wall":3}
+{"kind":"tool_out","span":"s-real-ok","text":"step 2: cells=6281 pca_ok=1\n","seq":3,"wall":204}
+{"kind":"tool_out","span":"s-real-ok","text":"step 3: cells=6281 pca_ok=1\n","seq":4,"wall":405}
+{"kind":"tool_out","span":"s-real-ok","text":"step 4: cells=6281 pca_ok=1\n","seq":5,"wall":605}
+{"kind":"tool_out","span":"s-real-ok","text":"step 5: cells=6281 pca_ok=1\n","seq":6,"wall":806}
+{"kind":"tool_out","span":"s-real-ok","text":"step 6: cells=6281 pca_ok=1\n","seq":7,"wall":1007}
+{"kind":"tool_out","span":"s-real-ok","text":"wrote out/real_matrix.csv\n","seq":8,"wall":1208}
+{"kind":"tool_end","span":"s-real-ok","exit":0,"durMs":1207,"out":{"digest":"1484217955d0fa7ca68ecafc090a42202d8d081ae0aae887e42f81bd83b54dc4","bytes":194},"seq":9,"wall":1209}
+{"kind":"tool_start","span":"s-real-fail","tool":"bash","cmd":"echo 'reading missing.sra'; echo 'ERROR: no such file' >&2; exit 3","seq":10,"wall":1209}
+{"kind":"tool_out","span":"s-real-fail","text":"reading missing.sra\n","seq":11,"wall":1210}
+{"kind":"tool_end","span":"s-real-fail","exit":3,"durMs":1,"out":{"digest":"62038c84e04c3d96bdf70bfccb98c57ead250a8c9ebadd6980e2cb3771f0b2ee","bytes":20},"err":{"digest":"f3398515207994bae310bb9e5818ee3a9eb86d7ac24b239de75c03f85d1bd6b1","bytes":20},"seq":12,"wall":1210}
+{"kind":"note","sev":"error","text":"stderr: ERROR: no such file\n","seq":13,"wall":1210}
+{"kind":"fs_write","path":"work/out/real_matrix.csv","digest":"ff1d5c65b687ae4def5ba69ad4ecffd3de08f267e3e66983c0c1d3d46400e99b","bytes":30,"prev":null,"text":"gene,mean\nGAPDH,12.3\nCD3D,4.1\n","seq":14,"wall":1210}
+{"kind":"state","label":"after-real","data":{"spans":2,"exit_ok":0,"exit_fail":3},"seq":15,"wall":1210}

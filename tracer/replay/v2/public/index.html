@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Live-mimic Replay</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          14px/1.5 ui-sans-serif,
+          system-ui;
+        background: #eef1f4;
+        color: #111827;
+      }
+      header {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 16px;
+        background: #111827;
+        color: #fff;
+        flex-wrap: wrap;
+      }
+      header .m {
+        color: #9ca3af;
+        font-size: 12px;
+      }
+      .bar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 16px;
+        background: #fff;
+        border-bottom: 1px solid #e2e8f0;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+      }
+      .bar button {
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #fff;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      .bar input[type="range"] {
+        flex: 1;
+      }
+      .step {
+        font-variant-numeric: tabular-nums;
+        min-width: 70px;
+        text-align: center;
+      }
+      .wrap {
+        display: flex;
+        justify-content: center;
+        padding: 12px;
+      }
+      .feed {
+        width: min(860px, 100%);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-bottom: 40vh;
+      }
+      .card {
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #fff;
+        transition: box-shadow 0.15s;
+      }
+      .card.collapsed {
+        opacity: 0.72;
+      }
+      .card.newest {
+        box-shadow:
+          0 0 0 2px #10b981,
+          0 6px 18px rgba(16, 185, 129, 0.18);
+      }
+      .card.msg {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+      }
+      .card.note {
+        border-style: dashed;
+      }
+      .hd {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .hd .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #cbd5e1;
+      }
+      .card.newest .hd .dot {
+        background: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+      }
+      .hd b {
+        font-size: 12.5px;
+      }
+      .hd .tag {
+        margin-left: auto;
+        font-size: 11px;
+        color: #64748b;
+      }
+      .hd .caret {
+        transition: transform 0.12s;
+      }
+      .card.open .caret,
+      .card.newest .caret {
+        transform: rotate(90deg);
+      }
+      .bd {
+        padding: 4px 12px 10px;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        font:
+          12.5px/1.6 ui-monospace,
+          Menlo,
+          monospace;
+      }
+      .term {
+        background: #0b1220;
+        color: #d1fae5;
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+      .term .cmd {
+        color: #7dd3fc;
+      }
+      .term .ok {
+        color: #d1fae5;
+      }
+      .term .err {
+        color: #fca5a5;
+      }
+      .term button {
+        border: 1px solid #475569;
+        background: #1f2937;
+        color: #a7f3d0;
+        border-radius: 5px;
+        font-size: 11px;
+        cursor: pointer;
+        margin: 6px 0;
+      }
+      img.plot {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        max-width: min(420px, 100%);
+      }
+      .fs {
+        font: 12px ui-monospace;
+        color: #334155;
+      }
+      .noteTxt {
+        font-size: 12.5px;
+        color: #b45309;
+      }
+      .st {
+        color: #4338ca;
+        font: 12px ui-monospace;
+      }
+      .newlabel {
+        font-size: 10px;
+        background: #10b981;
+        color: #fff;
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-weight: 600;
+      }
+      .diag {
+        position: fixed;
+        left: 10px;
+        bottom: 10px;
+        background: #111827d9;
+        color: #cbd5e1;
+        font: 11px ui-monospace;
+        padding: 6px 10px;
+        border-radius: 8px;
+        max-width: 46%;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <b>Live-mimic Replay</b>
+      <select id="run"></select>
+      <span class="m" id="meta">…</span>
+    </header>
+    <div class="bar">
+      <button id="play">▶</button>
+      <button id="prev">⏮</button>
+      <input type="range" id="scrub" min="0" disabled />
+      <button id="next">⏭</button>
+      <span class="step" id="step">0/0</span>
+    </div>
+    <div class="wrap"><div class="feed" id="feed"></div></div>
+    <div class="diag" id="diag"></div>
+    <script>
+      const $ = (s) => document.querySelector(s)
+      let runId = null,
+        total = 0,
+        t = 0,
+        timer = null,
+        pinned = new Set(),
+        lastAuto = 0
+      const d = [] // diagnostics: things a reviewer should notice in this prototype
+      const j = async (u) => {
+        const r = await fetch(u)
+        if (!r.ok) throw new Error(u + " " + r.status)
+        return r.json()
+      }
+      async function boot() {
+        const runs = await j("/api/runs")
+        for (const r of runs)
+          $("#run").insertAdjacentHTML("beforeend", `<option value="${r.id}">${r.id} (${r.events})</option>`)
+        const pick = runs.find((r) => r.id === "run-v2") || runs[0]
+        if (pick) await select(pick.id)
+        $("#run").onchange = (e) => select(e.target.value)
+        $("#play").onclick = () => {
+          if (timer) {
+            stop()
+          } else {
+            timer = setInterval(() => {
+              jump(t + 1, true)
+              if (t >= total - 1) stop()
+            }, 650)
+            $("#play").textContent = "⏸"
+          }
+        }
+        $("#prev").onclick = () => jump(t - 1, false)
+        $("#next").onclick = () => jump(t + 1, false)
+        $("#scrub").oninput = (e) => jump(+e.target.value, false)
+      }
+      function stop() {
+        clearInterval(timer)
+        timer = null
+        $("#play").textContent = "▶"
+      }
+      async function select(id) {
+        runId = id
+        pinned = new Set()
+        const st = await j(`/api/runs/${id}/steps`)
+        total = st.length
+        $("#scrub").max = total - 1
+        $("#scrub").disabled = false
+        $("#meta").textContent = `run=${id} · ${total} 步 · 服务端 live 投影`
+        await jump(total - 1, false, true)
+      }
+      async function jump(i, auto, initial) {
+        i = Math.max(0, Math.min(total - 1, i))
+        t = i
+        $("#scrub").value = t
+        $("#step").textContent = `${t + 1}/${total}`
+        const q = `/api/runs/${runId}/live?t=${t}&pinned=${[...pinned].join(",")}`
+        const v = await j(q)
+        await render(v.cards, v.newest)
+        if ((auto || initial) && v.newest) {
+          const el = document.getElementById("c-" + CSS.escape(v.newest))
+          if (el) el.scrollIntoView({ block: "nearest" })
+        }
+      }
+      function cardShell(id, state) {
+        const n = document.createElement("div")
+        n.id = "c-" + id
+        n.className = "card " + state
+        n.onclick = () => pin(id)
+        return n
+      }
+      function pin(id) {
+        if (pinned.has(id)) pinned.delete(id)
+        else pinned.add(id)
+        jump(t, false)
+      }
+      async function render(cards, newest) {
+        const feed = $("#feed")
+        feed.textContent = ""
+        for (const c of cards) {
+          const open = c.state === "newest" || c.state === "open"
+          const el = cardShell(c.id, c.state)
+          const label = c.state === "newest" ? '<span class="newlabel">NEW</span>' : ""
+          if (c.type === "msg") {
+            el.innerHTML = `<div class="bd" style="background:#f0fdf4"><pre>${esc(c.text)}</pre></div>`
+            feed.append(el)
+            continue
+          }
+          const head = document.createElement("div")
+          head.className = "hd"
+          let title = "",
+            tag = ""
+          if (c.type === "run") {
+            title = (c.status === "running" ? "▶ " : "✓ ") + c.tool + " · " + c.span
+            tag = c.status + (c.exit !== undefined ? ` · exit=${c.exit} · ${c.durMs}ms` : "")
+          } else if (c.type === "artifact") {
+            title = "🖼 " + c.name
+            tag = c.mime.split("/")[1]
+          } else if (c.type === "fs") {
+            title = "📄 " + c.text
+            tag = "fs"
+          } else if (c.type === "state") {
+            title = "Σ " + c.label
+            tag = "state"
+          } else if (c.type === "note") {
+            title = c.sev.toUpperCase()
+            tag = "note"
+          }
+          head.innerHTML = `<span class="dot"></span><b>${esc(title)}</b>${label}<span class="caret">›</span><span class="tag">${esc(tag)}</span>`
+          el.append(head)
+          if (open) {
+            const bd = document.createElement("div")
+            bd.className = "bd"
+            await body(bd, c)
+            el.append(bd)
+          }
+          feed.append(el)
+        }
+        const imgs = feed.querySelectorAll("img.plot").length
+        const openCards = cards.filter((c) => c.state !== "collapsed").length
+        const arts = cards.filter((c) => c.type === "artifact").length
+        $("#diag").textContent =
+          `t=${t} · 卡片 ${cards.length}（展开 ${openCards}） · 产物 ${arts} → 已加载图 ${imgs}\n` +
+          `懒加载：仅“展开/最新”卡片会 fetch 产物 blob，折叠卡不下载\n` +
+          `scrub 回退会重建 DOM；手动展开经 pin 集保留（不会被自动折叠）`
+      }
+      function esc(x) {
+        return (x ?? "")
+          .toString()
+          .replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[m])
+      }
+      async function body(bd, c) {
+        if (c.type === "run") {
+          const tdiv = document.createElement("div")
+          tdiv.className = "term"
+          tdiv.innerHTML =
+            `<pre class="cmd">$ ${esc(c.tool)}</pre>` +
+            (c.lines ? `<pre class="ok">${esc(c.lines.join(""))}</pre>` : "")
+          bd.append(tdiv)
+          if (c.status === "done") {
+            if (c.out) {
+              const b = document.createElement("button")
+              b.textContent = `显示完整输出 (${c.out.bytes}B)`
+              b.onclick = async () => {
+                const txt = await (await fetch(`/content/${c.out.digest}`)).text()
+                const p = document.createElement("pre")
+                p.className = "ok"
+                p.textContent = txt.slice(0, 4000)
+                tdiv.append(p)
+              }
+              tdiv.append(b)
+            }
+            if (c.err) {
+              const b = document.createElement("button")
+              b.textContent = `stderr (${c.err.bytes}B)`
+              b.style.cssText = "color:#fca5a5"
+              b.onclick = async () => {
+                const txt = await (await fetch(`/content/${c.err.digest}`)).text()
+                const p = document.createElement("pre")
+                p.className = "err"
+                p.textContent = txt
+                tdiv.append(p)
+              }
+              tdiv.append(b)
+            }
+          }
+        } else if (c.type === "artifact") {
+          const img = document.createElement("img")
+          img.className = "plot"
+          img.alt = c.name
+          img.src = `/artifacts/${c.digest}?mime=${encodeURIComponent(c.mime)}` // lazy: only built when the card is open
+          bd.append(img)
+        } else if (c.type === "state") {
+          bd.innerHTML = `<pre class="st">${esc(JSON.stringify(c.data, null, 2))}</pre>`
+        } else if (c.type === "note") {
+          bd.innerHTML = `<pre class="noteTxt">${esc(c.text)}</pre>`
+        } else {
+          bd.innerHTML = `<pre>${esc(JSON.stringify(c))}</pre>`
+        }
+      }
+      boot().catch((e) => {
+        $("#meta").textContent = "load failed: " + e
+      })
+    </script>
+  </body>
+</html>

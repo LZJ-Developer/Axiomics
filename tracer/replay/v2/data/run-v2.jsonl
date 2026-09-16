@@ -1,0 +1,29 @@
+{"kind":"meta","goal":"10x PBMC: QC→norm→PCA→UMAP→注释，全流程可复现","model":"qwen3-30b-a3b","seq":0,"wall":1700000000000}
+{"kind":"msg","role":"agent","text":"目标已明确。先读入数据并做 QC，随后固化脚本 `run_qc.py` 便于回放。","seq":1,"wall":1700000000037}
+{"kind":"tool_start","span":"s1","tool":"python","cmd":"python scripts/run_qc.py --read","seq":2,"wall":1700000000074}
+{"kind":"tool_out","span":"s1","text":"reading data/pbmc_raw.h5…","seq":3,"wall":1700000000111}
+{"kind":"tool_end","span":"s1","exit":0,"durMs":3120,"out":{"digest":"279edc3c02eaed242002849733572c572e1ed0fdb1b81579847471bc38309155","bytes":1577},"seq":4,"wall":1700000000148}
+{"kind":"fs_write","path":"scripts/run_qc.py","digest":"a12de8cfa9e2229cea6d912e7bca0ff03ace22d337384029f2fe19a39e46d33b","bytes":138,"prev":null,"text":"import scanpy as sc\nadata = sc.read_10x_h5(\"data/pbmc_raw.h5\")\nadata = qc(adata, min_genes=200, pct_mt=20)   # v1\nadata.write(\"norm.h5ad\")","seq":5,"wall":1700000000185}
+{"kind":"fs_write","path":"notes/scratch.md","digest":"5a12469fa684927afa5a51ff91ba9e684942d1061199042c239bf86c3faccc21","bytes":9,"prev":null,"text":"# scratch","seq":6,"wall":1700000000222}
+{"kind":"fs_write","path":"scripts/legacy_plot.py","digest":"190c2032d55829723d71b4806fd60c64b9d484939a797b1aac0ba8467f0cdbcd","bytes":15,"prev":null,"text":"print('legacy')","seq":7,"wall":1700000000259}
+{"kind":"msg","role":"agent","text":"QC 阈值已定：min_genes=200、线粒体<20%。","seq":8,"wall":1700000000296}
+{"kind":"tool_start","span":"s2","tool":"python","cmd":"python scripts/run_qc.py --qc","seq":9,"wall":1700000000333}
+{"kind":"tool_out","span":"s2","text":"filter_cells: 7233 -> 6281","seq":10,"wall":1700000000370}
+{"kind":"tool_end","span":"s2","exit":0,"durMs":9400,"out":{"digest":"9e4a011358a33e43216f5f58174a6e30ec3d34a0ff6ff81257265cdf2f49e77e","bytes":1582},"seq":11,"wall":1700000000407}
+{"kind":"artifact","name":"qc-violin.svg","digest":"d464c77e449253905fd8fdcb76d05f7c074ec6cc57fd98289e3866d9d7cb7327","mime":"image/svg+xml","bytes":139,"width":360,"height":200,"seq":12,"wall":1700000000444}
+{"kind":"fs_write","path":"scripts/run_qc.py","digest":"b5c7d9152246572579d92791238dfe133f53abcb3aa854fedaa4df5cb6027b0d","bytes":196,"prev":"a12de8cfa9e2229cea6d912e7bca0ff03ace22d337384029f2fe19a39e46d33b","text":"import scanpy as sc\nadata = sc.read_10x_h5(\"data/pbmc_raw.h5\")\nadata = qc(adata, min_genes=200, pct_mt=20)   # v2\nadata.write(\"norm.h5ad\")\nsc.pp.normalize_total(adata)\nsc.pp.pca(adata, n_comps=30)","seq":13,"wall":1700000000481}
+{"kind":"fs_write","path":"out/matrix_summary.csv","digest":"f86e074ad4d1651cc5ca0620b083bd98ebecc2592291dedf00f553ab59837995","bytes":5889,"prev":null,"seq":14,"wall":1700000000518}
+{"kind":"state","label":"after-QC","data":{"n_cells":6281,"n_genes":15248,"removed_pct":13.2},"seq":15,"wall":1700000000555}
+{"kind":"msg","role":"agent","text":"继续 v3：UMAP + Leiden，可视化聚类。","seq":16,"wall":1700000000592}
+{"kind":"tool_start","span":"s3","tool":"python","cmd":"python scripts/run_qc.py --umap","seq":17,"wall":1700000000629}
+{"kind":"tool_out","span":"s3","text":"neighbors+umap ok","seq":18,"wall":1700000000666}
+{"kind":"tool_end","span":"s3","exit":0,"durMs":18700,"out":{"digest":"761a2b7154d76009f4e0dabcc768dcd52340a9c53ccc3f674338f03cbdb60c86","bytes":1580},"seq":19,"wall":1700000000703}
+{"kind":"artifact","name":"umap-clusters.svg","digest":"ac3ee7b32a46e24bdd61cf3992c1bd8472fda3f41b2fbcec2be489bc4e5f2ac9","mime":"image/svg+xml","bytes":145,"width":360,"height":200,"seq":20,"wall":1700000000740}
+{"kind":"fs_write","path":"scripts/run_qc.py","digest":"ca4cb0c27159250fc63b69b1cc723637e94b9ffc780e97b85acbd81c9d85a85e","bytes":243,"prev":"b5c7d9152246572579d92791238dfe133f53abcb3aa854fedaa4df5cb6027b0d","text":"import scanpy as sc\nadata = sc.read_10x_h5(\"data/pbmc_raw.h5\")\nadata = qc(adata, min_genes=200, pct_mt=20)   # v2\nadata.write(\"norm.h5ad\")\nsc.pp.normalize_total(adata)\nsc.pp.pca(adata, n_comps=30)\nsc.pp.neighbors(adata)\nsc.tl.umap(adata)  # v3","seq":21,"wall":1700000000777}
+{"kind":"fs_write","path":"notes/result.md","digest":"b0088c1ed0a0ac0293e78be76364085a1772952618f41f024061b07e2f794cdf","bytes":32,"prev":null,"text":"# 结果\n6 clusters, UMAP 稳定","seq":22,"wall":1700000000814}
+{"kind":"fs_delete","path":"notes/scratch.md","seq":23,"wall":1700000000851}
+{"kind":"fs_move","from":"scripts/legacy_plot.py","to":"scripts/plotting.py","seq":24,"wall":1700000000888}
+{"kind":"state","label":"final","data":{"n_clusters":6,"umap_done":true,"files":["scripts/run_qc.py","notes/result.md","out/matrix_summary.csv"]},"seq":25,"wall":1700000000925}
+{"kind":"note","sev":"info","text":"本轨迹为 v2 模型校验用 mock 数据，未调用 LLM。","seq":26,"wall":1700000000962}
+{"kind":"fs_write","path":"scripts/run_qc.py","digest":"ca4cb0c27159250fc63b69b1cc723637e94b9ffc780e97b85acbd81c9d85a85e","bytes":243,"prev":"ca4cb0c27159250fc63b69b1cc723637e94b9ffc780e97b85acbd81c9d85a85e","text":"import scanpy as sc\nadata = sc.read_10x_h5(\"data/pbmc_raw.h5\")\nadata = qc(adata, min_genes=200, pct_mt=20)   # v2\nadata.write(\"norm.h5ad\")\nsc.pp.normalize_total(adata)\nsc.pp.pca(adata, n_comps=30)\nsc.pp.neighbors(adata)\nsc.tl.umap(adata)  # v3","seq":27,"wall":1700000000999}
+{"kind":"note","sev":"warn","text":"上一步 fs_write 内容未变（digest 相同）——渲染时无需新增 blob。","seq":28,"wall":1700000001036}
