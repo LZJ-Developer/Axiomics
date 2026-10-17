@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "typecheck": "tsgo --noEmit",
-    "test": "bun test --timeout 15000",
+    "test": "bun run ../../tooling/repo/test.ts --timeout 15000",
     "build": "bun run script/build.ts",
     "dev": "bun --no-env-file run --conditions=browser ./src/bootstrap.ts"
   },
@@ -61,6 +61,9 @@
     "@ai-sdk/togetherai": "1.0.31",
     "@ai-sdk/vercel": "1.0.31",
     "@ai-sdk/xai": "2.0.51",
+    "@axiomics/plugin": "workspace:*",
+    "@axiomics/sdk": "workspace:*",
+    "@axiomics/util": "workspace:*",
     "@clack/prompts": "1.0.0-alpha.1",
     "@gitlab/gitlab-ai-provider": "3.3.1",
     "@hono/standard-validator": "0.1.5",
@@ -68,9 +71,6 @@
     "@openrouter/ai-sdk-provider": "1.5.2",
     "@parcel/watcher": "2.5.1",
     "@standard-schema/spec": "1.0.0",
-    "@axiomics/plugin": "workspace:*",
-    "@axiomics/sdk": "workspace:*",
-    "@axiomics/util": "workspace:*",
     "@zip.js/zip.js": "2.7.62",
     "ai": "catalog:",
     "bun-pty": "0.4.4",

@@ -34,8 +34,14 @@ delete process.env["AXIOMICS_CONFIG_DIR"]
 // Keep the companion CLI credential inside the same throwaway test sandbox.
 process.env["ATLAS_CLI_CONFIG_PATH"] = path.join(dir, "atlas-cli-config.json")
 
-// Local HTTP fixtures must never be routed through a developer or CI host's
-// outbound proxy. Tests that exercise proxy behavior provide their own env.
+// Keep the proxy out of application code that reads process.env (for example
+// Bun.install's --no-cache decision).
+//
+// This does NOT stop Bun's own fetch from using a proxy: that configuration is
+// resolved once at process start, before this preload runs, so a local 127.0.0.1
+// fixture would still be sent to the caller's proxy. tooling/repo/test.ts clears
+// the variables in the parent process, which is the only place it takes effect;
+// run `bun run test` rather than a bare `bun test` when your shell has a proxy.
 delete process.env["HTTP_PROXY"]
 delete process.env["HTTPS_PROXY"]
 delete process.env["ALL_PROXY"]
