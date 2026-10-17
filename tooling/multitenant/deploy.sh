@@ -58,7 +58,10 @@ AX_NAME_SUFFIX="${AX_NAME_SUFFIX:-}"                 # 例：-stage → ax-stage
 AX_UNIT_PREFIX="${AX_UNIT_PREFIX:-axiomics}"         # 例：axiomics-stage
 AUTHELIA_NAME="ax${AX_NAME_SUFFIX}-authelia"
 GATEWAY_NAME="ax${AX_NAME_SUFFIX}-gw"
-AUTHELIA_ADDR="${AX_AUTHELIA_ADDR:-0.0.0.0:9091}"    # Authelia 监听（容器内 network=host）
+# 绑环回就够了：只有同机的 Caddy 连它，浏览器走 443 上的 /auth。绑 0.0.0.0 时，
+# 宿主若没开防火墙（这类机器常见），9091 会直接暴露在全部网段上 —— 一个只该内部
+# 可见的登录服务没有理由让外网能连。拆多机部署时再改成对网关可达的地址。
+AUTHELIA_ADDR="${AX_AUTHELIA_ADDR:-127.0.0.1:9091}"  # Authelia 监听（容器内 network=host）
 GW_ADDR="${AX_GW_ADDR:-:443}"                        # Caddy 站点
 MODEL_ADDR="${AX_MODEL_ADDR:-:43001}"
 # Caddy 管理端：**必须留在 127.0.0.1 上**，只能换端口。
