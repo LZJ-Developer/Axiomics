@@ -1,0 +1,66 @@
+<mxfile host="axiomics" type="device">
+  <diagram id="系统架构" name="系统架构">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+      <mxCell id="t1" value="Axiomics 多租户部署 · 当前架构（全部运行在 GPU 节点）" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=16;fontColor=#333333;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="8" width="1100" height="30" as="geometry"/></mxCell>
+      <mxCell id="b2" value="api.deepseek.com
+外部模型服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="1"><mxGeometry x="1180" y="70" width="200" height="60" as="geometry"/></mxCell>
+      <mxCell id="b3" value="web 服务器
+未接入 · 22/80/443 均不通" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=12;dashed=1;" vertex="1" parent="1"><mxGeometry x="1180" y="420" width="200" height="60" as="geometry"/></mxCell>
+      <mxCell id="b4" value="数据库服务器
+未接入 · 完全不可达" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=12;dashed=1;" vertex="1" parent="1"><mxGeometry x="1180" y="500" width="200" height="60" as="geometry"/></mxCell>
+      <mxCell id="b5" value="浏览器
+https://&lt;网关&gt;/axiomics
+(无端口，单入口)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="70" width="220" height="70" as="geometry"/></mxCell>
+      <mxCell id="b6" value="Caddy 网关  :443 / :43001
+容器 ax-gw · host 网络
+TLS（内部 CA）· 单入口 /axiomics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="380" y="60" width="320" height="80" as="geometry"/></mxCell>
+      <mxCell id="g7" value="控制面（宿主侧）" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;fillColor=#fafafa;strokeColor=#999999;fontSize=12;dashed=1;" vertex="1" parent="1"><mxGeometry x="300" y="180" width="740" height="80" as="geometry"/></mxCell>
+      <mxCell id="b8" value="Authelia :9091
+登录 / 会话 / cookie" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1"><mxGeometry x="330" y="200" width="200" height="46" as="geometry"/></mxCell>
+      <mxCell id="b9" value="激活器 :9300
+按需拉起租户" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="560" y="200" width="200" height="46" as="geometry"/></mxCell>
+      <mxCell id="b10" value="模型代理 :43002
+识别租户 / 换真密钥 / 记账" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="790" y="200" width="220" height="46" as="geometry"/></mxCell>
+      <mxCell id="b11" value="回收 timer
+每 2 分钟 · 空闲 20 分钟停容器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1"><mxGeometry x="900" y="300" width="260" height="50" as="geometry"/></mxCell>
+      <mxCell id="g12" value="数据面：一人一容器（按租户隔离，独立 PID/net/fs）" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;fillColor=#fafafa;strokeColor=#999999;fontSize=12;dashed=1;" vertex="1" parent="1"><mxGeometry x="60" y="380" width="900" height="150" as="geometry"/></mxCell>
+      <mxCell id="b13" value="租户容器 ax-u0006
+relay :8080 → axiomics :4096
+GPU 0 · 发布在 127.0.0.1:42101" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="90" y="405" width="300" height="66" as="geometry"/></mxCell>
+      <mxCell id="b14" value="ax-u0008 …  × N
+同一镜像、同一套标志
+各自 data/config/cache/state" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1"><mxGeometry x="420" y="405" width="300" height="66" as="geometry"/></mxCell>
+      <mxCell id="g15" value="持久化（全部在本机磁盘）" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;fillColor=#fafafa;strokeColor=#999999;fontSize=12;dashed=1;" vertex="1" parent="1"><mxGeometry x="60" y="570" width="900" height="120" as="geometry"/></mxCell>
+      <mxCell id="b16" value="AX_ROOT  /srv/axiomics
+租户数据 · tenants.map · 审计 / 用量账本 · 密钥(0600)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="1"><mxGeometry x="90" y="595" width="390" height="60" as="geometry"/></mxCell>
+      <mxCell id="b17" value="共享工具链 51 GB
+只读挂载到每个租户（不复制）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="1"><mxGeometry x="520" y="595" width="390" height="60" as="geometry"/></mxCell>
+      <mxCell id="g18" value="GPU 硬件" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;fillColor=#fafafa;strokeColor=#999999;fontSize=12;dashed=1;" vertex="1" parent="1"><mxGeometry x="60" y="720" width="900" height="70" as="geometry"/></mxCell>
+      <mxCell id="b19" value="4 × RTX 5090 32 GB —— 按租户 --device 分配（--gpu N）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6e6e6;strokeColor=#666666;fontSize=12;" vertex="1" parent="1"><mxGeometry x="90" y="742" width="820" height="40" as="geometry"/></mxCell>
+      <mxCell id="e20" value="HTTPS :443" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" parent="1" source="b5" target="b6"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e21" value="/auth* + forward_auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=0.1;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="b6" target="b8"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e22" value="/ensure（每次认证后）" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="b6" target="b9"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e23" value="按 Remote-User 路由
+Bearer &lt;租户 token&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="b6" target="b13"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e24" value="podman start" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="b9" target="b13"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e25" value="podman stop（空闲）" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#b85450;strokeWidth=1;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.95;entryY=0.3;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="b11" target="b13"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e26" value=":43001 模型请求
+Bearer tenant-u0006" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#9673a6;strokeWidth=1;exitX=0.9;exitY=0;exitDx=0;exitDy=0;entryX=0.95;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="b13" target="b6"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e27" value="/model/*" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=0.95;exitY=1;exitDx=0;exitDy=0;entryX=0.9;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="b6" target="b10"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e28" value="换成真密钥" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="b10" target="b2"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e29" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.4;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="b13" target="b16"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e30" value="只读" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="b13" target="b17"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e31" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.85;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="b8" target="b16"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e32" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="b13" target="b19"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e33" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#1a1a1a;strokeWidth=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.6;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="b14" target="b19"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e34" value="未开放" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#999999;strokeWidth=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.6;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="b3" target="b6"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e35" value="不可达" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#999999;strokeWidth=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.8;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="b4" target="b6"><mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="t36" value="信任边界：对外只开 443 与 43001；其余端口全部绑 127.0.0.1，用户不可见。
+隔离边界：每个租户一个容器 + 独立数据目录；容器内 bwrap 沙箱（本部署关闭审批模式）。" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#666666;" vertex="1" parent="1"><mxGeometry x="60" y="810" width="900" height="50" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
