@@ -1,11 +1,10 @@
 # Axiomics acceptance cases
 
 This directory defines the reproducible inputs and verification contracts for
-the five public-data acceptance stories. Runtime projects live under
-`/disk1/dabiao/axiomics-projects/`, shared toolchains under
-`/disk1/dabiao/axiomics-envs/`, and platform state under
-`~/.config/axiomics/data-root/`. Large inputs, intermediate outputs, and PDFs
-stay outside the platform source repository.
+the five public-data acceptance stories. Runtime projects live in the
+deployment's project root, shared toolchains under `$AX_SHARED_ENVS`, and
+platform state under `~/.config/axiomics/data-root/`. Large inputs,
+intermediate outputs, and PDFs stay outside the platform source repository.
 
 Each case is developed as a vertical tracer bullet:
 
@@ -21,6 +20,17 @@ a successful run, but playback preserves that session's saved messages and
 execution records without deletion, rewriting, merging, or reordering. Speed
 controls and seeking compress presentation time without inventing tool results
 or scientific claims.
+
+**One recorded exception, and only one.** The transcript — messages and their
+parts — is never touched. But the records that bind a session to a _machine_
+(`project.worktree`, `session_workspace.scratchRoot`, `session_filesystem.directory`
+and its `grants[]`) name paths that existed on the machine that produced the case.
+Those fields are rewritten to the destination container's convention
+(`/data/projects/<prj>`, `/data/workspaces/<prj>/<sid>`) when the case slice is
+seeded into a tenant — see `seed-cases` in `tooling/multitenant/bin/axiomics-tenant`.
+Without it the UI reports `Folder unavailable` / `SessionFilesystemDeniedError`,
+because the path simply does not exist there. The rewrite changes environment
+bindings only; no message, part, ordering, or tool result is altered.
 
 The gallery presents the current analysis and its scientific effect. Paper
 comparisons are supporting evidence in the report. Every report ends with what

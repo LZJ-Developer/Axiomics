@@ -1,0 +1,11 @@
+# 案例存储切片：装配产物，不入库。
+#
+# 它是从某个数据根里按 catalog 抽出来的（见 export-case-slice.ts），
+# 含该机器的绝对路径，且约 68 MB / 上百 MB 块占用 —— 属于派生物，不是源。
+# 需要时重新装配：
+#   bun run tooling/acceptance-cases/export-case-slice.ts <数据根>
+# 再由 tooling/multitenant/deploy.sh 装到 AX_ROOT、`axiomics-tenant seed-cases` 分发。
+#
+# 代价：全新克隆的部署拿不到切片（案例回放不可用），deploy.sh 会提示。
+# 它依赖装配机的原始数据，那份数据不在仓库里。
+case-slice/
