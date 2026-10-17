@@ -96,6 +96,14 @@ if [ "${AX_CERTS_ONLY:-false}" = "true" ]; then
 fi
 
 BIN="$REPO/backend/cli/dist/@axiomics/axiomics-linux-x64/bin/axiomics"
+# 全新 clone 上直接跑本脚本会死在 `Cannot find module '@axiomics/script'`：
+# 二进制构建的第一行就 import 了一个 workspace 包，模块解析发生在任何
+# "缺依赖就自动安装" 的兜底代码之前。所以依赖必须先装。
+if [ ! -d "$REPO/node_modules" ]; then
+  echo "首次构建：安装 workspace 依赖"
+  (cd "$REPO" && "$BUN" install --frozen-lockfile) \
+    || { echo "bun install 失败 —— 内网机器需要先把依赖装好再重跑" >&2; exit 1; }
+fi
 # 迭代镜像层时用 AX_SKIP_BINARY=true 复用上一次的产物，省几分钟。
 if [ "${AX_SKIP_BINARY:-false}" = "true" ]; then
   echo "跳过二进制构建（AX_SKIP_BINARY=true）"

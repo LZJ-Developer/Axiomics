@@ -180,7 +180,14 @@ chmod 0600 "$KEY_FILE"
 # ）。所以从零部署必须先有一个用户；而用户只能由 axiomics-tenant 写入。
 # 这就是 deploy.sh 必须能自己建用户的理由，否则又是"互相等对方先存在"。
 # 已有用户的部署（重复执行）自动跳过；口令只经环境变量传入，不会出现在日志里。
-if ! python3 -c 'import sys,yaml;d=yaml.safe_load(open(sys.argv[1])) or {};sys.exit(0 if d.get("users") else 1)' "$AX_USERS_FILE" 2>/dev/null; then
+# 少了 PyYAML 时，下面那句会以非零退出，看起来和"用户库为空"一模一样，于是
+# 报错把人引向"加个用户"而不是"装依赖"。先单独验一次。
+python3 -c 'import yaml' 2>/dev/null || {
+  echo "缺少 PyYAML：deploy.sh 与 axiomics-tenant 都用它读写 Authelia 的用户库。" >&2
+  echo "  dnf install -y python3-pyyaml   或   pip3 install pyyaml" >&2
+  exit 1
+}
+if ! python3 -c 'import sys,yaml;d=yaml.safe_load(open(sys.argv[1])) or {};sys.exit(0 if d.get("users") else 1)' "$AX_USERS_FILE"; then
   if [ -n "${AX_IDP_USER:-}" ]; then
     [ -n "${AX_IDP_PASS:-}" ] || { echo "AX_IDP_USER 已设但缺少 AX_IDP_PASS" >&2; exit 1; }
     say "创建首个 IdP 用户：$AX_IDP_USER"

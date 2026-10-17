@@ -28,6 +28,20 @@ systemd/axiomics-reclaim.*  回收 timer
 
 ```bash
 export AX_ROOT=/srv/axiomics
+# $AX_ROOT 必须由**执行部署的这个用户**可写。Rocky/CentOS 的 /srv 默认 root 所有，
+# 非 root 部署请先 sudo install -d -o "$USER" /srv/axiomics，或把 AX_ROOT 指到
+# 自己的目录（例如持久盘上）。
+
+# 0. 依赖（非 root）
+#   bun                构建二进制；激活器与模型代理也由它跑
+#   podman ≥ 4          rootless 容器
+#   openssl             内部 CA 与证书
+#   python3 + PyYAML   deploy.sh 与 axiomics-tenant 用它读写 Authelia 的 YAML 用户库
+#   curl                自检
+# dnf install -y podman openssl python3-pyyaml      # 发行版包名可能不同
+# bun 见 https://bun.sh
+# 镜像（rockylinux:9 / caddy:2 / authelia:latest）与依赖包都要能拉取；
+# 隔离网络请先在可出网的机器上备好。
 
 # 1. 宿主前置（root，需持久化）
 sudo tee /etc/sysctl.d/99-axiomics.conf <<'EOF'

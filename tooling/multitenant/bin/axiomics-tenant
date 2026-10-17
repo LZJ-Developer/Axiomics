@@ -183,9 +183,17 @@ render_maps() {
 
 # ── add ─────────────────────────────────────────────────────────────
 cmd_add() {
-  local name=${1:?用法: axiomics-tenant add <用户名> [--gpu N]}
+  local name=${1:?用法: axiomics-tenant add <用户名> [GPU编号] [--gpu N]}
+  # GPU 两种写法都认：`add bob 1` 与 `add bob --gpu 1`。README 和 deploy.sh 的
+  # 提示写的是位置参数，而这里早先只解析 `--gpu` —— `add bob 1` 的 1 被静默丢弃，
+  # 想要 GPU 1 的人拿到 GPU 0。两者都能跑，所以这个错不会自己暴露。
   local gpu=0
-  [ "${2:-}" = "--gpu" ] && gpu=${3:?}
+  if [ "${2:-}" = "--gpu" ]; then
+    gpu=${3:?--gpu 后缺编号}
+  elif [ -n "${2:-}" ]; then
+    gpu=$2
+  fi
+  case "$gpu" in ''|*[!0-9]*) die "GPU 编号必须是整数，收到：$gpu" ;; esac
   grep -q "^$name " "$MAP" 2>/dev/null && die "用户 $name 已存在"
 
   local tid port
