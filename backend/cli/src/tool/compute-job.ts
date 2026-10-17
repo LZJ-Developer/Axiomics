@@ -653,7 +653,11 @@ export function createComputeJobTool(base?: JobBroker.Options) {
         await ctx.ask({
           permission: plan.provider === "modal" ? "modal" : plan.provider === "ssh" ? "remote_compute" : "compute_job",
           patterns: [plan.digest],
-          always: plan.provider === "local" ? [] : [plan.digest],
+          // A standing approval is bound to one exact plan digest, so remembering
+          // a left-behind local job can never widen what a later run executes:
+          // any change to the command, cwd, resources, artifacts, or runtime
+          // produces a different digest and asks again.
+          always: [plan.digest],
           metadata,
         })
         const job = await JobBroker.start(

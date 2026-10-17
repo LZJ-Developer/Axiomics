@@ -129,7 +129,10 @@ test("rejects ambiguous or invalid compute shapes with one copy-ready repair", a
   )
 })
 
-test("plans and starts a detached local job through the model-facing broker", async () => {
+// 注意这条断言曾经是反的：本地作业原先刻意用 `always: []`（用户永远无法记住
+// 一次本地批准），而 modal/ssh 一直是 `[digest]`。策略已对齐成 digest 绑定 ——
+// 放宽的粒度只是「同一份计划」，改命令/cwd/资源/产物/runtime 都会产生新摘要。
+test("a local job asks with a digest-bound standing approval and starts through the broker", async () => {
   await using tmp = await tmpdir({ git: true })
   const root = path.join(tmp.path, "compute")
   await Instance.provide({
@@ -154,11 +157,14 @@ test("plans and starts a detached local job through the model-facing broker", as
       const dispatched = await tool.execute({ action: "start", ...workload }, context(session.id, asked))
       const job = dispatched.metadata.job
       if (!job) throw new Error("compute_job did not return its started local job")
+      const digest = preview.metadata.compute_job.plan?.digest
       expect(asked).toHaveLength(1)
       expect(asked[0]).toMatchObject({
         permission: "compute_job",
-        patterns: [preview.metadata.compute_job.plan?.digest],
-        always: [],
+        patterns: [digest],
+        // A local job offers the same digest-bound standing approval as the
+        // remote targets, so an identical plan is not re-approved endlessly.
+        always: [digest],
       })
       expect(dispatched.output).toContain(`Dispatched local job ${job.id}`)
       expect(dispatched.output).toContain("compute_job wait")
