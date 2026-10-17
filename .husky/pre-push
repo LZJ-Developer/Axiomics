@@ -1,5 +1,16 @@
 #!/bin/sh
 set -e
+# `internal` is a local-only branch carrying this deployment's live record —
+# host addresses, disk layout, tenant roster. It must never be published, and
+# one `git push --all` would do it. Refuse here instead of relying on whoever
+# is pushing to notice which branch they are on.
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [ "$remote_ref" = "refs/heads/internal" ]; then
+    echo "拒绝推送 internal：该分支只应存在于本地（含现场地址与租户名单）。" >&2
+    exit 1
+  fi
+done
+
 # Full local validation is opt-in: AXIOMICS_PUSH_CHECKS=1 git push
 [ "${AXIOMICS_PUSH_CHECKS:-0}" = "1" ] || exit 0
 
