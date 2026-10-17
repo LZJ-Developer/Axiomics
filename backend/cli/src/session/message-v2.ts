@@ -745,6 +745,13 @@ export namespace MessageV2 {
           role: "user",
           parts: [],
         }
+        // 附件落盘时（session/prompt.ts 会生成一条 "is saved at <路径>" 的 synthetic
+        // 提示）。原 file part 保留是为了界面显示；模型侧只应该看到路径，所以下面
+        // 把对应的 data: 附件跳过 —— 否则 transform 会把它内联成最多 64,000 字符。
+        // 用"本条消息里有没有那条提示"来判定；老消息（没有提示）保持原行为。
+        const savedAttachment = msg.parts.some(
+          (part) => part.type === "text" && part.synthetic && part.text.includes(" is saved at "),
+        )
         result.push(userMessage)
         for (const part of msg.parts) {
           if (part.type === "text" && !part.ignored)
@@ -759,6 +766,8 @@ export namespace MessageV2 {
             })
           // text/plain and directory files are converted into text parts, ignore them
           if (part.type === "file" && part.mime !== "text/plain" && part.mime !== "application/x-directory") {
+            // 已落盘的附件只留路径（见上方 savedAttachment），不把 base64 送进模型。
+            if (savedAttachment && !part.mime.startsWith("image/") && part.url.startsWith("data:")) continue
             const dropped = dropImage(part.mime, part.url, part.filename)
             if (dropped) {
               userMessage.parts.push({ type: "text", text: dropped })

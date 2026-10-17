@@ -264,7 +264,7 @@ export namespace ProviderTransform {
     }
     return {
       type: "text",
-      text: `[Attached file ${name} (${mime}) is binary and can't be shown inline. If its contents are needed, ask the user to paste them or read it from .context/.]`,
+      text: `[Attached file ${name} (${mime}) is binary and can't be shown inline. If its contents are needed, open the saved copy this message names; if no copy is named, ask the user to paste them.]`,
     }
   }
 

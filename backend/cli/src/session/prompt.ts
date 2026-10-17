@@ -11,6 +11,7 @@ import { Agent } from "../agent/agent"
 import { Provider } from "../provider/provider"
 import { asSchema, type Tool as AITool, tool, jsonSchema, type ToolCallOptions } from "ai"
 import { SessionCompaction } from "./compaction"
+import { SubtaskAttachments } from "./subtask-attachments"
 import { SessionTelemetry } from "./telemetry"
 import { Instance } from "../project/instance"
 import { Bus } from "../bus"
@@ -2480,7 +2481,60 @@ export namespace SessionPrompt {
                   },
                 ]
               }
-              break
+              // 图片以外的 data: 附件**不内联**。
+              //
+              // 原先这里直接 break：附件只以 base64 存在于消息里。后果有两层——
+              // 一是模型只能看到内联截断后的前 64,000 字符（组学数据连表头都不够）；
+              // 二是工具打不开它，因为磁盘上没有这个文件，agent 只能满盘搜
+              // storage/part 里的 JSON 再自己解码。
+              //
+              // 现在落成会话工作区里的一个实体文件，并保留原 part：
+              //   · 原 part 给界面用（聊天记录里能看到/打开附件）；
+              //   · 模型侧由 message-v2.toModelMessages 跳过它，只读那条路径提示。
+              // 跳过是**按"本条消息里有 saved-at 提示"判定**的，见 message-v2.ts，
+              // 所以老消息（没有提示）仍按原样处理，不会丢内容。
+              if (part.mime.startsWith("image/")) break
+              return SubtaskAttachments.materialize(
+                [{ type: "file", mime: part.mime, filename: part.filename, url: part.url }],
+                input.sessionID,
+                new AbortController().signal,
+                "attachment",
+              )
+                .then(([saved]) => [
+                  {
+                    id: Identifier.ascending("part"),
+                    messageID: info.id,
+                    sessionID: input.sessionID,
+                    type: "text" as const,
+                    synthetic: true,
+                    text: `The attached file ${part.filename ? `"${part.filename}"` : `(${part.mime})`} is saved at ${fileURLToPath(saved!.url)}. Read it with the read tool when its contents are needed; do not ask the user for a path.`,
+                  },
+                  {
+                    ...part,
+                    id: part.id ?? Identifier.ascending("part"),
+                    messageID: info.id,
+                    sessionID: input.sessionID,
+                  },
+                ])
+                .catch((error: unknown) => {
+                  log.warn("attachment not saved", { error })
+                  return [
+                    {
+                      id: Identifier.ascending("part"),
+                      messageID: info.id,
+                      sessionID: input.sessionID,
+                      type: "text" as const,
+                      synthetic: true,
+                      text: `The attached file ${part.filename ? `"${part.filename}"` : `(${part.mime})`} could not be saved to disk (${error instanceof Error ? error.message : String(error)}). Ask the user for a path or a text export if its contents are needed.`,
+                    },
+                    {
+                      ...part,
+                      id: part.id ?? Identifier.ascending("part"),
+                      messageID: info.id,
+                      sessionID: input.sessionID,
+                    },
+                  ]
+                })
             case "file:": {
               log.info("file", { mime: part.mime })
               // have to normalize, symbol search returns absolute paths
