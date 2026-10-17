@@ -48,6 +48,10 @@ legacy-chat-ui/
 docs/ui/
 docs/harness/
 docs/SKILL.state.pdf
+# Third-party papers kept locally for reference. They are cited by URL in the
+# notes that use them; a downloaded copy is not ours to redistribute and does
+# not belong in the source tree.
+docs/*.pdf
 
 # Harbor adapter local virtualenv
 tooling/harbor/.venv/
@@ -60,3 +64,5 @@ tooling/acceptance-cases/cases/*/tracer/result.json
 
 # Unpublished SCENIC case study (280 MB of raw input and dist tarballs; stays local)
 /Agent_CaseStudy_SCENIC/
+软件著作权申请资料/
+docs/acceptance/软著/
