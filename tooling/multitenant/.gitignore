@@ -1,0 +1,25 @@
+# 运行时产物与凭据，永不入库。
+#
+# AX_ROOT 通常不在这里（默认 /srv/axiomics），但有人会就地调试，
+# 所以把可能落进来的东西全部挡掉。
+
+# 私钥与口令
+secrets/
+ca/*.key
+auth/*.key
+auth/*.pem
+auth/users_database.yml
+auth/db.sqlite3
+auth/secrets.env
+
+# 运行时状态
+tenants/
+logs/
+gateway/
+backup/
+archive/
+tenants.map
+
+# 镜像构建上下文（build.sh 用临时目录，这里只防手滑）
+image/axiomics
+image/axiomics-internal-ca.crt

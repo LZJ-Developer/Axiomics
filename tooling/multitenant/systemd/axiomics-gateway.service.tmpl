@@ -1,0 +1,24 @@
+[Unit]
+Description=Axiomics 网关（__GATEWAY__）
+# AX_ROOT 必须在持久盘上；挂载失败时宁可不起服务，也不要在空目录上跑。
+RequiresMountsFor=__AX_ROOT__
+After=network.target __UNIT_PREFIX__-authelia.service
+Requires=__UNIT_PREFIX__-authelia.service
+
+[Service]
+# RequiresMountsFor 在**用户级**单元里不会生成 Requires= —— 用户管理器不能 Require
+# 系统级挂载单元，它只留下 After=。所以真正的兜底是下面两条显式检查：
+#   ① AX_ROOT 目录不存在 —— 数据盘没挂上（或从未部署），拒绝启动；
+#   ② __AX_REQUIRE_MOUNT__ 非空时，该挂载点必须真的挂着 —— 否则 /disk1 这类挂载点
+#      会以一个空目录的形式"存在"，目录检查照样通过，用户看到项目全空、新写入落到
+#      系统盘。deploy.sh 在 AX_ROOT 位于独立挂载点时自动填入，留空则只做 ①。
+ExecStartPre=/bin/sh -c '[ -d __AX_ROOT__ ] || { echo "AX_ROOT __AX_ROOT__ 不存在 —— 拒绝启动" >&2; exit 1; }'
+ExecStartPre=/bin/sh -c 'test -z "__AX_REQUIRE_MOUNT__" || findmnt -M "__AX_REQUIRE_MOUNT__" >/dev/null || { echo "数据盘 __AX_REQUIRE_MOUNT__ 未挂载 —— 拒绝启动" >&2; exit 1; }'
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/podman start __GATEWAY__
+ExecStop=/usr/bin/podman stop __GATEWAY__
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

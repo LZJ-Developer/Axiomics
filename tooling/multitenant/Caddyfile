@@ -1,0 +1,68 @@
+{
+	admin {$AX_CADDY_ADMIN:127.0.0.1:2019}
+	auto_https off
+}
+
+{$AX_GW_ADDR::443} {
+	log {
+		output file /var/log/caddy/access.log
+		format json
+	}
+	tls /certs/server.crt /certs/server.key
+
+	handle /auth* {
+		reverse_proxy {$AX_AUTH_ADDR:127.0.0.1:9091}
+	}
+
+	# 唯一入口是 /axiomics。`path /` 只匹配精确的根路径，不匹配 /assets/…
+	# —— 这一点是硬的：SPA 的资源是根路径绝对引用（<script src="/assets/…">），
+	# 把根路径整体重定向会连资源一起跳走，页面白屏。
+	# 放在 forward_auth 之前，少一次认证往返；rd= 会把 /axiomics 带进登录页。
+	@root path /
+	redir @root /axiomics 302
+
+	route {
+		forward_auth {$AX_AUTH_ADDR:127.0.0.1:9091} {
+			uri /auth/api/authz/forward-auth
+			copy_headers Remote-User Remote-Name Remote-Email
+		}
+
+		# 按需激活：被回收的租户在这里被拉起并等到可服务
+		forward_auth {$AX_ACTIVATOR_ADDR:127.0.0.1:9300} {
+			uri /ensure
+		}
+
+		# 三张映射表由 tenants.map 渲染，租户增删后无需改本文件
+		map {http.request.header.Remote-User} {tid} {
+			import /etc/caddy/maps/tenants.caddy
+		}
+		map {tid} {upstream} {
+			import /etc/caddy/maps/upstreams.caddy
+		}
+		map {tid} {token} {
+			import /etc/caddy/maps/tokens.caddy
+		}
+		@unknown expression {tid} == ""
+		respond @unknown 403
+
+		handle_path /axiomics/* {
+			reverse_proxy {upstream} {
+				header_up Host 127.0.0.1:4096
+				header_up Authorization "Bearer {token}"
+			}
+		}
+		reverse_proxy {upstream} {
+			header_up Host 127.0.0.1:4096
+			header_up Authorization "Bearer {token}"
+		}
+	}
+}
+
+{$AX_MODEL_ADDR::43001} {
+	tls /certs/server.crt /certs/server.key
+	# 交给模型代理：它按占位符识别租户、换成真密钥、并记录用量账本。
+	# 不剥前缀、不改 Authorization（代理需要拿到租户占位符）。
+	handle /model/* {
+		reverse_proxy {$AX_MODEL_PROXY_ADDR:127.0.0.1:43002}
+	}
+}

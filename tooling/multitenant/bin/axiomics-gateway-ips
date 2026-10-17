@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# 打印本机所有内网 IPv4（每行一个，含 127.0.0.1）。
+#
+# 为什么要"全部"而不是挑一个：这类机器往往同时挂着多个网段（办公网、VPN 池、
+# 容器网桥各一个），客户端经 VPN 进来时落在哪一段由**网络侧**决定，我们这边
+# 看不出来。实测教训：只配对外的那一个 IP 时，从别的段进来的客户端一个包都
+# 到不了服务器（访问日志里除本机 IP 外零记录），而服务器每个 IP 都在 *:443 上听着。
+# 三处必须同时覆盖全部 IP，缺一处就表现为另一种错：
+#   ① 证书 SAN        —— 缺 → 浏览器报证书不匹配
+#   ② Authelia cookie domain + 访问规则 —— 缺 → HTTP 400
+#                          （实测原文："no configured session cookie domain matches"）
+#   ③ 租户 --cors      —— 缺 → 登录后 SPA 的接口调用被 CORS 挡
+# 用 AX_GATEWAY_IPS（空格或逗号分隔）可覆盖，给需要收窄的部署用。
+set -euo pipefail
+
+if [ -n "${AX_GATEWAY_IPS:-}" ]; then
+  printf '%s\n' "${AX_GATEWAY_IPS}" | tr ', ' '\n\n' | awk 'NF' | sort -u
+  exit 0
+fi
+
+{
+  echo 127.0.0.1
+  # 只要真实对外网卡：容器网桥（docker0/podman0/br-/veth/cni）不是客户端会用的地址
+  ip -4 -o addr show scope global 2>/dev/null \
+    | awk '{ split($4, a, "/"); if ($2 !~ /^(docker|podman|br-|veth|cni)/) print a[1] }'
+} | awk 'NF' | sort -u

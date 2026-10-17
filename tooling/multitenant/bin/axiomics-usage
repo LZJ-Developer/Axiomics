@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# 用量账本报表：按租户汇总，或列出每调用明细
+set -euo pipefail
+# 从 AX_ROOT 派生，别写死 /srv —— 换根后报表会静默报"空"。
+# AX_ROOT 未设时按脚本自身位置推导（部署后就在 $AX_ROOT/bin/ 下）；
+# 只认"像运行时根"的目录，否则退回 /srv/axiomics，免得在仓库里原地跑时
+# 把源码目录当成运行时根。（与 axiomics-tenant / axiomics-audit 同一段逻辑，
+# 刻意内联而非抽公共库：这三个脚本是被逐个 install 的，少装一个库就整片失效。）
+_self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -z "${AX_ROOT:-}" ]; then
+  if [ -d "$_self_root/bin" ] && { [ -f "$_self_root/tenants.map" ] || [ -d "$_self_root/logs" ]; }; then
+    AX_ROOT="$_self_root"
+  else
+    AX_ROOT=/srv/axiomics
+  fi
+fi
+LEDGER="${AX_LEDGER:-$AX_ROOT/logs/usage.jsonl}"
+MAP="${AX_MAP:-$AX_ROOT/tenants.map}"
+case "${1:-summary}" in
+  summary)
+    [ -s "$LEDGER" ] || { echo "账本为空"; exit 0; }
+    python3 - "$LEDGER" "$MAP" <<'PY'
+import json, sys, collections
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+name = {}
+for line in open(sys.argv[2]):
+    f = line.split()
+    if len(f) >= 2: name[f[1]] = f[0]
+agg = collections.defaultdict(lambda: {"calls":0,"in":0,"out":0,"cache":0,"cost":0.0})
+for r in rows:
+    a = agg[r["tenant"]]
+    a["calls"] += 1; a["in"] += r["input"]; a["out"] += r["output"]
+    a["cache"] += r.get("cache_hit",0); a["cost"] += r["cost_cny"]
+print(f"{'租户':<8}{'用户':<10}{'调用':>6}{'输入':>9}{'输出':>8}{'缓存命中':>10}{'费用(元)':>12}")
+for tid in sorted(agg):
+    a = agg[tid]
+    print(f"{tid:<8}{name.get(tid,'?'):<10}{a['calls']:>6}{a['in']:>9}{a['out']:>8}{a['cache']:>10}{a['cost']:>12.6f}")
+tot = collections.defaultdict(int); cost = 0.0
+for a in agg.values():
+    tot["calls"]+=a["calls"]; tot["in"]+=a["in"]; tot["out"]+=a["out"]; cost+=a["cost"]
+print(f"{'合计':<18}{tot['calls']:>6}{tot['in']:>9}{tot['out']:>8}{'':>10}{cost:>12.6f}")
+PY
+    ;;
+  detail) tail -n "${2:-20}" "$LEDGER" | python3 -c "
+import sys,json
+for l in sys.stdin:
+    d=json.loads(l)
+    print(f\"  {d['ts'][:19]}  {d['tenant']}  {d['model']:<18} in={d['input']:<6} out={d['output']:<5} ¥{d['cost_cny']}\")"
+    ;;
+  *) echo "用法: axiomics-usage [summary|detail [N]]" ;;
+esac

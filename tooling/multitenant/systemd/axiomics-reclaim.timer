@@ -1,0 +1,10 @@
+[Unit]
+Description=每 2 分钟回收空闲 Axiomics 租户
+
+[Timer]
+OnCalendar=*:0/2
+Persistent=true
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

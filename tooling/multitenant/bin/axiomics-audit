@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# 审计报表：从激活器审计日志汇总
+set -euo pipefail
+# 从 AX_ROOT 派生，别写死 /srv —— 换根后报表会静默报"空"。
+# AX_ROOT 未设时按脚本自身位置推导（部署后就在 $AX_ROOT/bin/ 下）；
+# 只认"像运行时根"的目录，否则退回 /srv/axiomics，免得在仓库里原地跑时
+# 把源码目录当成运行时根。（与 axiomics-tenant / axiomics-usage 同一段逻辑，
+# 刻意内联而非抽公共库：这三个脚本是被逐个 install 的，少装一个库就整片失效。）
+_self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -z "${AX_ROOT:-}" ]; then
+  if [ -d "$_self_root/bin" ] && { [ -f "$_self_root/tenants.map" ] || [ -d "$_self_root/logs" ]; }; then
+    AX_ROOT="$_self_root"
+  else
+    AX_ROOT=/srv/axiomics
+  fi
+fi
+AUDIT="${AX_AUDIT:-$AX_ROOT/logs/audit.jsonl}"
+case "${1:-summary}" in
+  summary)
+    [ -s "$AUDIT" ] || { echo "审计日志为空"; exit 0; }
+    python3 - "$AUDIT" <<'PY'
+import json, sys, collections
+rows=[json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+print(f"  总访问 {len(rows)} 次")
+agg=collections.defaultdict(lambda:{"n":0,"wake":0,"ms":0})
+for r in rows:
+    a=agg[(r['user'],r['tenant'])]
+    a["n"]+=1; a["wake"]+= 1 if r.get('woken') else 0; a["ms"]+=r.get('wake_ms',0)
+print(f"  {'用户':<8}{'租户':<8}{'访问':>6}{'冷启动唤醒':>12}{'平均耗时':>10}")
+for (u,t),a in sorted(agg.items()):
+    print(f"  {u:<8}{t:<8}{a['n']:>6}{a['wake']:>12}{a['ms']//max(a['n'],1):>9}ms")
+PY
+    ;;
+  tail) tail -n "${2:-10}" "$AUDIT" | python3 -c "
+import sys,json
+for l in sys.stdin:
+    d=json.loads(l); print(f\"  {d['ts'][:19]} {d['user']:<8}{d['tenant']}  {'唤醒' if d.get('woken') else '热态'}  {d.get('wake_ms')}ms\")" ;;
+  *) echo "用法: axiomics-audit [summary|tail [N]]" ;;
+esac

@@ -1,0 +1,11 @@
+# Authelia 用户库模板。deploy.sh 在 users_database.yml 不存在时创建它。
+#
+# 注意：**空库不是合法终态** —— Authelia 启动校验会 fatal（实测原文
+#   error reading the authentication database: could not validate the schema:
+#   users: non zero value required
+# ）。所以 deploy.sh 在启动 Authelia 之前必须先写入至少一个用户；从零部署时用
+#   AX_IDP_USER=alice AX_IDP_PASS='<口令>' ./deploy.sh
+# 给它。已有用户的部署（重复执行）自动跳过这一步。
+#
+# 文件由 idp-add 原地改写，路径不要动（portless.yml 里 authentication_backend.file.path）。
+users: {}

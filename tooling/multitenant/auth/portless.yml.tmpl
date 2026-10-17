@@ -1,0 +1,42 @@
+# Authelia 配置模板。deploy.sh 在 $AX_ROOT/auth/portless.yml 不存在时用它生成：
+#   __AUTHELIA_ADDR__ / __JWT_SECRET__ / __SESSION_SECRET__ / __ENCRYPTION_KEY__
+# 三个密钥是**每个实例各生成一份**的随机值，不写死在仓库里。
+#
+# 为什么必须有模板：从零部署时 deploy.sh 只检查 users_database.yml 是否存在，
+# 缺了就让你去跑 idp-add，而 idp-add open() 的正是这个文件 —— 互相要求对方先存在。
+# 实测从零部署在这一步是死路（FileNotFoundError）。模板让 deploy.sh 有能力自己建。
+theme: auto
+log:
+  level: info
+ntp:
+  disable_startup_check: true
+server:
+  address: tcp://__AUTHELIA_ADDR__/auth
+totp:
+  disable: true
+identity_validation:
+  reset_password:
+    jwt_secret: __JWT_SECRET__
+authentication_backend:
+  file:
+    path: /config/users_database.yml
+# access_control 与 session.cookies 由 deploy.sh 按本机全部内网 IP 重写，
+# 这里的值只是占位，覆盖前能通过语法校验即可。
+access_control:
+  default_policy: deny
+  rules:
+  - domain:
+    - 127.0.0.1
+    policy: one_factor
+session:
+  secret: __SESSION_SECRET__
+  cookies:
+  - domain: 127.0.0.1
+    authelia_url: https://127.0.0.1/auth
+storage:
+  encryption_key: __ENCRYPTION_KEY__
+  local:
+    path: /config/db.sqlite3
+notifier:
+  filesystem:
+    filename: /config/notification.txt

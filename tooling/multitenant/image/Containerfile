@@ -1,0 +1,65 @@
+# 租户镜像。
+#
+# 构建上下文由 image/build.sh 准备：axiomics（二进制）+ axiomics-internal-ca.crt。
+#
+# 两条禁令，都有实测依据：
+#
+#   1. 不要加 --cap-add。CAP_SYS_PTRACE 会让 bwrap 拒绝启动
+#      （`bwrap: Unexpected capabilities but not setuid, old file caps config?`），
+#      沙箱随即不可用 → 所有 bash 与本地算力被拒。
+#      （代价：这也意味着容器内不能跑 strace。观测改用 /proc 与日志。）
+#   2. 不要挂 /opt/relay-libs 或设 LD_LIBRARY_PATH。那是给 ncat 用的宿主
+#      libssl/libcrypto，会遮蔽容器自己的系统库，对所有进程生效；
+#      relay 已改用 socat，不再需要。
+FROM docker.io/library/rockylinux:9
+
+# 源固定成单个 baseurl，不用 mirrorlist。mirrorlist 会返回一批第三方镜像，
+# 其中不响应的那个会让 dnf 停在 ESTABLISHED、CPU 归零 —— 看起来像「网络慢」，
+# 实际是死等（实测卡在 218.104.71.170:443 五分钟无进展）。
+# 同时钉死 IPv4：本机没有 IPv6 路由，而 AAAA 记录优先会让连接直接挂住。
+# 换源：--build-arg ROCKY_MIRROR=...
+ARG ROCKY_MIRROR=https://dl.rockylinux.org/pub/rocky/9
+RUN printf 'ip_resolve=4\ntimeout=60\nretries=5\n' >> /etc/dnf/dnf.conf \
+ && rm -f /etc/yum.repos.d/rocky*.repo \
+ && { \
+      echo '[baseos]'; \
+      echo 'name=Rocky 9 BaseOS'; \
+      echo "baseurl=$ROCKY_MIRROR/BaseOS/\$basearch/os/"; \
+      echo 'gpgcheck=1'; echo 'enabled=1'; \
+      echo 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9'; \
+      echo; \
+      echo '[appstream]'; \
+      echo 'name=Rocky 9 AppStream'; \
+      echo "baseurl=$ROCKY_MIRROR/AppStream/\$basearch/os/"; \
+      echo 'gpgcheck=1'; echo 'enabled=1'; \
+      echo 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9'; \
+    } > /etc/yum.repos.d/rocky.repo
+
+# bubblewrap         沙箱后端。缺则 Sandbox.available() 为假，一切命令被拒
+# bzip2 + pbzip2     缺则 micromamba 解包失败（execve /usr/bin/lbzip2 = ENOENT）
+# socat              relay，见 ../entrypoint.sh
+# git                作业快照步骤调用 git，缺则 compute_job 直接失败
+# procps-ng findutils hostname tar gzip which   常规运维与回收判据（ps）
+RUN dnf install -y \
+      bubblewrap procps-ng findutils hostname tar gzip which \
+      socat bzip2 pbzip2 git \
+ && dnf clean all \
+ && rm -rf /var/cache/dnf
+
+COPY axiomics /usr/local/bin/axiomics
+RUN chmod 0755 /usr/local/bin/axiomics
+
+# 内部 CA：租户容器内 curl 走它；Bun 不读系统 bundle，
+# 另需在 podman run 时传 NODE_EXTRA_CA_CERTS 指向同一文件。
+COPY axiomics-internal-ca.crt /etc/pki/ca-trust/source/anchors/axiomics-internal-ca.crt
+RUN update-ca-trust extract
+
+ENV AXIOMICS_DATA_DIR=/data \
+    AXIOMICS_CONFIG_DIR=/config \
+    XDG_CACHE_HOME=/cache \
+    XDG_STATE_HOME=/state
+
+VOLUME ["/data", "/config", "/cache", "/state"]
+
+ENTRYPOINT ["/usr/local/bin/axiomics"]
+CMD ["serve", "--port", "4096"]

@@ -1,0 +1,26 @@
+[Unit]
+Description=Axiomics Authelia（__AUTHELIA__）
+# AX_ROOT 必须在持久盘上；挂载失败时宁可不起服务，也不要在空目录上跑。
+RequiresMountsFor=__AX_ROOT__
+After=network.target
+Before=__UNIT_PREFIX__-gateway.service
+
+[Service]
+# RequiresMountsFor 在**用户级**单元里不会生成 Requires= —— 用户管理器不能 Require
+# 系统级挂载单元，它只留下 After=。所以真正的兜底是下面两条显式检查：
+#   ① AX_ROOT 目录不存在 —— 数据盘没挂上（或从未部署），拒绝启动；
+#   ② __AX_REQUIRE_MOUNT__ 非空时，该挂载点必须真的挂着 —— 否则 /disk1 这类挂载点
+#      会以一个空目录的形式"存在"，目录检查照样通过，用户看到项目全空、新写入落到
+#      系统盘。deploy.sh 在 AX_ROOT 位于独立挂载点时自动填入，留空则只做 ①。
+ExecStartPre=/bin/sh -c '[ -d __AX_ROOT__ ] || { echo "AX_ROOT __AX_ROOT__ 不存在 —— 拒绝启动" >&2; exit 1; }'
+ExecStartPre=/bin/sh -c 'test -z "__AX_REQUIRE_MOUNT__" || findmnt -M "__AX_REQUIRE_MOUNT__" >/dev/null || { echo "数据盘 __AX_REQUIRE_MOUNT__ 未挂载 —— 拒绝启动" >&2; exit 1; }'
+Type=oneshot
+RemainAfterExit=yes
+# 容器由 deploy.sh 创建，这里只负责开机把它拉起来 —— 用 `podman start` 而不是
+# 重新 `podman run`：容器的挂载、端口、密钥都在创建时定死了，重建等于换一个容器。
+ExecStart=/usr/bin/podman start __AUTHELIA__
+ExecStop=/usr/bin/podman stop __AUTHELIA__
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

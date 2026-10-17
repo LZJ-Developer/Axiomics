@@ -1,0 +1,579 @@
+#!/usr/bin/env bash
+# 租户生命周期管理：add / retire / list / reclaim
+#
+# 设计约束（每条都有实测依据）：
+#   - 容器标志集缺一不可（见 docs/多租户运维手册.md 2.3）
+#   - 租户 ID 本地分配、永不复用
+#   - tenants.map 必须原子替换（Caddy 重载时读取）
+#   - 用 serve 不用 web（web 会探测并接管已运行的服务器）
+set -euo pipefail
+
+# AX_ROOT 未设时按脚本自身位置推导：部署后脚本就在 $AX_ROOT/bin/ 下。
+# 少了这段，直接跑 `$AX_ROOT/bin/axiomics-usage`（README 教的就是这么跑）会静默
+# 读到不存在的 /srv/axiomics，表现是"账本为空""无租户"—— 不像报错，像**真的没数据**。
+# 只认"像运行时根"的目录，否则退回 /srv/axiomics：免得在仓库里原地跑时
+# 把源码目录当成运行时根。
+_self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -z "${AX_ROOT:-}" ]; then
+  if [ -d "$_self_root/bin" ] && { [ -f "$_self_root/tenants.map" ] || [ -d "$_self_root/logs" ]; }; then
+    AX_ROOT="$_self_root"
+  else
+    AX_ROOT=/srv/axiomics
+  fi
+fi
+TENANTS="$AX_ROOT/tenants"
+MAP="$AX_ROOT/tenants.map"
+IMAGE="${AX_IMAGE:-localhost/axiomics-tenant:latest}"
+# 共享工具链的根。它是**部署事实**（盘在哪、多大），不是源码常量：
+#   ① AX_SHARED_ENVS
+#   ② $AX_ROOT/shared-envs-root —— deploy.sh 在安装时落下，与 gateway-ip 同一套
+#      "粘住"做法：之后再跑本脚本不必每次带变量
+#   ③ $AX_ROOT/envs —— 约定位置
+# 写死在源码里的代价不是"路径不对"这么轻：换台机器就是容器内解释器不存在，
+# pythonRuntime 退回建 conda starter，内网连不通 conda-forge，工具永久 running。
+if [ -z "${AX_SHARED_ENVS:-}" ] && [ -f "$AX_ROOT/shared-envs-root" ]; then
+  AX_SHARED_ENVS="$(tr -d '[:space:]' <"$AX_ROOT/shared-envs-root")"
+fi
+SHARED_ENVS="${AX_SHARED_ENVS:-$AX_ROOT/envs}"
+# 基础层的三个子路径必须**从 SHARED_ENVS 派生**，一个字面量都不留。
+# 挂载是 `-v "$SHARED_ENVS:$SHARED_ENVS:ro"`（两侧同路径），所以容器里只存在
+# $SHARED_ENVS 之下的东西。这三个各自写死过一个绝对路径：只改 AX_SHARED_ENVS 时
+# 挂载点搬了、它们没跟，容器内路径落空，就是上面那段说的同一个故障。
+# AX_BASE_ENV 也直接派生自 SHARED_PYTHON，别再抄一遍同样的路径。
+SHARED_PYTHON="${AX_SHARED_PYTHON:-$SHARED_ENVS/omics-stamo-1.0.0}"
+SHARED_R="${AX_SHARED_R:-$SHARED_ENVS/omics-archr-1.0.3}"
+BASE_ENV="${AX_BASE_ENV:-$SHARED_PYTHON}"
+ENTRYPOINT="${AX_ENTRYPOINT:-$AX_ROOT/entrypoint.sh}"
+GATEWAY="${AX_GATEWAY:-ax${AX_NAME_SUFFIX:-}-gw}"
+# 租户端口的发布地址：默认 loopback（用户不可见）。拆成多机部署时改成内网地址，
+# 且**必须用防火墙只放行网关那一台** —— 这些端口只靠每租户的 Bearer token 保护，
+# 暴露给整个网段等于把 token 当成唯一防线。
+TENANT_BIND="${AX_TENANT_BIND:-127.0.0.1}"
+AUTHELIA="${AX_AUTHELIA:-ax${AX_NAME_SUFFIX:-}-authelia}"
+# 激活器写的审计：每个已认证请求一条。回收判据拿它当"真实活动"信号。
+AUDIT="${AX_AUDIT:-$AX_ROOT/logs/audit.jsonl}"
+PORT_BASE="${AX_PORT_BASE:-42100}"
+# CORS 白名单必须覆盖**本机全部内网 IP**：客户端经 VPN 落在哪一段由网络侧决定，
+# 我们看不出来；只配一个 IP 时，从别的段进来的浏览器登录后接口会被 CORS 挡掉。
+# 内置白名单只有 http://localhost / http://127.0.0.1（见 server/host-guard.ts），
+# 所以 https://<任意IP> 必须显式列出，且是**精确匹配**。
+# AX_CORS_ORIGIN 可整体覆盖（空格分隔），AX_GATEWAY_IPS 可指定 IP 清单。
+# 取 IP 只走一处实现（bin/axiomics-gateway-ips）：早先两处各写一遍，
+# 改了一处漏一处 —— 网桥过滤就漏了，docker0 的 192.0.2.74 混进了 CORS 列表。
+die() { echo "错误: $*" >&2; exit 1; }
+
+_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_IPS_CMD="$_HERE/axiomics-gateway-ips"
+[ -x "$_IPS_CMD" ] || _IPS_CMD="$AX_ROOT/bin/axiomics-gateway-ips"
+# 缺这个助手时**必须响亮地死**，别让它变成静默 127。
+# 旧写法：${AX_CORS_ORIGIN:-$( "$_IPS_CMD" 2>/dev/null | sed | tr )}
+# 文件不存在 → `2>/dev/null` 吞掉 "No such file or directory" → pipefail 让管道
+# 返回 127 → 赋值失败 → set -e 当场杀掉整个脚本。现象是 **add / list / retire /
+# reclaim 全部静默退出 127、一个字都不打印** —— 分不清是脚本坏了还是环境不对。
+# 而 deploy.sh 的 install 清单里恰好漏了它，所以"全新机器首次部署"就是这个状态。
+if [ -z "${AX_CORS_ORIGIN:-}" ] && [ ! -x "$_IPS_CMD" ]; then
+  die "缺少 $_IPS_CMD
+      它由 deploy.sh 安装；手工部署请一并 install 到 \$AX_ROOT/bin/。
+      临时绕过：AX_CORS_ORIGIN='https://<IP>' $0 $*"
+fi
+CORS_ORIGINS_RAW="${AX_CORS_ORIGIN:-$( "$_IPS_CMD" | sed 's|^|https://|' | tr '\n' ' ' )}"
+
+# ── 下一个未用租户 ID（永不复用已退役的）─────────────────────────────
+# 从映射表与退役日志取号，不依赖目录名（目录名可能与 ID 不一致）
+next_id() {
+  local max=0 n id from_map from_retired
+  # 两个来源各自兜底，不能让其中一个失败把另一个的好值也丢掉。
+  # 早先写成 `ids=$( { a; b; } | tr ) || ids=""`：retired.log 不存在时 b 非零退出，
+  # set -euo pipefail 让整个赋值失败，`|| ids=""` 把已经读到的 map 内容一并清空 ——
+  # 于是 next_id 恒返回 u0001，add 必然与现有租户撞名。
+  from_map=$(awk '{print $2}' "$MAP" 2>/dev/null || true)
+  from_retired=$(awk '{print $1}' "$AX_ROOT/retired.log" 2>/dev/null || true)
+  while read -r id; do
+    [ -n "$id" ] || continue
+    n=${id#u}
+    [[ "$n" =~ ^[0-9]+$ ]] && [ "$n" -gt "$max" ] && max=$n
+  done <<<"$from_map
+$from_retired"
+  printf 'u%04d' $((max + 1))
+}
+
+# ── 下一个空闲端口 ───────────────────────────────────────────────────
+# 必须避开两类占用，缺一即撞车：
+#   1) 宿主上正在监听的端口（网关、其它服务）
+#   2) tenants.map 里已登记的端口 —— 被回收的租户端口不处于 LISTEN，
+#      只查 ss 会漏，登记表是唯一防线。
+# map 行的端口在第 3 列（`alice u0001 42001 0`，行尾是 GPU 号），
+# 所以按列比对；早先用 `grep " $p$"` 锚行尾，永远匹配不上，导致 u0003/u0004 同占 42100。
+next_port() {
+  local p=$PORT_BASE
+  while :; do
+    if ss -ltn 2>/dev/null | grep -q ":$p "; then p=$((p + 1)); continue; fi
+    if awk -v p="$p" '$3 == p { found = 1 } END { exit !found }' "$MAP" 2>/dev/null; then
+      p=$((p + 1))
+      continue
+    fi
+    break
+  done
+  echo "$p"
+}
+
+# ── 容器标志集（缺一不可）────────────────────────────────────────────
+run_tenant() {
+  local tid=$1 port=$2 gpu=$3 tok
+  tok=$(cat "$TENANTS/$tid/token")
+  local libs=()
+  for l in libcuda.so.1 libnvidia-ml.so.1 libnvidia-ptxjitcompiler.so.1 \
+           libnvidia-allocator.so.1 libnvidia-cfg.so.1 libnvidia-nvvm.so.4; do
+    [ -e "/usr/lib64/$l" ] && libs+=(-v "/usr/lib64/$l:/usr/lib64/$l:ro")
+  done
+
+  # 共享基础层（AXIOMICS_SHARED_PYTHON / _R）：pythonRuntime 与 rRuntime 在项目
+  # 没有 .venv 时先取它，取不到才去建 conda starter —— 而 starter 需要 conda-forge，
+  # 内网不可达，那次失败是「45 分钟租约 + 20 分钟超时」的长等待，表现为工具永久
+  # running。指向共享层后解释器立刻可用；pip / install.packages 的长尾落进可写的
+  # PIP_TARGET / R_LIBS_USER 覆盖层，仍然持久。
+
+  # 把 CORS_ORIGINS_RAW 拆成重复的 --cors 参数（该选项是数组、精确匹配）
+  local CORS_ARGS=()
+  for o in $CORS_ORIGINS_RAW; do [ -n "$o" ] && CORS_ARGS+=(--cors "$o"); done
+
+  podman run -d --name "ax-$tid" \
+    --init \
+    --userns=keep-id \
+    --security-opt unmask=ALL \
+    --security-opt mask=/sys/bus/pci \
+    --security-opt mask=/sys/devices \
+    --security-opt mask=/sys/class/drm \
+    --device "/dev/nvidia$gpu" --device /dev/nvidiactl \
+    --device /dev/nvidia-uvm --device /dev/nvidia-uvm-tools \
+    "${libs[@]}" \
+    -e HOME=/data \
+    -e AXIOMICS_SKIP_ENVIRONMENT_BOOTSTRAP=1 \
+    -e PYTHONPYCACHEPREFIX=/cache/pycache \
+    -e PIP_CACHE_DIR=/cache/pip -e UV_CACHE_DIR=/cache/uv \
+    -e AXIOMICS_SHARED_PYTHON="$SHARED_PYTHON" \
+    -e AXIOMICS_SHARED_R="$SHARED_R" \
+    -e http_proxy= -e https_proxy= -e HTTP_PROXY= -e HTTPS_PROXY= \
+    -e all_proxy= -e ALL_PROXY= -e no_proxy= -e NO_PROXY= \
+    -e NODE_EXTRA_CA_CERTS=/etc/pki/ca-trust/source/anchors/axiomics-internal-ca.crt \
+    -v "$ENTRYPOINT:/entrypoint.sh:ro" \
+    -v "$SHARED_ENVS:$SHARED_ENVS:ro" \
+    -v "$TENANTS/$tid/data:/data" -v "$TENANTS/$tid/config:/config" \
+    -v "$TENANTS/$tid/cache:/cache" -v "$TENANTS/$tid/state:/state" \
+    -e "AXIOMICS_AUTH_TOKEN=$tok" \
+    -p "$TENANT_BIND:$port:8080" \
+    --entrypoint sh "$IMAGE" /entrypoint.sh serve --port 4096 "${CORS_ARGS[@]}" >/dev/null
+}
+
+reload_gateway() {
+  podman exec "$GATEWAY" caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 \
+    || echo "警告: 网关重载失败（核对站点数 grep -c '^:' Caddyfile）" >&2
+}
+
+# ── 从 tenants.map 渲染 Caddy 的 import 文件，再重载 ─────────────────
+# 映射表是唯一真相：新增/注销租户后路由必须跟着变，否则新租户建了也用不了
+render_maps() {
+  local d="$AX_ROOT/gateway"
+  mkdir -p "$d"
+  awk 'NF>=2 {print $1" "$2}' "$MAP"                             > "$d/tenants.caddy"
+  awk 'NF>=3 {print $2" 127.0.0.1:"$3}' "$MAP"                   > "$d/upstreams.caddy"
+  awk 'NF>=2 {print $2" \"{file./srv/ax/tenants/"$2"/token}\""}' "$MAP" > "$d/tokens.caddy"
+  reload_gateway
+}
+
+# ── add ─────────────────────────────────────────────────────────────
+cmd_add() {
+  local name=${1:?用法: axiomics-tenant add <用户名> [--gpu N]}
+  local gpu=0
+  [ "${2:-}" = "--gpu" ] && gpu=${3:?}
+  grep -q "^$name " "$MAP" 2>/dev/null && die "用户 $name 已存在"
+
+  local tid port
+  tid=$(next_id); port=$(next_port)
+  local root="$TENANTS/$tid"
+  mkdir -p "$root"/{data,config,cache,state}
+  openssl rand -hex 32 > "$root/token"; chmod 600 "$root/token"
+
+  cat > "$root/config/axiomics.json" <<JSON
+{
+  "model": "deepseek/deepseek-flash",
+  "provider": { "deepseek": { "options": {
+    "baseURL": "https://host.containers.internal:43001/model/v1",
+    "apiKey": "tenant-$tid"
+  }}},
+  "sandbox": { "enabled": false }
+}
+JSON
+  # 这一个值同时决定两件事，没有中间档（实测）：
+  #   true  → mode=approve → bwrap 沙箱开 + 每个动作都要用户点确认
+  #   false → mode=full    → 无沙箱 + 不询问
+  # 本部署选 false：agent 跑在云端，容器本身就是租户间的隔离边界
+  # （一人一容器、独立 PID/net/fs），权限放开不打断长流程。
+  #
+  # 代价要记住：ScientificCapability 派发本地作业前要求「已验证的 OS 沙箱」，
+  # 关掉这一档后该要求是否仍被满足，取决于 ExecutionAuthority 的判定式
+  # （unavailable = enabled && !available && onUnavailable==="error"，enabled=false 时恒假）。
+  # 这条在真机上验证过再改这个默认值，别凭印象。
+
+  run_tenant "$tid" "$port" "$gpu"
+
+  printf '%s %s %s %s\n' "$name" "$tid" "$port" "$gpu" >> "$MAP.new"
+  cat "$MAP" >> "$MAP.new" 2>/dev/null || true
+  sort -u "$MAP.new" -o "$MAP.new"; mv "$MAP.new" "$MAP"
+  render_maps
+
+  seed_cases "$tid" optional
+  echo "已开通 $name → $tid  端口 $port  GPU $gpu"
+  echo "  IdP 账号需另行创建（file 后端：axiomics-tenant idp-add $name <密码>）"
+}
+
+# ── seed-cases：把案例存储切片注入租户 ──────────────────────────────
+# 案例回放走的是普通会话路由，依赖三层（路由 / provider / 产物）且全部绑项目。
+# 只要那个项目在租户的 storage 里真的存在，三层就自然成立 —— 零前端改动。
+# 切片由 tooling/acceptance-cases/export-case-slice.ts 装配、deploy.sh 装到
+# $AX_ROOT/case-slice。
+#
+# 合并写入（cp -a 不动租户自己的数据）。会覆盖同名的案例文件 —— 那是刻意的：
+# 切片是平台维护的唯一一份，租户侧只读语义靠这一点保证，而不是靠文件权限。
+seed_cases() {
+  local tid=${1:?用法: axiomics-tenant seed-cases <租户ID>|--all}
+  local required=${2:-required}
+  local slice="${AX_CASE_SLICE:-$AX_ROOT/case-slice}"
+  if [ ! -d "$slice/storage" ]; then
+    # 切片是可选件：gitignore 里，全新部署可能没有。
+    # 显式调 seed-cases 时报错；由 add 顺带调用时只提示，否则建不了租户。
+    local msg="没有案例切片：$slice（装配见 tooling/acceptance-cases/export-case-slice.ts）"
+    [ "$required" = "required" ] && die "$msg"
+    echo "  提示：$msg —— 案例回放将不可用"
+    return
+  fi
+
+  if [ "$tid" = "--all" ]; then
+    while read -r n t _; do [ -n "${t:-}" ] && seed_cases "$t" "$required"; done < "$MAP"
+    return
+  fi
+
+  podman ps --filter "name=^ax-$tid$" --format '{{.Names}}' 2>/dev/null | grep -q . || { echo "  $tid 未运行，跳过"; return; }
+  local root="$TENANTS/$tid/data"
+  mkdir -p "$root/storage"
+  # 不吞错：复制失败（权限、磁盘满）时若照样报"已注入"，后面排障会一路找到回放页
+  # 才发现数据根本没到，比当场失败贵得多。
+  #
+  # --reflink=auto 是**显式写出**，不是修复：coreutils ≥9 的 cp 默认就是这个，
+  # 所以案例数据在本机的 XFS 上本来就是写时复制 —— 各租户看到的文件 inode 不同，
+  # 物理扩展区是同一份（实测三个租户的 pdflatex.fmt 都落在 2571926912..2571927235）。
+  # 写出来是为了不依赖那份默认值：POSIXLY_CORRECT=1 会关掉它，旧版 coreutils
+  # 默认 --reflink=never，有人给 cp 起了别名也一样。一旦退回实体拷贝，磁盘占用
+  # 就从"一份"变成"每人一份"，而这条路径很难在事后发现。
+  # 不用硬链接：租户在回放会话里接着提问会原地写，硬链接是同一 inode，一改串所有租户。
+  # auto 在不支持 reflink 的文件系统上静默退回实体拷贝，所以这行在任何盘上都正确。
+  if ! cp -a --reflink=auto "$slice/storage/." "$root/storage/"; then
+    die "案例切片写入失败：$slice/storage → $root/storage"
+  fi
+  if [ -d "$slice/projects" ]; then
+    mkdir -p "$root/projects"
+    cp -a --reflink=auto "$slice/projects/." "$root/projects/" || die "案例项目骨架写入失败：$slice/projects"
+  fi
+
+  # 记录里带着装配时的宿主路径（worktree 指向磁盘上的案例目录、scratchRoot 指向
+  # 装配机的 ~/.axiomics）。容器里这些路径不存在，界面会报 "Folder unavailable"。
+  # 改写成容器内的约定路径，并把目录建出来 —— 回放只需要它存在。
+  # 记录里写容器内路径（/data 是容器里的数据根），但目录要建在宿主的物理路径下
+  # —— 脚本跑在宿主，宿主没有 /data。
+  python3 - "$root" <<'PY'
+import json, os, sys
+physical = sys.argv[1]
+logical = "/data"
+storage = os.path.join(physical, "storage")
+changed = 0
+for dirpath, _, files in os.walk(storage):
+    for name in files:
+        if not name.endswith(".json"):
+            continue
+        p = os.path.join(dirpath, name)
+        try:
+            d = json.load(open(p))
+        except Exception:
+            continue
+        if not isinstance(d, dict):
+            continue
+        touched = False
+        # 必须优先取 projectID：会话记录里 `id` 是会话号，拿它当项目号会写出
+        # /data/projects/ses_xxx，随后服务端以 SessionDirectoryMismatchError 拒绝。
+        prj = d.get("projectID") or d.get("id")
+        if dirpath.endswith(os.sep + "project") and isinstance(d.get("worktree"), str):
+            d["worktree"] = f"{logical}/projects/{prj}"
+            os.makedirs(os.path.join(physical, "projects", str(prj)), exist_ok=True)
+            touched = True
+        if isinstance(d.get("scratchRoot"), str):
+            sid = str(d.get("sessionID", ""))
+            d["scratchRoot"] = f"{logical}/workspaces/{prj}/{sid}"
+            os.makedirs(os.path.join(physical, "workspaces", str(prj), sid), exist_ok=True)
+            touched = True
+        # session_filesystem 的 directory + grants 也要重写，否则读取时被
+        # SessionFilesystemDeniedError 拦下（授权清单 grant 的是装配机的路径）。
+        sid = str(d.get("sessionID", ""))
+        if isinstance(d.get("directory"), str):
+            d["directory"] = f"{logical}/projects/{prj}"
+            touched = True
+        for grant in d.get("grants", []) if isinstance(d.get("grants"), list) else []:
+            if not isinstance(grant, dict) or not isinstance(grant.get("path"), str):
+                continue
+            if grant.get("source") == "workspace":
+                grant["path"] = f"{logical}/workspaces/{prj}/{sid}"
+                touched = True
+            elif grant.get("source") == "api":
+                grant["path"] = f"{logical}/projects/{prj}"
+                touched = True
+        if touched:
+            json.dump(d, open(p, "w"), ensure_ascii=False)
+            changed += 1
+print(f"    改写 {changed} 条记录里的宿主路径")
+PY
+  echo "  已注入案例切片 → $tid"
+}
+
+# ── retire ──────────────────────────────────────────────────────────
+cmd_retire() {
+  local name=${1:?用法: axiomics-tenant retire <用户名>}
+  local tid
+  tid=$(awk -v n="$name" '$1==n{print $2}' "$MAP")
+  [ -n "$tid" ] || die "未找到用户 $name"
+
+  podman stop -t 10 "ax-$tid" >/dev/null 2>&1 || true
+  mkdir -p "$AX_ROOT/archive"
+  tar -czf "$AX_ROOT/archive/$tid-$(date +%F).tar.gz" -C "$TENANTS" "$tid" 2>/dev/null || true
+  grep -v "^$name " "$MAP" > "$MAP.new"; mv "$MAP.new" "$MAP"
+  echo "$tid retired $(date +%F) $name" >> "$AX_ROOT/retired.log"
+  rm -f "$TENANTS/$tid/token"
+  cmd_idp_del "$name" >/dev/null 2>&1 || true
+  render_maps
+  echo "已注销 $name（$tid）。数据卷保留，序号 $tid 不再复用。"
+}
+
+# ── idp-add / idp-del：Authelia file 后端账号 ───────────────────────
+USERS_FILE="${AX_USERS_FILE:-$AX_ROOT/auth/users_database.yml}"
+cmd_idp_add() {
+  local name=${1:?用法: axiomics-tenant idp-add <用户名> <密码>}
+  local pass=${2:?需要密码}
+  local h
+  h=$(timeout 120 podman run --rm ghcr.io/authelia/authelia:latest \
+        authelia crypto hash generate argon2 --password "$pass" 2>/dev/null | sed -n 's/^Digest: //p')
+  [ -n "$h" ] || die "口令哈希生成失败"
+  # 文件不存在时自建空库，而不是 FileNotFoundError —— deploy.sh 现在也会预建，
+  # 但直接跑 idp-add 不该依赖这一点。
+  mkdir -p "$(dirname "$USERS_FILE")"
+  python3 - "$USERS_FILE" "$name" "$h" <<'PYEOF'
+import sys, yaml
+p, name, h = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    d = yaml.safe_load(open(p))
+except FileNotFoundError:
+    d = None
+d = d or {}
+d.setdefault("users", {})
+d["users"][name] = {"displayname": name, "password": h, "email": f"{name}@example.internal"}
+yaml.safe_dump(d, open(p, "w"), allow_unicode=True, sort_keys=True)
+print("  已写入，现有用户:", list(d["users"].keys()))
+PYEOF
+  # 容器可能还不存在：deploy.sh 在 podman run 之前就会调这里建首个用户
+  # （Authelia 不接受空用户库）。没有容器可重启不算错误。
+  podman restart "$AUTHELIA" >/dev/null 2>&1 || true
+  echo "  Authelia 已重启（若容器尚未创建，稍后启动时生效）"
+}
+cmd_idp_del() {
+  local name=${1:?用法: axiomics-tenant idp-del <用户名>}
+  python3 - "$USERS_FILE" "$name" <<'PYEOF'
+import sys, yaml
+p, name = sys.argv[1], sys.argv[2]
+d = yaml.safe_load(open(p))
+if name in d["users"]:
+    del d["users"][name]
+    yaml.safe_dump(d, open(p, "w"), allow_unicode=True, sort_keys=True)
+    print("  已移除，剩余用户:", list(d["users"].keys()))
+else:
+    print("  用户不存在")
+PYEOF
+  podman restart ax-authelia >/dev/null 2>&1
+}
+
+# ── list ────────────────────────────────────────────────────────────
+cmd_list() {
+  printf '%-10s %-8s %-7s %-5s %s\n' 用户 租户ID 端口 GPU 状态
+  while read -r n t p g; do
+    [ -n "${n:-}" ] || continue
+    local st
+    st=$(podman ps -a --filter "name=^ax-$t$" --format "{{.Status}}" 2>/dev/null | head -1 || true)
+    printf '%-10s %-8s %-7s %-5s %s\n' "$n" "$t" "$p" "$g" "${st:-未运行}"
+  done < "$MAP"
+}
+
+# ── reclaim：两个精确信号 ────────────────────────────────────────────
+# 判据 1「有人在用」：租户 API 的忙碌会话（比数进程精确——入口脚本的 sleep
+#   与 agent 自己的长命令在进程层面无法区分）
+# 判据 2「近期有写入」：数据根最新 mtime（awk 读全量，避免 head 触发 SIGPIPE
+#   被 pipefail 判失败后抹掉好值）
+cmd_reclaim() {
+  local idle_min=20 dry=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --idle-min) idle_min=$2; shift 2 ;;
+      --dry-run) dry=1; shift ;;
+      *) shift ;;
+    esac
+  done
+
+  while read -r n t p g; do
+    [ -n "${n:-}" ] || continue
+    podman ps --filter "name=^ax-$t$" --format '{{.Names}}' 2>/dev/null | grep -q . || continue
+
+    # 判据 1：容器内是否有 axiomics 之外的工作进程。
+    # 用 podman exec 直接跑 ps（不加 sh 包装），否则检查命令自身会被计入。
+    # 基础设施白名单：podman-init / axiomics / socat（relay）/ ps（本次检查）
+    # socat 每连接 fork 一个子进程，漏了它租户会被永远判忙、永不回收。
+    # 注意：/session/status 在忙与闲时都返回 {}，不可用作忙碌信号。
+    local busy
+    busy=$(podman exec "ax-$t" ps -e -o stat=,comm= 2>/dev/null \
+           | awk '$1 !~ /^Z/ && $2 !~ /^(podman-init|axiomics|socat|ps)$/ {n++} END{print n+0}')
+    busy=${busy:-0}
+
+    # 判据 2：最近一次真实活动。取三个来源的最大值。
+    #
+    # 早先只用「数据根最新 mtime」当代理，两个失效场景：
+    #   (a) 只读访问不写盘 —— 正在翻会话的用户会被中途回收，SSE 断开、回合被打断
+    #   (b) start 不刷新它 —— 刚唤醒的租户（数据是几小时前的）下一轮就被回收
+    #
+    #   · 容器启动时刻    刚拉起必有宽限，不依赖任何外部记录
+    #   · 审计最近请求    真实使用信号，覆盖只读；激活器对每个已认证请求都记一条
+    #   · 数据根 mtime    兜底：激活器挂了，或绕过网关直连的使用
+    local started audit_last mtime last now age ts
+    started=$(podman inspect "ax-$t" --format '{{.State.StartedAt}}' 2>/dev/null | cut -d. -f1)
+    started=$(date -d "${started:-1970-01-01}" +%s 2>/dev/null || echo 0)
+
+    audit_last=0
+    if [ -f "$AUDIT" ]; then
+      # tac 从尾部读，命中即停；审计随使用增长，不能每轮全量扫。
+      #
+      # 末尾的 `|| true` 不是可有可无的：awk 命中即 exit，tac 还没写完就收到 SIGPIPE，
+      # `set -o pipefail` 让整条管道返回 141，`set -e` 当场把脚本杀掉 —— 回收因此**静默**
+      # 失效（systemd 里只留一句 "Main process exited, code=exited, status=1"）。
+      # 触发条件是审计日志长过 64 KB 管道缓冲：小日志时 tac 一次写完、awk 才退出，
+      # 侥幸不报错；日志只增不减，所以是"某天起突然不回收了"，且永不自愈。
+      # 值本身由 awk 在退出前写出，吞掉的是 tac 的 SIGPIPE，不是结果。
+      ts=$(tac "$AUDIT" 2>/dev/null | awk -v pat="\"tenant\":\"$t\"" \
+             'index($0,pat) && match($0,/"ts":"[^"]*"/) { print substr($0,RSTART+6,RLENGTH-7); exit }' || true)
+      [ -n "$ts" ] && audit_last=$(date -d "$ts" +%s 2>/dev/null || echo 0)
+    fi
+
+    mtime=$(find "$TENANTS/$t/data" -type f -not -path '*/cache/*' -printf '%T@\n' 2>/dev/null \
+            | awk 'BEGIN{m=0}{v=$1+0; if(v>m)m=v}END{printf "%d", m}')
+    mtime=${mtime:-0}
+
+    now=$(date +%s)
+    last=$started
+    [ "$audit_last" -gt "$last" ] && last=$audit_last
+    [ "$mtime" -gt "$last" ] && last=$mtime
+    age=$(( (now - last) / 60 ))
+
+    # 日志里标出是哪个来源决定的，排障时不必再猜
+    local src="启动"
+    [ "$last" = "$audit_last" ] && src="请求"
+    [ "$last" = "$mtime" ] && [ "$mtime" -ge "$audit_last" ] && src="写盘"
+
+    if [ "${busy:-1}" -eq 0 ] && [ "$age" -ge "$idle_min" ]; then
+      if [ "$dry" -eq 1 ]; then
+        echo "[dry-run] $t 空闲 ${age} 分（最近活动来自$src）、无工作进程 → 可回收"
+      else
+        # 收窄竞态：判定到停止之间可能有请求到达，停之前再确认一次
+        local recheck
+        recheck=$(podman exec "ax-$t" ps -e -o stat=,comm= 2>/dev/null \
+                  | awk '$1 !~ /^Z/ && $2 !~ /^(podman-init|axiomics|socat|ps)$/ {n++} END{print n+0}')
+        if [ "${recheck:-1}" -ne 0 ]; then
+          echo "保持 $t：复检发现工作进程 $recheck"
+          continue
+        fi
+        podman stop -t 10 "ax-$t" >/dev/null 2>&1 && echo "已回收 $t（空闲 ${age} 分，最近活动来自$src）"
+      fi
+    else
+      echo "保持 $t：工作进程 $busy、空闲 ${age} 分（最近活动来自$src）"
+    fi
+  done < "$MAP"
+}
+
+# ── sweep：宿主侧为各租户的项目目录备好 .venv ───────────────────────
+# 放在宿主侧而非容器内：容器内的 sleep 循环会被"忙碌判据"当成工作进程。
+#
+# 关键：项目 venv 必须**从共享基础层的解释器**建，且开 --system-site-packages。
+# 早先用容器的 `python3 -m venv`，那建出来的是**空 venv**（且是 3.9，与共享层的
+# 3.11 不同 ABI）—— 于是共享层装了 51 GB 却一分没用上，agent 得把 numpy/pandas/
+# scanpy 全部重装一遍；而没有 .venv 时 pythonRuntime 会去构建 conda starter 环境，
+# 那条路因为连不通 conda-forge 必然失败（表现为工具永久 running）。
+# 继承之后：共享依赖直接可用，pip 装的长尾落在这个可写的项目 venv 里、持久保存。
+cmd_sweep() {
+  local base="$BASE_ENV"
+  local made=0
+  while read -r n t p g; do
+    [ -n "${n:-}" ] || continue
+    podman ps --filter "name=^ax-$t$" --format '{{.Names}}' 2>/dev/null | grep -q . || continue
+    local need
+    need=$(podman exec "ax-$t" sh -c 'for d in /data/projects/*/; do [ -x "$d.venv/bin/python" ] || echo "$d"; done' 2>/dev/null || true)
+    [ -n "$need" ] || continue
+    podman exec "ax-$t" sh -c "
+      [ -x '$base/bin/python' ] || { echo '    基础层缺失：$base' >&2; exit 1; }
+      for d in /data/projects/*/; do
+        [ -x \"\$d.venv/bin/python\" ] && continue
+        '$base/bin/python' -m venv --system-site-packages \"\$d.venv\" >/dev/null 2>&1 || echo \"    建 venv 失败: \$d\" >&2
+      done
+    " 2>&1 | sed 's/^/  /' || true
+    echo "  已为 $t 补齐项目 venv（继承 $base）"
+    made=$((made + 1))
+  done < "$MAP"
+  [ "$made" -eq 0 ] && echo "  无需补齐"
+}
+
+# ── start：从映射表启动（幂等，供回收后的按需唤醒使用）──────────────
+cmd_recreate() {
+  local tid=${1:?用法: axiomics-tenant recreate <租户ID>|--all}
+  if [ "$tid" = "--all" ]; then
+    while read -r n t _; do [ -n "${t:-}" ] && cmd_recreate "$t"; done < "$MAP"
+    return
+  fi
+  local port gpu
+  read -r port gpu <<< "$(awk -v t="$tid" '$2==t{print $3, $4}' "$MAP")"
+  [ -n "${port:-}" ] || die "映射表中无 $tid"
+  # 数据在宿主的 $AX_ROOT/tenants/$tid 下，删容器不会动数据。
+  # 这一步是镜像升级的唯一手段：挂载路径与镜像都烤在容器定义里，重启不会换镜像。
+  local root="$TENANTS/$tid"
+  [ -d "$root/data" ] || die "$tid 的数据目录不存在：$root/data —— 拒绝重建（会造成空数据启动）"
+  podman rm -f "ax-$tid" >/dev/null 2>&1 || true
+  run_tenant "$tid" "$port" "$gpu"
+  echo "$tid 已按当前镜像重建（端口 $port，GPU $gpu）"
+}
+
+cmd_start() {
+  local tid=${1:?用法: axiomics-tenant start <租户ID>}
+  local port gpu
+  read -r port gpu <<< "$(awk -v t="$tid" '$2==t{print $3, $4}' "$MAP")"
+  [ -n "${port:-}" ] || die "映射表中无 $tid"
+  if podman ps --filter "name=^ax-$tid$" --format '{{.Names}}' 2>/dev/null | grep -q .; then
+    echo "$tid 已在运行"; return 0
+  fi
+  podman rm -f "ax-$tid" >/dev/null 2>&1 || true
+  run_tenant "$tid" "$port" "$gpu"
+  echo "$tid 已启动（端口 $port，GPU $gpu）"
+}
+
+case "${1:-}" in
+  add)     shift; cmd_add "$@" ;;
+  retire)  shift; cmd_retire "$@" ;;
+  start)   shift; cmd_start "$@" ;;
+  recreate) shift; cmd_recreate "$@" ;;
+  list)    cmd_list ;;
+  reclaim) shift; cmd_reclaim "$@" ;;
+  sweep)   cmd_sweep ;;
+  seed-cases) shift; seed_cases "${1:?用法: axiomics-tenant seed-cases <租户ID>|--all [optional]}" "${2:-required}" ;;
+  idp-add) shift; cmd_idp_add "$@" ;;
+  idp-del) shift; cmd_idp_del "$@" ;;
+  next-id) next_id ;;
+  *) sed -n '2,7p' "$0" | sed 's/^# \?//'; exit 1 ;;
+esac
