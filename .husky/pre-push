@@ -1,5 +1,24 @@
 #!/bin/sh
 set -e
+# Only `main` is public. Two local branches must never be published, and one
+# `git push --all` would do it:
+#   internal — this deployment's live record (host addresses, disk, roster)
+#   axiomics — the pre-rewrite history, kept as a local backup
+# Refuse here instead of relying on whoever is pushing to notice which branch
+# they are on.
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/internal)
+      echo "拒绝推送 internal：该分支只应存在于本地（含现场地址与租户名单）。" >&2
+      exit 1
+      ;;
+    refs/heads/axiomics)
+      echo "拒绝推送 axiomics：重写前的历史，仅作本地备份，远程只保留 main。" >&2
+      exit 1
+      ;;
+  esac
+done
+
 # Full local validation is opt-in: AXIOMICS_PUSH_CHECKS=1 git push
 [ "${AXIOMICS_PUSH_CHECKS:-0}" = "1" ] || exit 0
 
