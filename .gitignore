@@ -52,6 +52,8 @@ docs/SKILL.state.pdf
 # notes that use them; a downloaded copy is not ours to redistribute and does
 # not belong in the source tree.
 docs/*.pdf
+# A saved full-text article, same reasoning: the URL in the file is the citation.
+docs/ds沙箱.md
 
 # Harbor adapter local virtualenv
 tooling/harbor/.venv/
