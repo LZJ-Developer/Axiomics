@@ -4,7 +4,7 @@ import { ManagedEnvironments } from "@/science/kernel/environment-manager"
 import { pythonEnvironment } from "@/science/kernel/interpreter"
 import type { KernelStartOptions } from "@/science/kernel/types"
 import { createHash } from "node:crypto"
-import { constants, mkdirSync } from "node:fs"
+import { constants, existsSync, mkdirSync } from "node:fs"
 import { access, readdir, realpath } from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
@@ -209,6 +209,40 @@ export namespace KernelEnvironmentMutation {
     return path.join(Global.Path.data, "kernel-environments", Instance.project.id, language, environment)
   }
 
+  /** An administrator-provisioned interpreter that stands in for the app-managed
+   * starter when the starter cannot be built.
+   *
+   * Why this exists: the starter is created with `micromamba create -c conda-forge`,
+   * which needs conda-forge at runtime. On an isolated network that channel is
+   * unreachable, so every resolution ends in a bounded but useless wait —
+   * `ensureStarter` runs under a 20 minute command timeout behind a 45 minute
+   * lease — and the tool that asked for an interpreter stays `running` the whole
+   * time. Deployments that ship a shared read-only environment root set
+   * AXIOMICS_SHARED_PYTHON / AXIOMICS_SHARED_R to it and get an interpreter
+   * immediately; everything downstream is unchanged, including the writable
+   * PIP_TARGET / R_LIBS_USER overlay that project packages install into.
+   *
+   * Unset by default, so behavior on a networked machine is exactly as before. */
+  export function sharedBase(language: Language): KernelStartOptions | undefined {
+    const root = process.env[language === "python" ? "AXIOMICS_SHARED_PYTHON" : "AXIOMICS_SHARED_R"]?.trim()
+    if (!root) return
+    const bin = path.join(root, "bin")
+    const binary = path.join(bin, language === "python" ? "python" : "Rscript")
+    if (!existsSync(binary)) return
+    // PATH must carry the shared bin: the caller runs shell commands that say
+    // `python` / `Rscript`, not an absolute path, and the app-managed starter
+    // this replaces exported PATH for exactly that reason. Leaving it out makes
+    // every such command fail with "command not found".
+    return {
+      binary,
+      environmentName: language,
+      env: {
+        PATH: [bin, process.env.PATH].filter(Boolean).join(path.delimiter),
+        ...(language === "python" ? {} : { R_HOME: root }),
+      },
+    }
+  }
+
   /** Resolve the complete Python start contract for both the canonical tool
    * and HTTP runtime surface. The starter is read-only with a project package
    * overlay; approved named task environments own their packages directly and
@@ -225,17 +259,23 @@ export namespace KernelEnvironmentMutation {
     } catch (error) {
       projectError = error
     }
+    // Order: the project's own .venv, then the shared read-only root, then the
+    // app-managed starter. The shared root sits ahead of the starter because on
+    // an isolated network the starter cannot be built at all and the failure is
+    // a long bounded wait, not a fast error — see sharedBase(). Named task
+    // environments are explicit choices and are never substituted this way.
     const managed =
       environment === "python" && project?.binary
         ? project
-        : await ManagedEnvironments.runtime("python", environment).catch(async (error) => {
+        : (environment === "python" ? sharedBase("python") : undefined) ??
+          (await ManagedEnvironments.runtime("python", environment).catch(async (error) => {
             // Existing project-scoped named environments remain readable for
             // backward compatibility. New approved environments are created
             // in the shared app-owned store above.
             if (project) return project
             if (projectError) throw projectError
             throw error
-          })
+          }))
     const binary = managed.binary ?? (await hostPython())
 
     if (environment !== "python") {
@@ -267,7 +307,10 @@ export namespace KernelEnvironmentMutation {
 
   /** Complete R start contract shared by all canonical entry points. */
   export async function rRuntime(allowMutation = false): Promise<KernelStartOptions> {
-    const managed = await ManagedEnvironments.runtime("r")
+    // Same reasoning as pythonRuntime: the R starter needs conda-forge plus
+    // bioconda, so on an isolated network it can never build. R has no project
+    // venv equivalent, so the shared root is the first choice when configured.
+    const managed = sharedBase("r") ?? (await ManagedEnvironments.runtime("r"))
     const packages = path.join(managedRoot("r", "r"), "library")
     // R warns or fails when R_LIBS_USER names a missing directory. Provision
     // the empty app-managed library for every default start and recover it
