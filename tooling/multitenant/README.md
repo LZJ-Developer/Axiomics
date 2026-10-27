@@ -20,6 +20,7 @@ bin/axiomics-activator.ts  按需激活：被回收的租户在下一个认证�
 bin/axiomics-model-proxy.ts 模型网关：按占位符识别租户、换成真密钥、记账
 bin/axiomics-usage      用量报表
 bin/axiomics-audit      审计报表
+bin/axiomics-verify     部署自检：一次跑完 15 项断言
 systemd/*.service.tmpl  开机自恢复单元（Authelia / 网关 / 激活器 / 模型代理）
 systemd/axiomics-reclaim.*  回收 timer
 ```
@@ -74,6 +75,48 @@ $AX_ROOT/bin/axiomics-tenant add alice 0
 | `AX_REQUIRE_MOUNT` | 自动解析 `AX_ROOT` 的挂载点 | 单元启动前要求该挂载点真的挂着。`AX_ROOT` 在 rootfs 上（解析结果为 `/`）时自动留空，只查目录是否存在 |
 
 两者都默认按 `AX_ROOT` 推导，**源码里不出现任何具体机器的盘符或路径**。
+
+## 验收：一条命令
+
+```bash
+$AX_ROOT/bin/axiomics-verify          # 只读：不启动容器，不打模型额度
+$AX_ROOT/bin/axiomics-verify --deep   # 额外验模型网关会不会放行伪造租户（仍不产生真实调用）
+```
+
+断言覆盖五层：网关 302 与 Authelia 门户、每个租户的三态令牌矩阵（自己 200 / 无令牌 401 /
+他人令牌 401）、案例切片产物可读（记录 + `/raw` 字节）、模型代理的拒绝行为、
+systemd 单元与 linger。失败时直接指出是哪一层，不用对着浏览器猜。
+
+## 换一个站点要改什么
+
+整套组件没有任何写死的机器路径或地址，站点差异**全部收敛在这些输入上**：
+
+| 输入 | 变量 / 方式 | 说明 |
+| --- | --- | --- |
+| 站点根 | `AX_ROOT` | 部署机上的持久目录；`/srv/axiomics` 只是默认值 |
+| 共享工具链 | `AX_SHARED_ENVS` | 只读挂进每个租户；部署时写入 `$AX_ROOT/shared-envs-root`，之后不必每次带 |
+| 网关地址与证书 | `AX_GATEWAY_IP` / `AX_GATEWAY_IPS` / `AX_GW_ADDR` | 证书 SAN、Authelia cookie 域、租户 CORS 三处都从这一个清单派生 |
+| 认证入口 | `AX_AUTHELIA_ADDR` | 默认 `127.0.0.1:9091`，只该留 loopback；跨机才有理由改 |
+| 租户端口段 | `AX_PORT_BASE` | 默认 42100 起，只发布到 loopback |
+| 模型上游 | `AX_MODEL_UPSTREAM` + `$AX_ROOT/secrets/deepseek.key` | 换模型供应商只改这两处 |
+| GPU 分配 | `axiomics-tenant add <用户> --gpu N` | 每租户直通一张卡；N 从 0 起 |
+| 案例切片 | `AX_CASE_SLICE` | 可选。没有切片时回放不可用，其余功能不受影响 |
+
+部署顺序、宿主前置、镜像构建见上一节；换站点时**只需要重新填这张表**，代码不用动。
+
+## 已知失败模式（都是实测踩过的）
+
+| 现象 | 真因 | 处理 |
+| --- | --- | --- |
+| 本机 `curl 127.0.0.1:421xx` 一律 503 | 走了本机 HTTP 代理（`~/.curlrc` 或环境变量） | 加 `--noproxy '*'`；`axiomics-verify` 已内置 |
+| `axiomics-gateway-ips` 只输出 `127.0.0.1`，`add` 随即以 127 退出 | PATH 里没有 `/sbin`，`ip` 找不到 | `export PATH=/usr/sbin:/sbin:$PATH` |
+| `add` 报 `value too great for base` | 租户号带前导零，bash 按八进制解析 | 已修（`10#$n`）；第 8 个租户之前不会暴露 |
+| 回放里 Results 卡片点开 404 | 切片只带 storage，没带 artifact-store | 已修（导出器 + `seed-cases` 都补上） |
+| 卡片仍在、某些租户 404 | 产物按**当前项目**取，请求没带 `?project=` 或 `x-axiomics-project` | 前端会自动带；手写 curl 要自己加 |
+| 随便编 `tenant-u9999` 也能调模型 | 只校验占位符格式，不对照租户清单 | 已修（对照 `tenants.map`，未知名一律 401） |
+| 浏览器"隐私错误"，`curl` 返回 000 | 自签证书 | 浏览器点"继续"，`curl` 加 `-k` |
+| 改 `auth/configuration.yml` 不生效 | 容器实际加载的是 `/config/portless.yml` | 改 `portless.yml` 再 `podman restart ax-authelia` |
+| 租户过一阵子访问 502 | 空闲 20 分钟被回收，激活器正在拉起 | 属预期；别给租户加 `--restart=always`，会与回收打架 |
 
 ## 开机自恢复
 

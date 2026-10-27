@@ -91,7 +91,9 @@ next_id() {
   while read -r id; do
     [ -n "$id" ] || continue
     n=${id#u}
-    [[ "$n" =~ ^[0-9]+$ ]] && [ "$n" -gt "$max" ] && max=$n
+    # 10# 不可省：ID 带前导零（u0008），bash 算术按八进制解析，
+    # 碰到 8 或 9 就报 "value too great for base" —— 到第 8 个租户才炸。
+    [[ "$n" =~ ^[0-9]+$ ]] && [ "$((10#$n))" -gt "$max" ] && max=$((10#$n))
   done <<<"$from_map
 $from_retired"
   printf 'u%04d' $((max + 1))
@@ -281,6 +283,41 @@ seed_cases() {
   if [ -d "$slice/projects" ]; then
     mkdir -p "$root/projects"
     cp -a --reflink=auto "$slice/projects/." "$root/projects/" || die "案例项目骨架写入失败：$slice/projects"
+  fi
+
+  # 产物库：storage 里只有会话记录和 Results 卡片的引用，真正的字节在
+  # artifact-store（artifacts.db + blobs/）。只并 storage 的后果实测过：
+  # 卡片正常显示，点开报 404（GET /file/artifact-store/art_…）。
+  # 库要按行合并而不是覆盖 —— 租户自己产生的产物可能已经写进去了。
+  if [ -d "$slice/artifact-store" ]; then
+    mkdir -p "$root/artifact-store/blobs"
+    [ -d "$slice/artifact-store/blobs" ] && cp -a --reflink=auto "$slice/artifact-store/blobs/." "$root/artifact-store/blobs/"
+    python3 - "$root/artifact-store/artifacts.db" "$slice/artifact-store/artifacts.db" <<'PY' || die "案例产物库合并失败：$slice/artifact-store"
+import os, shutil, sqlite3, sys
+target, source = sys.argv[1], sys.argv[2]
+if not os.path.exists(source):
+    sys.exit(0)
+os.makedirs(os.path.dirname(target), exist_ok=True)
+# 租户还没写过产物时，整库复制比空库再合并简单，也不会漏掉表结构
+if not os.path.exists(target):
+    shutil.copy2(source, target)
+    print("  产物库：直接复制", sqlite3.connect(target).execute("select count(*) from artifacts").fetchone()[0], "条")
+    sys.exit(0)
+db = sqlite3.connect(target)
+db.execute("ATTACH DATABASE ? AS src", (source,))
+added = {}
+for table in ("store_meta", "blobs", "artifacts", "versions", "executions"):
+    cols = [row[1] for row in db.execute(f"PRAGMA src.table_info({table})")]
+    if not cols:
+        continue
+    names = ", ".join(cols)
+    before = db.total_changes
+    db.execute(f"INSERT OR IGNORE INTO main.{table} ({names}) SELECT {names} FROM src.{table}")
+    added[table] = db.total_changes - before
+db.commit()
+db.execute("DETACH DATABASE src")
+print("  产物库：合并", ", ".join(f"{k}+{v}" for k, v in added.items() if v) or "无新增")
+PY
   fi
 
   # 记录里带着装配时的宿主路径（worktree 指向磁盘上的案例目录、scratchRoot 指向

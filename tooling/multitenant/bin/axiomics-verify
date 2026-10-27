@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# 部署自检：一分钟内回答"这套多租户现在到底通不通"。
+#
+# 只读：不启动容器、不打模型额度。加 --deep 才做两件有副作用的事
+# （经激活器拉起租户、向模型网关发一次 1 token 的请求）。
+#
+# 为什么要有这个脚本：这套部署的关键失败模式都是"看起来正常"——
+# 卡片在、点开 404；占位符任意编、模型照答；租户睡着、网关报 502。
+# 逐项断言比人肉点一遍可靠，也让第二个站点部署时有一套现成的验收口径。
+set -uo pipefail
+
+# 本机 curl 常配着 HTTP 代理（~/.curlrc 或环境变量），打本地非标端口会拿到
+# 代理返回的 503 —— 实测把这当成过服务故障排查了半天。一律 --noproxy。
+# -k：网关用的是自签证书，校验失败会得到 000，看着像"服务没起"。
+CURL=(curl -s -k --noproxy '*' -m 5)
+pass=0
+fail=0
+skip=0
+
+ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; pass=$((pass + 1)); }
+bad()  { printf '  \033[31m✗\033[0m %s\n' "$*"; fail=$((fail + 1)); }
+note() { printf '  \033[2m- %s\033[0m\n' "$*"; skip=$((skip + 1)); }
+
+_self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -z "${AX_ROOT:-}" ]; then
+  if [ -d "$_self_root/bin" ] && { [ -f "$_self_root/tenants.map" ] || [ -d "$_self_root/logs" ]; }; then
+    AX_ROOT="$_self_root"
+  else
+    AX_ROOT=/srv/axiomics
+  fi
+fi
+MAP="$AX_ROOT/tenants.map"
+DEEP=0
+[ "${1:-}" = "--deep" ] && DEEP=1
+
+echo "Axiomics 多租户自检  AX_ROOT=$AX_ROOT"
+[ -f "$MAP" ] || { echo "找不到 $MAP" >&2; exit 2; }
+
+echo
+echo "1. 网关与身份"
+code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' https://127.0.0.1/axiomics)
+[ "$code" = "302" ] && ok "未认证 /axiomics → 302（被 Authelia 拦住）" || bad "未认证 /axiomics → $code（期望 302）"
+code=$("${CURL[@]}" -k -o /dev/null -w '%{http_code}' https://127.0.0.1/auth/)
+[ "$code" = "200" ] && ok "Authelia 门户 200" || bad "Authelia 门户 → $code"
+
+echo
+echo "2. 租户令牌隔离"
+while read -r user tid port gpu; do
+  [ -n "${port:-}" ] || continue
+  token_file="$AX_ROOT/tenants/$tid/token"
+  [ -f "$token_file" ] || { note "$tid 无 token（已注销？）"; continue; }
+  token="$(cat "$token_file")"
+  running=$(podman ps --filter "name=^ax-$tid$" --format '{{.Names}}' 2>/dev/null)
+  if [ -z "$running" ]; then
+    note "$tid 容器未运行（已回收）"
+    continue
+  fi
+  mine=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" "http://127.0.0.1:$port/")
+  none=$("${CURL[@]}" -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/")
+  # 拿另一个租户的 token 打本租户，必须被拒
+  other=$(awk -v t="$tid" '$2 != t {print $2; exit}' "$MAP")
+  cross="n/a"
+  if [ -n "${other:-}" ] && [ -f "$AX_ROOT/tenants/$other/token" ]; then
+    cross=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(cat "$AX_ROOT/tenants/$other/token")" "http://127.0.0.1:$port/")
+  fi
+  if [ "$mine" = "200" ] && [ "$none" = "401" ] && { [ "$cross" = "401" ] || [ "$cross" = "n/a" ]; }; then
+    ok "$user/$tid 自己 200 / 无 token 401 / 他人 token $cross"
+  else
+    bad "$user/$tid 自己 $mine（期望 200）/ 无 token $none（期望 401）/ 他人 token $cross（期望 401）"
+  fi
+done < "$MAP"
+
+echo
+echo "3. 案例切片的产物库"
+if [ -d "$AX_ROOT/case-slice/artifact-store" ]; then
+  count=$(python3 - "$AX_ROOT/case-slice/artifact-store/artifacts.db" <<'PY' 2>/dev/null
+import sqlite3, sys
+print(sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True).execute("select count(*) from artifacts").fetchone()[0])
+PY
+)
+  [ "${count:-0}" -gt 0 ] && ok "切片产物库有 $count 个产物" || bad "切片产物库是空的 —— 回放里 Results 会 404"
+  # 抽一个真实产物，去运行中的租户里取一次记录与字节。
+  # 必须带项目上下文（?project= 或 x-axiomics-project）：路由按「当前项目」取产物，
+  # 不带就一律 404 —— 这个 404 是选错项目造成的，不是数据缺失，很容易误判。
+  sample=$(python3 - "$AX_ROOT/case-slice/artifact-store/artifacts.db" <<'PY' 2>/dev/null
+import sqlite3, sys
+row = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True).execute(
+    "select id, project_id from artifacts order by created_at limit 1").fetchone()
+print(f"{row[0]} {row[1]}" if row else "")
+PY
+)
+  sample_id=${sample%% *}
+  sample_prj=${sample##* }
+  target=$(awk 'NR==1{print $2" "$3}' "$MAP")
+  set -- $target
+  if [ -n "${sample_id:-}" ] && [ -n "${1:-}" ] && [ -f "$AX_ROOT/tenants/$1/token" ] && [ -n "$(podman ps --filter "name=^ax-$1$" --format '{{.Names}}' 2>/dev/null)" ]; then
+    code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(cat "$AX_ROOT/tenants/$1/token")" \
+      "http://127.0.0.1:$2/file/artifact-store/$sample_id?project=$sample_prj")
+    [ "$code" = "200" ] && ok "产物记录可取（$1 → $sample_id）" || bad "产物取不到：$code（期望 200）"
+    code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(cat "$AX_ROOT/tenants/$1/token")" \
+      "http://127.0.0.1:$2/file/artifact-store/$sample_id/raw?project=$sample_prj")
+    [ "$code" = "200" ] && ok "产物字节可取（/raw 200）" || bad "产物字节取不到：$code（期望 200）"
+  else
+    note "没有运行中的租户可取产物"
+  fi
+else
+  bad "没有 $AX_ROOT/case-slice/artifact-store —— 案例回放只能看对话，点开 Results 会 404"
+fi
+
+echo
+echo "4. 模型网关"
+code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' http://127.0.0.1:43002/health)
+[ "$code" = "200" ] && ok "模型代理进程健康" || bad "模型代理 /health → $code"
+if [ "$DEEP" = "1" ]; then
+  code=$("${CURL[@]}" -k -o /dev/null -w '%{http_code}' -X POST https://127.0.0.1:43001/model/v1/chat/completions \
+    -H 'Content-Type: application/json' \
+    -d '{"model":"deepseek-flash","messages":[{"role":"user","content":"x"}],"max_tokens":1}')
+  [ "$code" = "401" ] && ok "无密钥请求被拒（401）" || bad "无密钥请求 → $code（期望 401）"
+  code=$("${CURL[@]}" -k -o /dev/null -w '%{http_code}' -X POST https://127.0.0.1:43001/model/v1/chat/completions \
+    -H 'Content-Type: application/json' -H 'Authorization: Bearer tenant-u9999' \
+    -d '{"model":"deepseek-flash","messages":[{"role":"user","content":"x"}],"max_tokens":1}')
+  [ "$code" = "401" ] && ok "不存在的租户被拒（401）" || bad "tenant-u9999 → $code（期望 401，否则任何人都能白嫖额度）"
+else
+  note "跳过模型调用（--deep 才跑）"
+fi
+
+echo
+echo "5. 开机自恢复"
+for unit in axiomics-activator.service axiomics-model-proxy.service axiomics-reclaim.timer; do
+  state=$(systemctl --user is-active "$unit" 2>/dev/null)
+  [ "$state" = "active" ] && ok "$unit 运行中" || bad "$unit 状态 $state"
+done
+[ "$(loginctl show-user "$USER" -p Linger 2>/dev/null)" = "Linger=yes" ] \
+  && ok "linger 已开（重启后服务能自己回来）" \
+  || bad "linger 未开 —— systemd --user 单元只在登录时跑"
+
+echo
+printf '通过 %d  失败 %d  跳过 %d\n' "$pass" "$fail" "$skip"
+[ "$fail" -eq 0 ]
