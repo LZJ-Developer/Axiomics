@@ -772,6 +772,20 @@ export namespace Sandbox {
     ].filter((value) => fs.existsSync(value))
   }
 
+  /** Can this process set a hostname in a fresh UTS namespace? Rootless
+   * containers cannot: the UTS namespace belongs to the container's user
+   * namespace, so a mapped root inside a nested one is not its owner. The
+   * tenant image therefore sets `--hostname axiomics` on the container and the
+   * sandbox omits the flags here. Probed once per process with the same bwrap
+   * the command will use. */
+  const hostnameCapable = lazy(() => {
+    if (process.platform !== "linux" || backend() !== "bubblewrap") return false
+    const probe = spawnSync("bwrap", ["--ro-bind", "/", "/", "--unshare-uts", "--hostname", "axiomics", "--", "/bin/true"], {
+      stdio: "ignore",
+    })
+    return probe.status === 0
+  })
+
   /** Preserve conventional merged-/usr aliases without exposing anything
    * beyond the corresponding host runtime directory. */
   function linuxRuntimeAliases(): string[] {
@@ -908,8 +922,9 @@ export namespace Sandbox {
       for (const [key, value] of Object.entries(view.env ?? {})) args.push("--setenv", key, value)
       args.push("--chdir", view.cwd)
       // A private UTS namespace keeps `hostname`/`uname -n` from naming the
-      // host machine.
-      args.push("--unshare-uts", "--hostname", "axiomics")
+      // host machine. Where the environment cannot own a UTS namespace (the
+      // tenant container), the container's own hostname is already synthetic.
+      if (hostnameCapable()) args.push("--unshare-uts", "--hostname", "axiomics")
     }
     // Bubblewrap shares the host network namespace only for an explicitly
     // network-enabled execution. Denied jobs receive an empty network

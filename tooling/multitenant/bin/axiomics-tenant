@@ -150,8 +150,12 @@ run_tenant() {
 
   # 面向研究者的 Web 产品默认不开终端：后端 /pty 直接 403，前端不渲染入口。
   # 需要排障的站点用 AX_TERMINAL_DISABLED=0 重新建租户即可恢复。
+  # --hostname：容器内无法自建 UTS 命名空间（rootless 下 sethostname 必 EPERM），
+  # 沙箱会把 --unshare-uts/--hostname 去掉；主机名由容器本身给出，
+  # 否则模型在 `hostname` 里读到的是容器 id。
   podman run -d --name "ax-$tid" \
     --init \
+    --hostname axiomics \
     --userns=keep-id \
     --security-opt unmask=ALL \
     --security-opt mask=/sys/bus/pci \
