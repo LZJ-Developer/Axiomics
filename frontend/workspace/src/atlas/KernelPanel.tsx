@@ -12,6 +12,7 @@ import { createKernelRouteRequester, kernelAPI, type KernelRoute } from "@/atlas
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { kernelMemoryLabel, type CommandStatus, type KernelStatus } from "@/atlas/kernel-runtime"
+import { englishT, type Translate } from "@/i18n/fallback"
 import { IconCpu } from "@/atlas/shared/Icon"
 import type { Part, ToolPart } from "@axiomics/sdk/v2/client"
 
@@ -27,6 +28,8 @@ const projectJobs = "__project_jobs__"
 
 type KernelPanelProps = {
   request?: (path: string, init?: RequestInit, query?: Record<string, string>) => Promise<Response>
+  /** Translator for the standalone test seam (no LanguageProvider). */
+  t?: Translate
 }
 
 export function inventory<T>(
@@ -158,6 +161,7 @@ export function provisionalKernels(parts: Part[], registered: KernelStatus[]): K
 }
 
 export function KernelPanel(props: KernelPanelProps = {}): JSX.Element {
+  const t = () => props.t ?? englishT
   const transport = props.request ?? useSDK().request
   const routeRequest = createKernelRouteRequester(transport)
   const sync = useSync()
@@ -326,8 +330,8 @@ export function KernelPanel(props: KernelPanelProps = {}): JSX.Element {
                 return (
                   <>
                     <Show when={index() === firstOther()}>
-                      <div class="kernel-panel__other" aria-label="Other sessions summary">
-                        <span>Other sessions</span>
+                      <div class="kernel-panel__other" aria-label={t()("compute.kernel.otherSummary")}>
+                        <span>{t()("compute.kernel.otherSessions")}</span>
                         <span>
                           {otherUsage().kinds} · {otherUsage().memory} · {otherUsage().cpu}
                         </span>
@@ -342,7 +346,7 @@ export function KernelPanel(props: KernelPanelProps = {}): JSX.Element {
                         <div class="kernel-session__identity">
                           <strong>{title(sessionID)}</strong>
                           <Show when={route() === sessionID}>
-                            <em>Current</em>
+                            <em>{t()("compute.kernel.current")}</em>
                           </Show>
                         </div>
                         <div class="kernel-session__summary" aria-label={summary().kinds}>
@@ -353,12 +357,12 @@ export function KernelPanel(props: KernelPanelProps = {}): JSX.Element {
                       </header>
                       <div class="kernel-panel__list">
                         <For each={group().kernels}>
-                          {(kernel) => <KernelCard kernel={kernel} sample={view.sample} />}
+                          {(kernel) => <KernelCard kernel={kernel} sample={view.sample} t={t()} />}
                         </For>
                         <For each={group().commands}>
-                          {(command) => <CommandCard command={command} sample={view.sample} />}
+                          {(command) => <CommandCard command={command} sample={view.sample} t={t()} />}
                         </For>
-                        <For each={group().jobs}>{(job) => <RemoteJobCard job={job} />}</For>
+                        <For each={group().jobs}>{(job) => <RemoteJobCard job={job} t={t()} />}</For>
                       </div>
                     </section>
                   </>

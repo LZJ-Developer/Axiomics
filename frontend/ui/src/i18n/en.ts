@@ -55,7 +55,8 @@ export const dict = {
   "ui.sessionTurn.progress.streaming": "Receiving from {{model}}…",
   "ui.sessionTurn.progress.conflictWait": "An earlier attempt is still running on the gateway; waiting ({{seconds}}s)",
   "ui.sessionTurn.progress.retryWait": "Retrying in {{seconds}}s",
-  "ui.sessionTurn.progress.stillOpen": "The request was sent, but no displayable output has arrived; the connection remains open.",
+  "ui.sessionTurn.progress.stillOpen":
+    "The request was sent, but no displayable output has arrived; the connection remains open.",
 
   "ui.messagePart.diagnostic.error": "Error",
   "ui.messagePart.reasoning.providerSummary": "Reasoning",
@@ -167,4 +168,14 @@ export const dict = {
   "ui.question.review.notAnswered": "(not answered)",
   "ui.question.multiHint": "(select all that apply)",
   "ui.question.custom.placeholder": "Type your answer...",
+
+  "ui.tool.details": "Technical details",
+  "ui.tool.kernel.stopped": "Kernel stopped",
+  "ui.messagePart.image.generate": "Generate image",
+  "ui.messagePart.image.saved": "The image is saved to the workspace. Open the file to preview it.",
+  "ui.messagePart.plan.updated": "Plan updated",
+  "ui.messagePart.code": "Code",
+  "ui.messagePart.delegation.currentActivity": "Current activity",
+  "ui.messagePart.delegation.activity": "Activity",
+  "ui.messagePart.delegation.details": "Delegated research details",
 }

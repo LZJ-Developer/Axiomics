@@ -410,13 +410,14 @@ export namespace Server {
                 description: "Enabled deployment capabilities",
                 content: {
                   "application/json": {
-                    schema: resolver(z.object({ terminal: z.boolean() })),
+                    schema: resolver(z.object({ terminal: z.boolean(), locale: z.string().nullable() })),
                   },
                 },
               },
             },
           }),
-          async (c) => c.json({ terminal: !Flag.AXIOMICS_DISABLE_TERMINAL }),
+          async (c) =>
+            c.json({ terminal: !Flag.AXIOMICS_DISABLE_TERMINAL, locale: Flag.AXIOMICS_UI_LOCALE ?? null }),
         )
         .route("/project", ProjectRoutes())
         .route("/pty", PtyRoutes())

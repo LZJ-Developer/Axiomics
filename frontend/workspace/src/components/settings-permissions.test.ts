@@ -5,6 +5,7 @@ import {
   permissionChange,
   permissionDefaultFor,
 } from "./settings/permission-defaults"
+import { dict as en } from "../i18n/en"
 
 const panel = await Bun.file(new URL("./settings/Permissions.tsx", import.meta.url)).text()
 
@@ -47,16 +48,21 @@ describe("permission defaults shown in Settings", () => {
   test("keeps project-code trust explicit without blocking routine sandboxed work", () => {
     expect(panel).toContain("sdk.client.project.trust.get(input)")
     expect(panel).toContain("sdk.client.project.trust.update({")
-    expect(panel).toContain('title: trusted ? "Trust this project?" : "Revoke project trust?"')
-    expect(panel).toContain("body: trusted ? { trusted: true, root: status.root } : { trusted: false }")
-    expect(panel).toContain('trust()?.canExecuteProjectCode ? "Revoke trust" : "Trust project"')
-    expect(panel).toContain("Sandboxed terminals, kernels, and local jobs do not require project trust")
     expect(panel).toContain(
+      'trusted ? "settings.permissions.trust.question" : "settings.permissions.trust.revokeQuestion"',
+    )
+    expect(panel).toContain("body: trusted ? { trusted: true, root: status.root } : { trusted: false }")
+    expect(panel).toContain('"settings.permissions.projectCode.revoke"')
+    expect(panel).toContain('"settings.permissions.projectCode.trust"')
+    expect(en["settings.permissions.trust.message"]).toContain(
+      "Sandboxed terminals, kernels, and local jobs do not require project trust",
+    )
+    expect(en["settings.permissions.trust.revokeMessage"]).toContain(
       "Remote jobs, kernel environment changes such as package installs, project-owned extensions, and unsandboxed execution will be blocked",
     )
-    expect(panel).toContain('title="Project code"')
-    expect(panel).toContain('"Project extensions blocked"')
-    expect(panel).toContain('"Restricted"')
+    expect(panel).toContain('"settings.permissions.projectCode.title"')
+    expect(panel).toContain('"settings.permissions.projectCode.blocked"')
+    expect(panel).toContain('"settings.permissions.projectCode.restricted"')
     expect(panel).not.toContain("verified Axiomics sandbox")
     expect(panel).not.toContain("verified OS sandbox")
   })

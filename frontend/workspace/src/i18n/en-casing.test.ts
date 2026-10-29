@@ -4,6 +4,12 @@ import { dict } from "./en"
 const deliberateFragments = new Set([
   "provider.connect.oauth.code.visit.suffix",
   "provider.connect.oauth.auto.visit.suffix",
+  // State fragments are composed into aria labels ("Protein screen, working"),
+  // so they must stay lowercase.
+  "session.tabs.working",
+  "session.tabs.unread",
+  "session.tabs.draftSaved",
+  "compute.host.cores",
 ])
 
 describe("English interface copy", () => {

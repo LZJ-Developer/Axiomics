@@ -3,6 +3,7 @@ import { createStore } from "solid-js/store"
 import { IconX } from "@/atlas/shared/Icon"
 import { StatusDot } from "@/atlas/shared/StatusDot"
 import { sessionTabTarget } from "@/pages/session-tab-navigation"
+import { englishT, type Translate } from "@/i18n/fallback"
 import "./session-tabs.css"
 
 export interface SessionTabItem {
@@ -42,7 +43,10 @@ export function SessionTabStrip(props: {
   onReorder: (id: string, to: number) => void
   onRename: (id: string, title: string) => Promise<boolean>
   onWarm?: (id: string) => void
+  /** Translator for the standalone test seam (no LanguageProvider). */
+  t?: Translate
 }): JSX.Element {
+  const t = () => props.t ?? englishT
   const inputID = createUniqueId()
   const statusID = `${inputID}-status`
   const [state, setState] = createStore({
@@ -142,7 +146,7 @@ export function SessionTabStrip(props: {
       focus(id)
       return
     }
-    setState("error", "Could not save the session name. Try again.")
+    setState("error", t()("session.tabs.renameFailed"))
     if (source === "keyboard") {
       queueMicrotask(() => {
         input?.focus()
@@ -185,13 +189,17 @@ export function SessionTabStrip(props: {
 
   return (
     <div ref={root} class="workspace-session-tabs">
-      <nav class="workspace-tabs" aria-label="Open sessions">
+      <nav class="workspace-tabs" aria-label={t()("session.tabs.open")}>
         <div class="workspace-tabs__list" role="tablist" aria-orientation="horizontal">
           <For each={props.tabs}>
             {(item, index) => {
               const active = () => props.active === item.id
               const stateLabel = () =>
-                [item.working ? "working" : "", item.unread ? "unread" : "", item.dirty ? "draft saved" : ""]
+                [
+                  item.working ? t()("session.tabs.working") : "",
+                  item.unread ? t()("session.tabs.unread") : "",
+                  item.dirty ? t()("session.tabs.draftSaved") : "",
+                ]
                   .filter(Boolean)
                   .join(", ")
               return (
@@ -202,7 +210,7 @@ export function SessionTabStrip(props: {
                   data-working={item.working ? "true" : undefined}
                   data-unread={item.unread ? "true" : undefined}
                   data-dirty={item.dirty ? "true" : undefined}
-                  title={active() && item.editable !== false ? "Double-click to rename" : item.title}
+                  title={active() && item.editable !== false ? t()("session.tabs.renameTitle") : item.title}
                 >
                   <button
                     type="button"
@@ -215,7 +223,7 @@ export function SessionTabStrip(props: {
                     aria-controls="session-conversation-panel"
                     aria-keyshortcuts={active() && item.editable !== false ? "F2" : undefined}
                     aria-label={`${item.title}${stateLabel() ? `, ${stateLabel()}` : ""}${
-                      active() && item.editable !== false ? ". Press F2 to rename" : ""
+                      active() && item.editable !== false ? t()("session.tabs.renameHint") : ""
                     }`}
                     draggable={item.reorderable !== false}
                     onPointerEnter={() => props.onWarm?.(item.id)}
@@ -276,7 +284,7 @@ export function SessionTabStrip(props: {
                     <button
                       type="button"
                       class="workspace-tab__close"
-                      aria-label={`Close ${item.title}`}
+                      aria-label={t()("session.tabs.close", { title: item.title })}
                       onClick={(event) => {
                         if (state.editing === item.id) clear()
                         const restoreFocus = document.activeElement === event.currentTarget

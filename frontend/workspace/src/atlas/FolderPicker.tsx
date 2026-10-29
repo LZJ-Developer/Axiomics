@@ -6,6 +6,7 @@ import { useDialog } from "@axiomics/ui/context/dialog"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { validateDirectoryPath } from "@/atlas/openDirectory"
+import { englishT, type Translate } from "@/i18n/fallback"
 import "./FolderPicker.css"
 
 interface FolderEntry {
@@ -19,6 +20,8 @@ interface PickerProps {
   kind?: "folder" | "file"
   title?: string
   onSelect: (result: string | string[] | null) => void
+  /** Translator for embeds that render outside the LanguageProvider. */
+  t?: Translate
 }
 
 const RECENT_KEY = "thesis-folder-picker-recents-v1"
@@ -53,6 +56,7 @@ function pushRecent(path: string) {
  * and returns absolute paths.
  */
 export function FolderPicker(props: PickerProps): JSX.Element {
+  const t = () => props.t ?? englishT
   const sdk = useGlobalSDK()
   const sync = useGlobalSync()
   const dialog = useDialog()
@@ -204,15 +208,15 @@ export function FolderPicker(props: PickerProps): JSX.Element {
 
   return (
     <Dialog
-      title={props.title ?? (props.kind === "file" ? "Choose a file" : "Choose a folder")}
+      title={props.title ?? (props.kind === "file" ? t()("files.picker.chooseFile") : t()("files.picker.chooseFolder"))}
       size="large"
       class="folder-picker-dialog"
       transition
     >
       <div class="folder-picker">
-        <aside class="folder-picker__sidebar" aria-label="Folder locations">
+        <aside class="folder-picker__sidebar" aria-label={t()("files.picker.locations")}>
           <div class="folder-picker__sidebar-group">
-            <SectionLabel>Favorites</SectionLabel>
+            <SectionLabel>{t()("files.picker.favorites")}</SectionLabel>
             <div class="folder-picker__sidebar-list">
               <For each={sidebarLinks()}>
                 {(location) => (
@@ -228,7 +232,7 @@ export function FolderPicker(props: PickerProps): JSX.Element {
           </div>
           <Show when={recents().length > 0}>
             <div class="folder-picker__sidebar-group">
-              <SectionLabel>Recent</SectionLabel>
+              <SectionLabel>{t()("files.picker.recent")}</SectionLabel>
               <div class="folder-picker__sidebar-list">
                 <For each={recents()}>
                   {(path) => (
@@ -247,15 +251,15 @@ export function FolderPicker(props: PickerProps): JSX.Element {
           </Show>
         </aside>
 
-        <section class="folder-picker__main" aria-label="Folder browser">
-          <nav class="folder-picker__location" aria-label="Current folder">
+        <section class="folder-picker__main" aria-label={t()("files.picker.browser")}>
+          <nav class="folder-picker__location" aria-label={t()("files.currentFolder")}>
             <div class="folder-picker__navigation">
               <button
                 type="button"
                 class="folder-picker__icon-button"
                 onClick={goUp}
-                aria-label="Parent folder"
-                title="Parent folder"
+                aria-label={t()("files.parentAria")}
+                title={t()("files.parent")}
                 disabled={cwd() === "/" || cwd() === ""}
               >
                 <Icon name="arrow-up" size="small" />
@@ -264,8 +268,8 @@ export function FolderPicker(props: PickerProps): JSX.Element {
                 type="button"
                 class="folder-picker__icon-button"
                 onClick={() => goTo(home())}
-                aria-label="Home folder"
-                title="Home folder"
+                aria-label={t()("files.picker.home")}
+                title={t()("files.picker.home")}
               >
                 <Icon name="home" size="small" />
               </button>
@@ -298,8 +302,8 @@ export function FolderPicker(props: PickerProps): JSX.Element {
               type="button"
               class="folder-picker__icon-button folder-picker__refresh"
               onClick={() => void refetch()}
-              aria-label="Refresh folder"
-              title="Refresh folder"
+              aria-label={t()("files.picker.refresh")}
+              title={t()("files.picker.refresh")}
             >
               <Icon name="refresh" size="small" />
             </button>
@@ -308,7 +312,7 @@ export function FolderPicker(props: PickerProps): JSX.Element {
           <div class="folder-picker__tools">
             <label class="folder-picker__field folder-picker__search">
               <Icon name="magnifying-glass" size="small" />
-              <span class="folder-picker__visually-hidden">Filter this folder</span>
+              <span class="folder-picker__visually-hidden">{t()("files.filterFolder")}</span>
               <input
                 value={filter()}
                 onInput={(e) => setFilter(e.currentTarget.value)}
@@ -332,11 +336,11 @@ export function FolderPicker(props: PickerProps): JSX.Element {
               }}
             >
               <Icon name="folder-tree" size="small" />
-              <span class="folder-picker__field-label">Path</span>
+              <span class="folder-picker__field-label">{t()("files.picker.path")}</span>
               <input
                 value={pathInput()}
                 onInput={(e) => setPathInput(e.currentTarget.value)}
-                aria-label="Go to path"
+                aria-label={t()("files.picker.goToPath")}
                 placeholder="/Users/example-user-bb0347/research or ~/research"
                 spellcheck={false}
                 autocomplete="off"
@@ -359,7 +363,7 @@ export function FolderPicker(props: PickerProps): JSX.Element {
             }}
           >
             <Show when={entries.loading}>
-              <div class="folder-picker__loading" role="progressbar" aria-label="Loading folder">
+              <div class="folder-picker__loading" role="progressbar" aria-label={t()("files.picker.loading")}>
                 <span />
               </div>
             </Show>
@@ -381,7 +385,10 @@ export function FolderPicker(props: PickerProps): JSX.Element {
                     }
                   >
                     <div class="folder-picker__empty atlas-fade-in">
-                      <Show when={(entries() ?? []).length === 0} fallback={<span>Nothing matches the filter.</span>}>
+                      <Show
+                        when={(entries() ?? []).length === 0}
+                        fallback={<span>{t()("files.picker.nothingMatches")}</span>}
+                      >
                         <Show
                           when={
                             /\/Desktop$|\/Documents$|\/Downloads$/.test(cwd()) ||
@@ -416,6 +423,7 @@ export function FolderPicker(props: PickerProps): JSX.Element {
                 {(e) => (
                   <PickerRow
                     entry={e}
+                    t={t()}
                     onOpen={() => drillInto(e)}
                     onPick={() => pick(e.absolute)}
                     pickingFile={props.kind === "file"}
@@ -443,7 +451,7 @@ export function FolderPicker(props: PickerProps): JSX.Element {
                     const valid = await validateDirectoryPath(sdk.url, cwd())
                     if (valid) pick(valid)
                   }}
-                  title="Choose the current folder"
+                  title={t()("files.picker.chooseCurrent")}
                 >
                   Use this folder
                   <Icon name="arrow-right" size="small" />
@@ -462,7 +470,9 @@ function PickerRow(props: {
   onOpen: () => void
   onPick: () => void
   pickingFile: boolean
+  t: Translate
 }): JSX.Element {
+  const t = () => props.t
   const folder = () => props.entry.type === "directory"
   return (
     <div class="folder-picker__row" data-kind={props.entry.type}>
@@ -475,15 +485,20 @@ function PickerRow(props: {
       >
         <Icon name={folder() ? "folder" : "file"} size="small" />
         <span class="folder-picker__row-name">{props.entry.name}</span>
-        <Show when={folder()} fallback={<span class="folder-picker__pick-label">Choose</span>}>
+        <Show when={folder()} fallback={<span class="folder-picker__pick-label">{t()("files.picker.choose")}</span>}>
           <span class="folder-picker__row-chevron" aria-hidden="true">
             <Icon name="chevron-right" size="small" />
           </span>
         </Show>
       </button>
       <Show when={folder() && !props.pickingFile}>
-        <button type="button" class="folder-picker__choose" onClick={props.onPick} title="Choose this folder">
-          Choose
+        <button
+          type="button"
+          class="folder-picker__choose"
+          onClick={props.onPick}
+          title={t()("files.picker.chooseThis")}
+        >
+          {t()("files.picker.choose")}
         </button>
       </Show>
     </div>

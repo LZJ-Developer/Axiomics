@@ -105,12 +105,13 @@ export function capabilityState(record: ScientificCapabilityRecord) {
   const target = scientificCapabilityTarget(record)
   if (!target) return { label: "Unavailable", tone: "danger" as const, action: undefined }
   const availability = target === "local" ? record.current_availability.local : record.current_availability.hosted
+  // Only a local package install has an in-panel action. Hosted tools need an
+  // account configured outside this surface, so their status is read-only.
   if (availability === "degraded")
     return {
       label: "Needs attention",
       tone: "warning" as const,
-      action:
-        target === "local" ? ("setup" as const) : target === "nvidia" ? ("credentials" as const) : ("compute" as const),
+      action: target === "local" ? ("setup" as const) : undefined,
     }
   if (availability === "configured" && target === "nvidia")
     return { label: "Connected", tone: "neutral" as const, action: undefined }
@@ -119,7 +120,6 @@ export function capabilityState(record: ScientificCapabilityRecord) {
   return {
     label: target === "local" ? "Not installed" : "Setup needed",
     tone: "neutral" as const,
-    action:
-      target === "local" ? ("setup" as const) : target === "nvidia" ? ("credentials" as const) : ("compute" as const),
+    action: target === "local" ? ("setup" as const) : undefined,
   }
 }

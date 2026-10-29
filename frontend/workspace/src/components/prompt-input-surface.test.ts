@@ -57,9 +57,9 @@ describe("floating prompt surface", () => {
 
   test("uses the shared icon system and accessible control groups instead of text glyphs", () => {
     expect(source).toContain('role="group"')
-    expect(source).toContain('aria-label="Composer tools"')
-    expect(source).toContain('aria-label="Model, effort, and send"')
-    expect(source).toContain('aria-label="Tools"')
+    expect(source).toContain('aria-label={language.t("prompt.aria.composerTools")}')
+    expect(source).toContain('aria-label={language.t("prompt.aria.modelEffortSend")}')
+    expect(source).toContain('aria-label={language.t("prompt.tools")}')
     expect(popover).toContain("aria-label={`Model: ${control().trigger}`}")
     expect(popover).toContain("data-model-effort-chip")
     expect(source).not.toContain('aria-label="Research capabilities"')
@@ -259,17 +259,17 @@ describe("composer control consolidation", () => {
 
   test("offers three real action-approval modes inside Research tools", () => {
     expect(source).toContain("data-research-access={option.value}")
-    expect(source).toContain('aria-label="How should Axiomics actions be approved?"')
+    expect(source).toContain('aria-label={language.t("prompt.aria.actionApprovalQuestion")}')
     expect(source).toContain("const projectAccess = async (projectID: string, init?: RequestInit)")
     expect(source).toContain("/project/${encodeURIComponent(projectID)}/access")
     expect(source).toContain("return projectAccess(projectID)")
     expect(source).toContain('sdk.event.on("project.trust.changed"')
     expect(source).toContain('sdk.event.on("project.access.changed"')
     expect(source).toContain('sdk.event.on("server.instance.disposed"')
-    expect(source).toContain('title: "Enable Full access?"')
-    expect(source).toContain("Full access disables the execution sandbox")
+    expect(source).toContain('title: language.t("prompt.access.confirm.full.title")')
+    expect(source).toContain('"prompt.access.confirm.full.message"')
     expect(source).toContain("if (!confirmed) return")
-    expect(source).toContain("title: `${accessLabel(effective)} enabled`")
+    expect(source).toContain('language.t("prompt.access.toast.enabled", { mode: accessLabel(effective) })')
     expect(source).toContain("onKeyDown={navigateResearchChoices}")
     expect(componentCss).toContain(".workspace-composer__research-choice-menu > button")
     expect(componentCss).toContain('button[data-tone="warning"][aria-checked="true"]')
@@ -293,11 +293,11 @@ describe("composer control consolidation", () => {
   })
 
   test("offers clear delegation controls without duplicating Compute or reviewer settings", () => {
-    expect(source).toContain('<summary aria-label="Tools">')
-    expect(source).toContain('class="workspace-composer__research-tools-label">Tools</span>')
+    expect(source).toContain('<summary aria-label={language.t("prompt.tools")}>')
+    expect(source).toContain('class="workspace-composer__research-tools-label">{language.t("prompt.tools")}</span>')
     expect(source).toContain('settings<CapabilityPreferences>("/settings/preferences")')
     expect(source).toContain("delegatedSpecialist(")
-    expect(source).toContain('aria-label="Research roles"')
+    expect(source).toContain('aria-label={language.t("prompt.aria.researchRoles")}')
     expect(source).toContain('class="workspace-composer__research-setting workspace-composer__research-slider"')
     expect(source).toContain('label="Delegation"')
     expect(source).toContain('label="Independence"')
@@ -318,13 +318,10 @@ describe("composer control consolidation", () => {
     expect(source).not.toContain("Compute activity")
     expect(source).not.toContain("Compute providers")
     expect(source).not.toContain("Manage skills")
-    expect(source).toContain("MCP servers")
-    expect(source).toContain('dialog.show(() => <DialogSettings initial="connectors" />)')
-    expect(source).toContain(
-      'class="workspace-composer__research-setting workspace-composer__research-control workspace-composer__research-connectors"',
-    )
-    expect(source).toContain('class="workspace-composer__research-setting-label">MCP servers</span>')
-    expect(source).toContain("configuredConnectorCount()")
+    expect(source).not.toContain("MCP servers")
+    expect(source).not.toContain('initial="connectors"')
+    expect(source).not.toContain("configuredConnectorCount")
+    expect(componentCss).not.toContain("workspace-composer__research-connectors")
     expect(componentCss).toContain("grid-template-columns: minmax(0, 1fr) auto 16px")
     expect(componentCss).toContain("button.workspace-composer__research-control:focus-visible")
     expect(source).not.toContain("workspace-composer__research-tools-divider")
@@ -358,7 +355,7 @@ describe("composer control consolidation", () => {
 
   test("shows missing model setup inline immediately above the composer", () => {
     expect(source).toContain('class="workspace-composer__setup" role="status"')
-    expect(source).toContain("Choose a model to start")
-    expect(source).toContain("Connect a provider in Settings to choose a model.")
+    expect(source).toContain('language.t("prompt.setup.title")')
+    expect(source).toContain('language.t("prompt.setup.detail")')
   })
 })

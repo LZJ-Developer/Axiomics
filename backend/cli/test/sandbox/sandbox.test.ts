@@ -263,6 +263,18 @@ describe("Sandbox.bubblewrapArgs", () => {
     expect(args[i + 2]).toBe("/work/project")
   })
 
+  test("mounts distribution identity so platform probes work inside the namespace", () => {
+    const args = Sandbox.bubblewrapArgs({ writable: ["/work/project"], readable: [], network: true })
+    // Interpreters and installers read these before choosing a package format;
+    // they name the runtime image, not a host user.
+    for (const file of ["/etc/os-release", "/etc/redhat-release", "/etc/lsb-release", "/etc/debian_version"]) {
+      if (!fs.existsSync(file)) continue
+      const index = args.findIndex((value, i) => value === "--ro-bind" && args[i + 1] === file)
+      expect(index).toBeGreaterThan(-1)
+      expect(args[index + 2]).toBe(file)
+    }
+  })
+
   test("re-mounts a nested exact runtime read-only after its writable workspace ancestor", () => {
     const workspace = "/work/project"
     const runtime = "/work/project/.data/conda/envs/exact"

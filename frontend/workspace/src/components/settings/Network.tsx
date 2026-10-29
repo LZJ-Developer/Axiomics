@@ -5,6 +5,7 @@ import { Switch } from "@axiomics/ui/switch"
 import { useDialog } from "@axiomics/ui/context/dialog"
 import { confirmDialog } from "@/atlas/dialogs"
 import { useGlobalSDK } from "@/context/global-sdk"
+import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { networkEndpoint } from "./network-endpoint"
 import { canonicalNetworkDomain } from "./network-domain"
@@ -29,6 +30,7 @@ export default function Network() {
   const sdk = useGlobalSDK()
   const platform = usePlatform()
   const dialog = useDialog()
+  const language = useLanguage()
   const doFetch = platform.fetch ?? fetch
 
   const [catalog, setCatalog] = createSignal<Group[]>([])
@@ -144,9 +146,9 @@ export default function Network() {
   async function clearCustom() {
     if (state().custom.length === 0) return
     const confirmed = await confirmDialog(dialog, {
-      title: "Clear allowed domains?",
-      message: "This removes all custom domains. Curated domain groups are not changed.",
-      confirmLabel: "Clear domains",
+      title: language.t("settings.network.domains.clearTitle"),
+      message: language.t("settings.network.domains.clearMessage"),
+      confirmLabel: language.t("settings.network.domains.clearConfirm"),
       danger: true,
     })
     if (!confirmed) return
@@ -167,7 +169,10 @@ export default function Network() {
         class="settings-preferences-panel settings-preferences-panel--network"
         aria-busy={saving() ? "true" : undefined}
       >
-        <PanelHeader title="Network" description="Choose which online services research tools can reach." />
+        <PanelHeader
+          title={language.t("settings.network.page.title")}
+          description={language.t("settings.network.page.description")}
+        />
         <PanelBody>
           <Show when={error()}>
             <div class="settings-alert" data-tone="critical" role="alert">
@@ -179,7 +184,7 @@ export default function Network() {
                 disabled={loading() || saving()}
                 onClick={() => void load()}
               >
-                Retry
+                {language.t("settings.network.retry")}
               </Button>
             </div>
           </Show>
@@ -191,7 +196,7 @@ export default function Network() {
                 <div
                   class="settings-panel-loading__rows settings-network-loading-rows"
                   role="status"
-                  aria-label="Loading network settings"
+                  aria-label={language.t("settings.network.loading")}
                 >
                   <span />
                   <span />
@@ -201,39 +206,42 @@ export default function Network() {
             }
           >
             <Section
-              title="Access policy"
-              description="Web fetches and science connectors follow this policy."
+              title={language.t("settings.network.access.title")}
+              description={language.t("settings.network.access.description")}
               action={
                 <span class="settings-network-save-state" role="status" aria-live="polite">
-                  {saving() ? "Saving…" : ""}
+                  {saving() ? language.t("settings.network.saving") : ""}
                 </span>
               }
             >
               <div class="settings-card settings-preferences-card">
                 <div class="settings-row settings-preference-row settings-network-policy-row">
                   <div class="settings-row-copy">
-                    <strong>Restrict network access</strong>
+                    <strong>{language.t("settings.network.restrict.title")}</strong>
                     <span>
                       {state().allowlistEnabled
-                        ? `Only ${effectiveCount()} approved domains may be reached.`
-                        : "Connections are not restricted by the domain list."}
+                        ? language.t("settings.network.restrict.on", { count: effectiveCount() })
+                        : language.t("settings.network.restrict.off")}
                     </span>
                   </div>
                   <Switch hideLabel checked={state().allowlistEnabled} disabled={loading()} onChange={toggleAllowlist}>
-                    Restrict network access
+                    {language.t("settings.network.restrict.title")}
                   </Switch>
                 </div>
               </div>
             </Section>
 
-            <Section title="Service groups" description="Use maintained domain sets for common research services.">
+            <Section
+              title={language.t("settings.network.groups.title")}
+              description={language.t("settings.network.groups.description")}
+            >
               <Show
                 when={!loading()}
                 fallback={
                   <div
                     class="settings-panel-loading__rows settings-network-loading-rows"
                     role="status"
-                    aria-label="Loading service groups"
+                    aria-label={language.t("settings.network.groups.loading")}
                   >
                     <span />
                     <span />
@@ -249,7 +257,7 @@ export default function Network() {
                     each={catalog()}
                     fallback={
                       <p class="settings-card-empty" role="status">
-                        No service groups available.
+                        {language.t("settings.network.groups.empty")}
                       </p>
                     }
                   >
@@ -264,7 +272,10 @@ export default function Network() {
                               type="button"
                               class="settings-network-disclosure"
                               onClick={() => toggleExpanded(group.id)}
-                              aria-label={`${open() ? "Collapse" : "Expand"} ${group.label}`}
+                              aria-label={language.t(
+                                open() ? "settings.network.groups.collapse" : "settings.network.groups.expand",
+                                { name: group.label },
+                              )}
                               aria-expanded={open()}
                               aria-controls={detailsId()}
                             >
@@ -276,17 +287,27 @@ export default function Network() {
                               <span class="settings-row-copy">
                                 <strong class="truncate">{group.label}</strong>
                                 <span class="settings-network-group-description">
-                                  {group.description} · <span class="tabular-nums">{group.domains.length}</span> domains
+                                  {group.description} ·{" "}
+                                  <span class="tabular-nums">
+                                    {language.t("settings.network.groups.domains", {
+                                      count: group.domains.length,
+                                    })}
+                                  </span>
                                 </span>
                               </span>
                             </button>
                             <Switch hideLabel checked={on()} onChange={(v) => toggleGroup(group.id, v)}>
-                              {`Allow ${group.label}`}
+                              {language.t("settings.network.groups.allow", { name: group.label })}
                             </Switch>
                           </div>
                           <Show when={open()}>
                             <div id={detailsId()} class="settings-preference-disclosure">
-                              <ul class="settings-preference-domain-list" aria-label={`${group.label} domains`}>
+                              <ul
+                                class="settings-preference-domain-list"
+                                aria-label={language.t("settings.network.groups.domainsAria", {
+                                  name: group.label,
+                                })}
+                              >
                                 <For each={group.domains}>
                                   {(domain) => (
                                     <li>
@@ -306,8 +327,8 @@ export default function Network() {
             </Section>
 
             <Section
-              title="Allowed domains"
-              description="Add domains that are specific to your work."
+              title={language.t("settings.network.domains.title")}
+              description={language.t("settings.network.domains.description")}
               action={
                 <Show when={state().custom.length > 0}>
                   <Button
@@ -315,9 +336,9 @@ export default function Network() {
                     variant="ghost"
                     class="settings-panel-action settings-panel-action--danger-quiet"
                     onClick={clearCustom}
-                    aria-label="Clear allowed domains"
+                    aria-label={language.t("settings.network.domains.clearAria")}
                   >
-                    Clear
+                    {language.t("settings.network.domains.clear")}
                   </Button>
                 </Show>
               }
@@ -328,7 +349,7 @@ export default function Network() {
                   <div
                     class="settings-panel-loading__rows settings-network-loading-rows settings-network-loading-rows--domains"
                     role="status"
-                    aria-label="Loading allowed domains"
+                    aria-label={language.t("settings.network.domains.loading")}
                   >
                     <span />
                     <span />
@@ -340,7 +361,7 @@ export default function Network() {
                     each={state().custom}
                     fallback={
                       <p class="settings-card-empty" role="status">
-                        No custom domains added.
+                        {language.t("settings.network.domains.empty")}
                       </p>
                     }
                   >
@@ -353,7 +374,7 @@ export default function Network() {
                           type="button"
                           class="settings-icon-action text-icon-weak-base hover:text-text-danger"
                           onClick={() => removeCustom(domain)}
-                          aria-label={`Remove ${domain}`}
+                          aria-label={language.t("settings.network.domains.remove", { domain })}
                         >
                           <Icon name="close-small" size="small" />
                         </button>
@@ -363,8 +384,8 @@ export default function Network() {
                   <div class="settings-row settings-preference-row settings-network-add-row">
                     <input
                       type="text"
-                      aria-label="Add allowed domain"
-                      placeholder="Add a domain, e.g. example.org"
+                      aria-label={language.t("settings.network.domains.input")}
+                      placeholder={language.t("settings.network.domains.placeholder")}
                       value={customDomain()}
                       disabled={loading()}
                       class="settings-field min-w-0 flex-1 basis-[220px] font-mono"
@@ -378,7 +399,7 @@ export default function Network() {
                       disabled={loading() || !customDomain().trim()}
                       onClick={addCustom}
                     >
-                      Add domain
+                      {language.t("settings.network.domains.add")}
                     </button>
                   </div>
                 </div>

@@ -1,4 +1,5 @@
 import type { JSX } from "solid-js"
+import { useLanguage } from "@/context/language"
 
 function record(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return
@@ -35,26 +36,24 @@ export function ProjectUnavailable(props: {
   onBack: () => void
   onRemove: () => void
 }): JSX.Element {
+  const language = useLanguage()
   return (
     <main class="app-not-found project-unavailable" aria-labelledby="project-unavailable-title">
-      <span class="app-not-found__eyebrow">Folder unavailable</span>
-      <h1 id="project-unavailable-title">This project folder can’t be found</h1>
-      <p>
-        Axiomics still has this project in your history, but its folder is no longer available. It won’t recreate the
-        folder or switch this session to another location.
-      </p>
+      <span class="app-not-found__eyebrow">{language.t("project.unavailable.eyebrow")}</span>
+      <h1 id="project-unavailable-title">{language.t("project.unavailable.title")}</h1>
+      <p>{language.t("project.unavailable.description")}</p>
       <code class="project-unavailable__path" title={props.directory}>
         {props.directory}
       </code>
       <div class="project-unavailable__actions">
         <button class="app-not-found__action" type="button" onClick={props.onBack}>
-          Back to Projects
+          {language.t("project.unavailable.back")}
         </button>
         <button class="app-not-found__action app-not-found__action--quiet" type="button" onClick={props.onRemove}>
-          Remove from home
+          {language.t("project.unavailable.remove")}
         </button>
       </div>
-      <p class="project-unavailable__note">Removing it from home does not delete saved sessions or any files.</p>
+      <p class="project-unavailable__note">{language.t("project.unavailable.note")}</p>
     </main>
   )
 }

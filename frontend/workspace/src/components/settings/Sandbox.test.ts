@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { dict as en } from "../../i18n/en"
 
 const source = Bun.file(new URL("./Sandbox.tsx", import.meta.url)).text()
 const styles = Bun.file(new URL("./sandbox.css", import.meta.url)).text()
@@ -6,7 +7,7 @@ const styles = Bun.file(new URL("./sandbox.css", import.meta.url)).text()
 test("sandbox keeps active native backends available and their fixed policies truthful", async () => {
   const component = await source
 
-  expect(component).toContain('s().available ? "Available" : "Unavailable"')
+  expect(component).toContain('s().available ? "settings.sandbox.available" : "settings.sandbox.unavailable"')
   expect(component).toContain('current.backend === "seatbelt" || current.backend === "bubblewrap"')
   expect(component).toContain("const grantOnlyEnforced")
   expect(component).toContain("const networkDenyEnforced")
@@ -14,8 +15,8 @@ test("sandbox keeps active native backends available and their fixed policies tr
   expect(component).toContain('capability === "deny_all" || (capability === undefined && nativeBackendActive())')
   expect(component).not.toContain('status()?.readIsolation === "grant_only" || nativeBackendActive()')
   expect(component).not.toContain('status()?.networkIsolation === "deny_all" || nativeBackendActive()')
-  expect(component).toContain("Reads and writes are limited to the workspace and approved paths.")
-  expect(component).toContain("including loopback, LAN, link-local, and metadata endpoints")
+  expect(component).toContain('"settings.sandbox.fileAccess.grantOnly"')
+  expect(component).toContain('"settings.sandbox.networkAccess.denied"')
   expect(component).toContain('disabled={busy("network") || unavailable() || networkDenyEnforced()}')
   expect(component).not.toContain('s().available && s().readIsolation === "grant_only" ? "Available"')
 })
@@ -41,11 +42,16 @@ test("sandbox reflects the contained default and retains the explicit containmen
   expect(component).toContain("enabled: true")
   expect(component).toContain("requireProjectTrust?: boolean")
   expect(component).toContain("requireProjectTrust: false")
-  expect(component).toContain("Sandboxed terminals, kernels, and local jobs can run immediately")
-  expect(component).toContain(
+  expect(component).toContain('"settings.sandbox.trust.off"')
+  expect(en["settings.sandbox.trust.off"]).toContain(
     "Remote jobs, kernel environment changes, project extensions, and unsandboxed execution still require trust",
   )
-  expect(component).toContain("Every project must be trusted before it can start terminals, kernels, or local jobs")
+  expect(en["settings.sandbox.trust.on"]).toContain(
+    "Every project must be trusted before it can start terminals, kernels, or local jobs",
+  )
+  expect(en["settings.sandbox.fileAccess.grantOnly"]).toContain(
+    "Reads and writes are limited to the workspace and approved paths.",
+  )
   expect(component).toContain("{ requireProjectTrust: checked }")
 })
 

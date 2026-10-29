@@ -4,6 +4,7 @@ import type { StoredArtifact } from "@/artifacts/store"
 import { withPdfResources } from "@/science/renderers/documents/pdfjs-resources"
 import { ensurePdfWorker } from "@/science/renderers/documents/pdfjs-worker"
 import { extension, thumbKind, thumbLanguage } from "./artifact-thumb"
+import { englishT, type Translate } from "@/i18n/fallback"
 
 export interface ThumbProps {
   artifact: StoredArtifact
@@ -11,6 +12,8 @@ export interface ThumbProps {
   read: (artifact: StoredArtifact) => Promise<Blob>
   /** Defaults to the shared shiki highlighter; injected in tests. */
   highlight?: (code: string, lang: string) => Promise<string>
+  /** Translator for the standalone test seam (no LanguageProvider). */
+  t?: Translate
 }
 
 const PREVIEW_LINES = 10
@@ -94,6 +97,7 @@ const remember = (version: string, preview: Preview) => {
 }
 
 export function ArtifactThumb(props: ThumbProps): JSX.Element {
+  const t = () => props.t ?? englishT
   const kind = () => thumbKind(props.artifact.current)
   const [preview, setPreview] = createSignal<Preview>()
   const [failed, setFailed] = createSignal(false)
@@ -181,7 +185,7 @@ export function ArtifactThumb(props: ThumbProps): JSX.Element {
       </Match>
       <Match when={kind() === "table" && !failed() && preview()?.table}>
         {(rows) => (
-          <span class="artifact-thumb artifact-thumb--table" aria-label="Table preview">
+          <span class="artifact-thumb artifact-thumb--table" aria-label={t()("files.artifact.tablePreview")}>
             {rows().map((row) => row.map((cell) => <span title={cell}>{cell}</span>))}
           </span>
         )}

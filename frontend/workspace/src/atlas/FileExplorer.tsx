@@ -3,6 +3,7 @@ import { createStore } from "solid-js/store"
 import { useParams } from "@solidjs/router"
 import { Button } from "@axiomics/ui/button"
 import { Select } from "@axiomics/ui/select"
+import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import type { ContextFile } from "@/atlas/store/ui"
@@ -61,6 +62,7 @@ async function grantAccess(request: ProjectRequest, identity: FilesystemIdentity
 }
 
 export function ExternalFileAccess(props: { file: ContextFile; active: boolean; onClose: () => void }): JSX.Element {
+  const language = useLanguage()
   const sdk = useSDK()
   const sync = useSync()
   const params = useParams()
@@ -115,13 +117,13 @@ export function ExternalFileAccess(props: { file: ContextFile; active: boolean; 
         )}
       </Match>
       <Match when={!grant()}>
-        <div class="external-file-access" role="region" aria-label="File access required">
+        <div class="external-file-access" role="region" aria-label={language.t("files.access.required")}>
           <div class="external-file-access__content">
             <span class="external-file-access__icon" aria-hidden="true">
               <IconFolder size={22} strokeWidth={1.35} />
             </span>
             <div class="external-file-access__copy">
-              <h2>Connect a folder</h2>
+              <h2>{language.t("files.access.connectFolder")}</h2>
               <p>
                 <strong>{props.file.name}</strong> is outside this project. Choose the access Axiomics needs; the folder
                 will stay connected to this project until you remove it.
@@ -136,9 +138,9 @@ export function ExternalFileAccess(props: { file: ContextFile; active: boolean; 
               }
             >
               <label class="external-file-access__field">
-                <span>Folder access</span>
+                <span>{language.t("files.access.folderAccess")}</span>
                 <Select
-                  aria-label="External file access"
+                  aria-label={language.t("files.access.external")}
                   options={accessOptions}
                   current={accessOptions.find((option) => option.value === state.access)}
                   value={(option) => option.value}

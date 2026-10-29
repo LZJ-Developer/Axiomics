@@ -3,20 +3,7 @@ import { describe, expect, test } from "bun:test"
 const root = new URL("./", import.meta.url)
 const read = (path: string) => Bun.file(new URL(path, root)).text()
 
-const panels = [
-  "Models.tsx",
-  "Connectors.tsx",
-  "ScientificTools.tsx",
-  "Compute.tsx",
-  "Network.tsx",
-  "Permissions.tsx",
-  "Sandbox.tsx",
-  "Credentials.tsx",
-  "CredentialServices.tsx",
-  "ProviderKeys.tsx",
-  "Storage.tsx",
-  "General.tsx",
-]
+const panels = ["ScientificTools.tsx", "Network.tsx", "Permissions.tsx", "Sandbox.tsx", "Storage.tsx", "General.tsx"]
 
 describe("settings panel layout contract", () => {
   test("lets shared card and row primitives own their boundaries", async () => {
@@ -49,18 +36,10 @@ describe("settings panel layout contract", () => {
 
   test("guards long settings values and dense action groups", async () => {
     const network = await read("Network.tsx")
-    const providers = await read("ProviderKeys.tsx")
     const storage = await read("Storage.tsx")
-    const connectors = await read("Connectors.tsx")
-    const connectorStyles = await read("connectors.css")
 
     expect(network).toContain("max-w-full break-all whitespace-normal")
     expect(network).toContain("min-w-0 flex-1 basis-[220px] font-mono")
-    expect(providers).toContain("min-w-0 flex-1 basis-[220px]")
     expect(storage).toContain("min-w-0 flex-1 basis-[240px]")
-    expect(connectors).toContain('class="connectors-row__actions"')
-    expect(connectorStyles).toContain("--connectors-row-columns: 32px minmax(180px, 1fr) minmax(92px, auto) auto")
-    expect(connectorStyles).toContain("grid-template-columns: var(--connectors-row-columns)")
-    expect(connectorStyles).toContain("justify-content: flex-end")
   })
 })

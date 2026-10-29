@@ -17,10 +17,7 @@ const registeredPanelSources = () => {
       (module) => [`settings/${module}.tsx`, new URL(`./settings/${module}.tsx`, import.meta.url)] as const,
     ),
     ["settings/_shared.tsx", new URL("./settings/_shared.tsx", import.meta.url)] as const,
-    ["settings/CodexConnection.tsx", new URL("./settings/CodexConnection.tsx", import.meta.url)] as const,
-    ["settings/ProviderKeys.tsx", new URL("./settings/ProviderKeys.tsx", import.meta.url)] as const,
     ["settings/ProviderLogo.tsx", new URL("./settings/ProviderLogo.tsx", import.meta.url)] as const,
-    ["settings/CredentialServices.tsx", new URL("./settings/CredentialServices.tsx", import.meta.url)] as const,
     ["settings-general.tsx", new URL("./settings-general.tsx", import.meta.url)] as const,
     ["settings-permissions.tsx", new URL("./settings-permissions.tsx", import.meta.url)] as const,
     ["link.tsx", new URL("./link.tsx", import.meta.url)] as const,
@@ -75,7 +72,7 @@ test("settings enforce one sentence-case typography system", () => {
     /\.settings-nav__item\[data-active="true"\]\s*\{[^}]*font-weight: var\(--font-weight-medium\)/s,
   )
   expect(dialog).toContain('size="normal"')
-  expect(dialog).toContain('title="Settings"')
+  expect(dialog).toContain('title={language.t("settings.dialog.title")}')
   expect(dialog).toMatch(/\.settings-dialog > \[data-slot="dialog-header"\]\s*\{[^}]*clip-path: inset\(50%\)/s)
   expect(dialog).not.toContain('class="settings-main__title"')
   expect(dialog).not.toContain("text-14-medium text-text-strong truncate pl-1")
@@ -194,7 +191,7 @@ test("settings search and filter controls expose contextual accessible names", (
   const shared = readFileSync(fileURLToPath(new URL("./settings/_shared.tsx", import.meta.url)), "utf8")
   const skills = readFileSync(fileURLToPath(new URL("../atlas/SkillsPage.tsx", import.meta.url)), "utf8")
 
-  expect(shared).toContain('aria-label={props.ariaLabel ?? props.placeholder ?? "Search"}')
+  expect(shared).toContain('aria-label={props.ariaLabel ?? props.placeholder ?? t()("settings.search.default")}')
   expect(shared).toContain("aria-label={props.ariaLabel}")
   expect(skills).toContain('ariaLabel="Filter skills by source"')
   expect(skills).toContain('ariaLabel="Filter skills by category"')
@@ -256,13 +253,12 @@ test("every registered settings panel uses the shared semantic surface contract"
 test("settings dialog makes every registered capability navigable", () => {
   const dialog = source()
   const skills = SETTINGS_PANELS.find((panel) => panel.id === "skills")
-  const models = SETTINGS_PANELS.find((panel) => panel.id === "models")
-  const compute = SETTINGS_PANELS.find((panel) => panel.id === "compute")
+  const tools = SETTINGS_PANELS.find((panel) => panel.id === "scientific-tools")
   const permissions = SETTINGS_PANELS.find((panel) => panel.id === "permissions")
 
   expect(skills?.title).toBe("Skills")
-  expect(models?.icon).toBe("models")
-  expect(compute?.icon).toBe("cpu")
+  expect(tools?.title).toBe("Tools")
+  expect(tools?.icon).toBe("atom")
   expect(permissions?.icon).toBe("shield")
   expect(dialog).toContain("SETTINGS_PANELS.filter((p) => p.section === section.id)")
   expect(dialog).toContain("onClick={() => void navigate(panel.id)}")

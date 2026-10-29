@@ -130,9 +130,9 @@ describe("host strip", () => {
   test("names the block as machine resources", () => {
     const source = readFileSync(fileURLToPath(new URL("./HostStrip.tsx", import.meta.url)), "utf8")
 
-    expect(source).toContain('<span class="host-strip__label">Memory</span>')
-    expect(source).toContain("<strong>This computer</strong>")
-    expect(source).toContain('aria-label="Current local compute"')
+    expect(source).toContain('<span class="host-strip__label">{t()("compute.host.memory")}</span>')
+    expect(source).toContain('<strong>{t()("compute.host.title")}</strong>')
+    expect(source).toContain('aria-label={t()("compute.host.current")}')
     expect(source).not.toContain("<details")
     expect(source).not.toContain("<summary")
   })

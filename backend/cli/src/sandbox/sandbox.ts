@@ -759,6 +759,15 @@ export namespace Sandbox {
       "/etc/services",
       "/etc/localtime",
       "/etc/timezone",
+      // Distribution identity: `platform`, `lsb_release`, and most installers
+      // read these before choosing a package manager or a wheel tag. They name
+      // the runtime image, never a host user, and without them a normal
+      // `python -m platform` fails inside the namespace.
+      "/etc/os-release",
+      "/etc/lsb-release",
+      "/etc/debian_version",
+      "/etc/redhat-release",
+      "/etc/system-release",
       "/etc/ssl/certs",
       "/etc/ssl/cert.pem",
       "/etc/ssl/openssl.cnf",

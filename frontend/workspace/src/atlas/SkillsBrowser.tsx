@@ -11,6 +11,7 @@ import { Icon } from "@axiomics/ui/icon"
 import { useSync } from "@/context/sync"
 import { FONT_MONO, FONT_SANS } from "@/styles/tokens"
 import { IconSearch } from "@/atlas/shared/Icon"
+import { englishT, type Translate } from "@/i18n/fallback"
 import { skillCatalogSnapshot } from "./skill-permissions"
 import { skillIconFor } from "./skill-icon"
 import "./skills-browser.css"
@@ -42,7 +43,12 @@ function sentence(value: string) {
   return `${text.charAt(0).toLocaleUpperCase()}${text.slice(1)}`
 }
 
-export function SkillsBrowser(props: { onPick: (name: string) => void; onClose: () => void }): JSX.Element {
+export function SkillsBrowser(props: {
+  onPick: (name: string) => void
+  onClose: () => void
+  t?: Translate
+}): JSX.Element {
+  const t = () => props.t ?? englishT
   const sync = useSync()
   const [query, setQuery] = createSignal("")
   let panelRef: HTMLDivElement | undefined
@@ -139,7 +145,7 @@ export function SkillsBrowser(props: { onPick: (name: string) => void; onClose: 
           autofocus
           value={query()}
           onInput={(e) => setQuery(e.currentTarget.value)}
-          placeholder="Search skills…"
+          placeholder={t()("skills.browser.search")}
           style={{
             all: "unset",
             flex: 1,
@@ -152,8 +158,8 @@ export function SkillsBrowser(props: { onPick: (name: string) => void; onClose: 
         <button
           type="button"
           onClick={props.onClose}
-          aria-label="Close skills"
-          title="Close (Esc)"
+          aria-label={t()("skills.browser.close")}
+          title={t()("skills.browser.closeHint")}
           style={{
             all: "unset",
             cursor: "pointer",
@@ -270,7 +276,12 @@ export function SkillsBrowser(props: { onPick: (name: string) => void; onClose: 
  * `onPick(name)` and closes the dialog; the caller decides what "pick"
  * means (the right pane prefills `/<name> ` into the composer).
  */
-export function SkillLibraryDialog(props: { onPick: (name: string) => void; initialQuery?: string }): JSX.Element {
+export function SkillLibraryDialog(props: {
+  onPick: (name: string) => void
+  initialQuery?: string
+  t?: Translate
+}): JSX.Element {
+  const t = () => props.t ?? englishT
   const sync = useSync()
   const dialog = useDialog()
   const [query, setQuery] = createSignal(props.initialQuery ?? "")
@@ -326,7 +337,7 @@ export function SkillLibraryDialog(props: { onPick: (name: string) => void; init
   }
 
   return (
-    <Dialog title="Skill Library" size="large" transition>
+    <Dialog title={t()("skills.browser.title")} size="large" transition>
       <div
         style={{
           display: "flex",
@@ -356,8 +367,8 @@ export function SkillLibraryDialog(props: { onPick: (name: string) => void; init
               setQuery(e.currentTarget.value)
               setVisibleRows(SKILL_LIBRARY_INITIAL_ROWS)
             }}
-            placeholder="Search skills…"
-            aria-label="Search the skill library"
+            placeholder={t()("skills.browser.search")}
+            aria-label={t()("skills.browser.searchAria")}
             style={{
               all: "unset",
               flex: 1,

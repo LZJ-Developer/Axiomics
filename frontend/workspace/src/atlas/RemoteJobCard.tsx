@@ -1,6 +1,7 @@
 import { Show, createSignal, onCleanup, type JSX } from "solid-js"
 import { Icon, type IconProps } from "@axiomics/ui/icon"
 import type { Job, Status } from "@/atlas/ComputeJobsAPI"
+import { englishT, type Translate } from "@/i18n/fallback"
 
 const terminal = new Set<Status>(["succeeded", "failed", "cancelled", "interrupted"])
 const attentionResource = new Set(["starting", "active", "unknown"])
@@ -81,7 +82,8 @@ const kind = (job: Job) => {
   return { icon: "server" as IconProps["name"], label: "Remote job" }
 }
 
-export function RemoteJobCard(props: { job: Job }): JSX.Element {
+export function RemoteJobCard(props: { job: Job; t?: Translate }): JSX.Element {
+  const t = () => props.t ?? englishT
   const [now, setNow] = createSignal(Date.now())
   const timer = setInterval(() => setNow(Date.now()), 1_000)
   onCleanup(() => clearInterval(timer))
@@ -101,7 +103,7 @@ export function RemoteJobCard(props: { job: Job }): JSX.Element {
           <small role="status">{billing(props.job)}</small>
         </Show>
       </div>
-      <div class="compute-row__telemetry compute-row__telemetry--request" aria-label="Requested resources">
+      <div class="compute-row__telemetry compute-row__telemetry--request" aria-label={t()("compute.request.resources")}>
         <span>{resources(props.job)}</span>
       </div>
     </article>

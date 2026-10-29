@@ -20,7 +20,7 @@ test("uses the shared modal foundation with focus containment and restoration", 
 
 test("exposes a named dialog and a useful close target", () => {
   expect(source).toContain("Keyboard shortcuts")
-  expect(source).toContain('aria-label="Close keyboard shortcuts"')
+  expect(source).toContain('aria-label={language.t("shortcuts.close")}')
   expect(source).toContain('width: "40px"')
   expect(source).toContain('height: "40px"')
 })

@@ -9,7 +9,6 @@ const publicSources = [
   "../atlas/kernel-runtime.ts",
   "../i18n/zh.ts",
   "./settings/General.tsx",
-  "./settings/ProviderKeys.tsx",
 ] as const
 
 function renderedSource(value: string) {

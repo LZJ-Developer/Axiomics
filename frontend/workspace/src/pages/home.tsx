@@ -165,7 +165,14 @@ export default function Home(): JSX.Element {
 
     const selection = { result: null as string | string[] | null }
     dialog.show(
-      () => <FolderPicker multiple title="Add source folder" onSelect={(value) => (selection.result = value)} />,
+      () => (
+        <FolderPicker
+          multiple
+          t={language.t}
+          title={language.t("home.folderPicker.addSource")}
+          onSelect={(value) => (selection.result = value)}
+        />
+      ),
       {
         onClose: () => {
           mergeSources(selection.result)

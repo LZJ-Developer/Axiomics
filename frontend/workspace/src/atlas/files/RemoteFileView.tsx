@@ -3,6 +3,7 @@ import { IconDownload, IconX } from "@/atlas/shared/Icon"
 import { bytes } from "./bytes"
 import { thumbLanguage } from "./artifact-thumb"
 import { remoteMime, remotePreview, type RemotePreview } from "./remote-preview"
+import { englishT, type Translate } from "@/i18n/fallback"
 
 export interface RemoteFile {
   name: string
@@ -18,6 +19,8 @@ export interface RemoteFileViewProps {
   read: (file: RemoteFile) => Promise<Blob>
   onDownload: (file: RemoteFile) => void
   onClose: () => void
+  /** Translator for the standalone test seam (no LanguageProvider). */
+  t?: Translate
   /** Defaults to the shared shiki highlighter; injected in tests. */
   highlight?: (code: string, lang: string) => Promise<string>
 }
@@ -61,6 +64,7 @@ const keep = (key: string, entry: Cached) => {
 }
 
 export function RemoteFileView(props: RemoteFileViewProps): JSX.Element {
+  const t = () => props.t ?? englishT
   const [text, setText] = createSignal<{ body: string; html?: string }>()
   const [url, setUrl] = createSignal<string>()
   const [failed, setFailed] = createSignal("")
@@ -177,8 +181,8 @@ export function RemoteFileView(props: RemoteFileViewProps): JSX.Element {
             // Not an error: a format this viewer will not guess at, or a file
             // too large to pull whole out of the cloud for a look.
             <div class="remote-view__empty" data-remote-unsupported>
-              <p>This file is not previewed here.</p>
-              <p class="remote-view__hint">Download it to open it with something that understands the format.</p>
+              <p>{t()("files.remote.notPreviewed")}</p>
+              <p class="remote-view__hint">{t()("files.remote.downloadHint")}</p>
             </div>
           }
         >

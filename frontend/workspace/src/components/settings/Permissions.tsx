@@ -16,6 +16,7 @@ import { showToast } from "@axiomics/ui/toast"
 import { confirmDialog } from "@/atlas/dialogs"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
+import { useLanguage } from "@/context/language"
 import { resolveProjectRoute } from "@/utils/project-route"
 import { PermissionToolDefaults } from "../settings-permissions"
 import { PanelBody, PanelHeader, PanelScroll, Section } from "./_shared"
@@ -43,6 +44,7 @@ const Permissions: Component = () => {
   const sdk = useGlobalSDK()
   const globalSync = useGlobalSync()
   const dialog = useDialog()
+  const language = useLanguage()
   const [busy, setBusy] = createSignal(false)
   const [showAllDefaults, setShowAllDefaults] = createSignal(false)
 
@@ -93,7 +95,10 @@ const Permissions: Component = () => {
       await sdk.client.permission.standing.revoke({ id: approval.id, directory })
       await refetch()
     } catch (err) {
-      showToast({ title: "Failed to revoke approval", description: err instanceof Error ? err.message : String(err) })
+      showToast({
+        title: language.t("settings.permissions.standing.revokeFailed"),
+        description: err instanceof Error ? err.message : String(err),
+      })
     } finally {
       setBusy(false)
     }
@@ -106,9 +111,9 @@ const Permissions: Component = () => {
     const sessionID = params.id
     if (!value || !sessionID || busy()) return
     const confirmed = await confirmDialog(dialog, {
-      title: `Revoke access to ${grant.path}?`,
-      message: "Axiomics will stop affected kernels so the folder cannot remain mounted with stale access.",
-      confirmLabel: "Revoke folder access",
+      title: language.t("settings.permissions.folders.revokeTitle", { path: grant.path }),
+      message: language.t("settings.permissions.folders.revokeMessage"),
+      confirmLabel: language.t("settings.permissions.folders.revokeConfirm"),
       danger: true,
     })
     if (!confirmed) return
@@ -118,7 +123,7 @@ const Permissions: Component = () => {
       .then(() => folderControls.refetch())
       .catch((error) =>
         showToast({
-          title: "Failed to revoke folder access",
+          title: language.t("settings.permissions.folders.revokeFailed"),
           description: error instanceof Error ? error.message : String(error),
         }),
       )
@@ -130,11 +135,13 @@ const Permissions: Component = () => {
     const status = trust()
     if (!value || !status || busy()) return
     const confirmed = await confirmDialog(dialog, {
-      title: trusted ? "Trust this project?" : "Revoke project trust?",
+      title: language.t(trusted ? "settings.permissions.trust.question" : "settings.permissions.trust.revokeQuestion"),
       message: trusted
-        ? `Allow project-owned code under ${status.root}, including plugins, MCP servers, formatters, language servers, provider commands, and startup hooks. Trust also permits remote jobs, kernel environment changes such as package installs, and host execution when the sandbox is off or explicitly configured to fall back without containment. Sandboxed terminals, kernels, and local jobs do not require project trust unless you enable that stricter policy in Sandbox settings.`
-        : "Remote jobs, kernel environment changes such as package installs, project-owned extensions, and unsandboxed execution will be blocked. Existing project processes are stopped. Sandboxed terminals, kernels, and local jobs remain available unless Sandbox settings require project trust for all execution.",
-      confirmLabel: trusted ? "Trust project" : "Revoke trust",
+        ? language.t("settings.permissions.trust.message", { root: status.root })
+        : language.t("settings.permissions.trust.revokeMessage"),
+      confirmLabel: language.t(
+        trusted ? "settings.permissions.trust.confirm" : "settings.permissions.trust.revokeConfirm",
+      ),
       danger: !trusted,
     })
     if (!confirmed) return
@@ -148,11 +155,13 @@ const Permissions: Component = () => {
       await trustControls.refetch()
       showToast({
         variant: "success",
-        title: trusted ? "Project trusted" : "Project trust revoked",
+        title: language.t(trusted ? "settings.permissions.toast.trusted" : "settings.permissions.toast.revoked"),
       })
     } catch (error) {
       showToast({
-        title: trusted ? "Could not trust project" : "Could not revoke project trust",
+        title: language.t(
+          trusted ? "settings.permissions.toast.trustFailed" : "settings.permissions.toast.revokeFailed",
+        ),
         description: error instanceof Error ? error.message : String(error),
       })
     } finally {
@@ -163,18 +172,25 @@ const Permissions: Component = () => {
   return (
     <PanelScroll>
       <div class="settings-preferences-panel settings-preferences-panel--permissions">
-        <PanelHeader title="Permissions" description="Control project trust, approvals, and tool behavior." />
+        <PanelHeader
+          title={language.t("settings.permissions.page.title")}
+          description={language.t("settings.permissions.page.description")}
+        />
         <PanelBody>
           <Show when={route()}>
             <Section
-              title="Project code"
-              description="Trust remote jobs, kernel environment changes, project-owned extensions, and host execution separately from routine sandboxed work."
+              title={language.t("settings.permissions.projectCode.title")}
+              description={language.t("settings.permissions.projectCode.description")}
             >
               <div class="settings-card settings-preferences-card">
                 <Show
                   when={!trust.loading}
                   fallback={
-                    <div class="settings-panel-loading__rows" role="status" aria-label="Checking project trust">
+                    <div
+                      class="settings-panel-loading__rows"
+                      role="status"
+                      aria-label={language.t("settings.permissions.projectCode.loading")}
+                    >
                       <span />
                     </div>
                   }
@@ -183,14 +199,18 @@ const Permissions: Component = () => {
                     when={!trust.error}
                     fallback={
                       <div class="settings-alert" data-tone="critical" role="alert">
-                        <span>Project trust could not be loaded. {String(trust.error)}</span>
+                        <span>
+                          {language.t("settings.permissions.projectCode.error", {
+                            error: String(trust.error),
+                          })}
+                        </span>
                         <Button
                           size="small"
                           variant="secondary"
                           class="settings-panel-action"
                           onClick={() => void trustControls.refetch()}
                         >
-                          Retry
+                          {language.t("settings.permissions.retry")}
                         </Button>
                       </div>
                     }
@@ -205,7 +225,11 @@ const Permissions: Component = () => {
                       </span>
                       <div class="settings-row-copy">
                         <strong>
-                          {trust()?.canExecuteProjectCode ? "Project code enabled" : "Project extensions blocked"}
+                          {language.t(
+                            trust()?.canExecuteProjectCode
+                              ? "settings.permissions.projectCode.enabled"
+                              : "settings.permissions.projectCode.blocked",
+                          )}
                         </strong>
                         <span class="text-11-regular text-text-weak break-all">{trust()?.root}</span>
                       </div>
@@ -213,7 +237,11 @@ const Permissions: Component = () => {
                         class="settings-preference-status"
                         data-tone={trust()?.canExecuteProjectCode ? "success" : "warning"}
                       >
-                        {trust()?.canExecuteProjectCode ? "Trusted" : "Restricted"}
+                        {language.t(
+                          trust()?.canExecuteProjectCode
+                            ? "settings.permissions.projectCode.trusted"
+                            : "settings.permissions.projectCode.restricted",
+                        )}
                       </span>
                       <Button
                         size="small"
@@ -221,7 +249,11 @@ const Permissions: Component = () => {
                         disabled={busy() || !trust()}
                         onClick={() => void updateTrust(!trust()?.canExecuteProjectCode)}
                       >
-                        {trust()?.canExecuteProjectCode ? "Revoke trust" : "Trust project"}
+                        {language.t(
+                          trust()?.canExecuteProjectCode
+                            ? "settings.permissions.projectCode.revoke"
+                            : "settings.permissions.projectCode.trust",
+                        )}
                       </Button>
                     </div>
                   </Show>
@@ -232,14 +264,18 @@ const Permissions: Component = () => {
 
           <Show when={route() && params.id && params.id !== "new"}>
             <Section
-              title="Connected folders"
-              description="Review durable read-only and read-write access from the active research session."
+              title={language.t("settings.permissions.folders.title")}
+              description={language.t("settings.permissions.folders.description")}
             >
               <div class="settings-card settings-preferences-card">
                 <Show
                   when={!folders.loading}
                   fallback={
-                    <div class="settings-panel-loading__rows" role="status" aria-label="Loading connected folders">
+                    <div
+                      class="settings-panel-loading__rows"
+                      role="status"
+                      aria-label={language.t("settings.permissions.folders.loading")}
+                    >
                       <span />
                     </div>
                   }
@@ -248,14 +284,14 @@ const Permissions: Component = () => {
                     when={!folders.error}
                     fallback={
                       <div class="settings-alert" data-tone="critical" role="alert">
-                        <span>Connected folders could not be loaded.</span>
+                        <span>{language.t("settings.permissions.folders.error")}</span>
                         <Button
                           size="small"
                           variant="secondary"
                           class="settings-panel-action"
                           onClick={() => void folderControls.refetch()}
                         >
-                          Retry
+                          {language.t("settings.permissions.retry")}
                         </Button>
                       </div>
                     }
@@ -264,7 +300,7 @@ const Permissions: Component = () => {
                       when={(folders() ?? []).length > 0}
                       fallback={
                         <p class="settings-card-empty" role="status">
-                          No connected folders in this session.
+                          {language.t("settings.permissions.folders.empty")}
                         </p>
                       }
                     >
@@ -274,12 +310,19 @@ const Permissions: Component = () => {
                             <div class="settings-row-copy">
                               <strong class="break-all">{grant.path}</strong>
                               <span class="text-11-regular text-text-weak">
-                                {grant.access === "write" ? "Read & write" : "Read only"} ·{" "}
-                                {grant.scope === "installation"
-                                  ? "Every project"
-                                  : grant.scope === "project"
-                                    ? "This project"
-                                    : "This session"}
+                                {language.t(
+                                  grant.access === "write"
+                                    ? "settings.permissions.access.write"
+                                    : "settings.permissions.access.read",
+                                )}{" "}
+                                ·{" "}
+                                {language.t(
+                                  grant.scope === "installation"
+                                    ? "settings.permissions.scope.everyProject"
+                                    : grant.scope === "project"
+                                      ? "settings.permissions.scope.thisProject"
+                                      : "settings.permissions.scope.thisSession",
+                                )}
                               </span>
                             </div>
                             <Button
@@ -288,7 +331,7 @@ const Permissions: Component = () => {
                               disabled={busy()}
                               onClick={() => void revokeFolder(grant)}
                             >
-                              Revoke
+                              {language.t("settings.permissions.folders.revoke")}
                             </Button>
                           </div>
                         )}
@@ -303,14 +346,18 @@ const Permissions: Component = () => {
           {/* ── Standing approvals ── */}
           <Show when={route()}>
             <Section
-              title="Standing approvals"
-              description="Approvals granted for this project or every project. Revoke one to ask again next time."
+              title={language.t("settings.permissions.standing.title")}
+              description={language.t("settings.permissions.standing.description")}
             >
               <div class="settings-card settings-preferences-card">
                 <Show
                   when={!standing.loading}
                   fallback={
-                    <div class="settings-panel-loading__rows" role="status" aria-label="Loading standing approvals">
+                    <div
+                      class="settings-panel-loading__rows"
+                      role="status"
+                      aria-label={language.t("settings.permissions.standing.loading")}
+                    >
                       <span />
                       <span />
                     </div>
@@ -320,7 +367,11 @@ const Permissions: Component = () => {
                     when={!standing.error}
                     fallback={
                       <div class="settings-alert" data-tone="critical" role="alert">
-                        <span>Standing approvals could not be loaded. {String(standing.error)}</span>
+                        <span>
+                          {language.t("settings.permissions.standing.error", {
+                            error: String(standing.error),
+                          })}
+                        </span>
                         <Button
                           size="small"
                           variant="secondary"
@@ -328,7 +379,7 @@ const Permissions: Component = () => {
                           disabled={standing.loading}
                           onClick={() => void refetch()}
                         >
-                          Retry
+                          {language.t("settings.permissions.retry")}
                         </Button>
                       </div>
                     }
@@ -337,7 +388,7 @@ const Permissions: Component = () => {
                       when={(standing() ?? []).length > 0}
                       fallback={
                         <p class="settings-card-empty" role="status">
-                          No standing approvals yet. Conversation-scoped approvals end with their session.
+                          {language.t("settings.permissions.standing.empty")}
                         </p>
                       }
                     >
@@ -352,8 +403,14 @@ const Permissions: Component = () => {
                                 </Show>
                               </strong>
                               <span class="text-11-regular text-text-weak">
-                                {approval.scope === "global" ? "Everywhere" : "This project"} · granted{" "}
-                                {when(approval.created)}
+                                {language.t(
+                                  approval.scope === "global"
+                                    ? "settings.permissions.standing.scopeEverywhere"
+                                    : "settings.permissions.standing.scopeProject",
+                                )}
+                                {language.t("settings.permissions.standing.granted", {
+                                  date: when(approval.created),
+                                })}
                               </span>
                             </div>
                             <span class="ml-auto shrink-0">
@@ -363,7 +420,7 @@ const Permissions: Component = () => {
                                 disabled={busy()}
                                 onClick={() => void revoke(approval)}
                               >
-                                Revoke
+                                {language.t("settings.permissions.standing.revoke")}
                               </Button>
                             </span>
                           </div>
@@ -398,7 +455,9 @@ const Permissions: Component = () => {
                   classList={{ "rotate-180": showAllDefaults() }}
                   aria-hidden="true"
                 />
-                {showAllDefaults() ? "Show fewer tool defaults" : "Show all tool defaults"}
+                {showAllDefaults()
+                  ? language.t("settings.permissions.defaults.showFewer")
+                  : language.t("settings.permissions.defaults.showAll")}
               </button>
             </div>
           </div>

@@ -26,6 +26,14 @@ export namespace Flag {
    * Unset keeps today's behaviour. */
   export const AXIOMICS_DISABLE_TERMINAL = truthy("AXIOMICS_DISABLE_TERMINAL")
   export const AXIOMICS_PERMISSION = process.env["AXIOMICS_PERMISSION"]
+  /** Deployment policy for unattended research: inside the enforced OS sandbox,
+   * routine shell and read access never stop for a human. Decisions that widen
+   * the boundary (compute jobs, environment mutation, network or MCP endpoints)
+   * still ask. Read dynamically so a long-running server follows its env. */
+  export declare const AXIOMICS_SANDBOX_UNATTENDED: boolean
+  /** Locale the client uses before anyone chooses one in settings. Unset keeps
+   * browser detection. */
+  export declare const AXIOMICS_UI_LOCALE: string | undefined
   export const AXIOMICS_DISABLE_DEFAULT_PLUGINS = truthy("AXIOMICS_DISABLE_DEFAULT_PLUGINS")
   export const AXIOMICS_DISABLE_LSP_DOWNLOAD = truthy("AXIOMICS_DISABLE_LSP_DOWNLOAD")
   export const AXIOMICS_ENABLE_EXPERIMENTAL_MODELS = truthy("AXIOMICS_ENABLE_EXPERIMENTAL_MODELS")
@@ -74,6 +82,22 @@ export namespace Flag {
 // Dynamic getter for AXIOMICS_DISABLE_PROJECT_CONFIG
 // This must be evaluated at access time, not module load time,
 // because external tooling may set this env var at runtime
+Object.defineProperty(Flag, "AXIOMICS_SANDBOX_UNATTENDED", {
+  get() {
+    return truthy("AXIOMICS_SANDBOX_UNATTENDED")
+  },
+  enumerable: true,
+  configurable: false,
+})
+
+Object.defineProperty(Flag, "AXIOMICS_UI_LOCALE", {
+  get() {
+    return process.env["AXIOMICS_UI_LOCALE"] || undefined
+  },
+  enumerable: true,
+  configurable: false,
+})
+
 Object.defineProperty(Flag, "AXIOMICS_DISABLE_PROJECT_CONFIG", {
   get() {
     return truthy("AXIOMICS_DISABLE_PROJECT_CONFIG")

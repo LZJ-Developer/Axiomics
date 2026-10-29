@@ -12,6 +12,7 @@ import { Switch } from "@axiomics/ui/switch"
 import { Icon } from "@axiomics/ui/icon"
 import { showToast } from "@axiomics/ui/toast"
 import { useGlobalSDK } from "@/context/global-sdk"
+import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { settingsApi } from "./api"
 import { PanelBody, PanelHeader, PanelScroll, Section } from "./_shared"
@@ -55,18 +56,19 @@ type WriteKey = "enabled" | "trust" | "network" | "fallback" | "paths"
 type PendingWrite = { body: SandboxConfig; key: WriteKey; failure: string }
 
 const NETWORK_OPTS = [
-  { value: "allow" as const, label: "Allow" },
-  { value: "deny" as const, label: "Deny" },
+  { value: "allow" as const, labelKey: "settings.sandbox.option.allow" as const },
+  { value: "deny" as const, labelKey: "settings.sandbox.option.deny" as const },
 ]
 const UNAVAILABLE_OPTS = [
-  { value: "warn" as const, label: "Warn & run" },
-  { value: "error" as const, label: "Refuse" },
-  { value: "allow" as const, label: "Run silently" },
+  { value: "warn" as const, labelKey: "settings.sandbox.option.warn" as const },
+  { value: "error" as const, labelKey: "settings.sandbox.option.error" as const },
+  { value: "allow" as const, labelKey: "settings.sandbox.option.silent" as const },
 ]
 
 const Sandbox: Component = () => {
   const sdk = useGlobalSDK()
   const platform = usePlatform()
+  const language = useLanguage()
   const fetchFn = platform.fetch ?? fetch
   const call = <T,>(path: string, init?: RequestInit) =>
     settingsApi<T>(sdk.url, fetchFn, `/settings/sandbox${path}`, init)
@@ -168,7 +170,10 @@ const Sandbox: Component = () => {
     try {
       setTest(await call<SelfTest>("/test", { method: "POST" }))
     } catch (err) {
-      showToast({ title: "Self-test failed to run", description: err instanceof Error ? err.message : String(err) })
+      showToast({
+        title: language.t("settings.sandbox.test.failedRun"),
+        description: err instanceof Error ? err.message : String(err),
+      })
     } finally {
       setTesting(false)
     }
@@ -178,17 +183,24 @@ const Sandbox: Component = () => {
     const p = newPath().trim()
     if (!p) return
     if (!p.startsWith("/")) {
-      showToast({ title: "Use an absolute path", description: "Extra writable paths must start with /." })
+      showToast({
+        title: language.t("settings.sandbox.paths.absoluteTitle"),
+        description: language.t("settings.sandbox.paths.absoluteDetail"),
+      })
       return
     }
     const next = [...(config().allowWrite ?? [])]
     if (!next.includes(p)) next.push(p)
     setNewPath("")
     setShowPathEditor(false)
-    patch({ allowWrite: next }, "paths", "Couldn't add the path")
+    patch({ allowWrite: next }, "paths", language.t("settings.sandbox.paths.addFailed"))
   }
   const removePath = (p: string) =>
-    patch({ allowWrite: (config().allowWrite ?? []).filter((x) => x !== p) }, "paths", "Couldn't remove the path")
+    patch(
+      { allowWrite: (config().allowWrite ?? []).filter((x) => x !== p) },
+      "paths",
+      language.t("settings.sandbox.paths.removeFailed"),
+    )
 
   return (
     <PanelScroll>
@@ -196,11 +208,14 @@ const Sandbox: Component = () => {
         class="settings-preferences-panel settings-preferences-panel--sandbox"
         aria-busy={saving() ? "true" : undefined}
       >
-        <PanelHeader title="Sandbox" description="Isolate local terminals, kernels, and shell commands." />
+        <PanelHeader
+          title={language.t("settings.sandbox.title")}
+          description={language.t("settings.sandbox.description")}
+        />
         <PanelBody>
           <Show when={data.error}>
             <div class="settings-alert" data-tone="critical" role="alert">
-              <span>Sandbox settings could not be loaded. {String(data.error)}</span>
+              <span>{language.t("settings.sandbox.error", { error: String(data.error) })}</span>
               <Button
                 size="small"
                 variant="secondary"
@@ -208,7 +223,7 @@ const Sandbox: Component = () => {
                 disabled={data.loading || saving()}
                 onClick={() => void refetch()}
               >
-                Retry
+                {language.t("settings.sandbox.retry")}
               </Button>
             </div>
           </Show>
@@ -216,7 +231,11 @@ const Sandbox: Component = () => {
             when={!data.loading && !data.error}
             fallback={
               <Show when={data.loading}>
-                <div class="settings-panel-loading__rows" role="status" aria-label="Loading sandbox settings">
+                <div
+                  class="settings-panel-loading__rows"
+                  role="status"
+                  aria-label={language.t("settings.sandbox.loading")}
+                >
                   <span />
                   <span />
                   <span />
@@ -225,22 +244,22 @@ const Sandbox: Component = () => {
             }
           >
             <Section
-              title="Protection"
-              description="Permissions approve a command; the sandbox limits what it can reach."
+              title={language.t("settings.sandbox.protection.title")}
+              description={language.t("settings.sandbox.protection.description")}
               action={
                 <span class="settings-sandbox-save-state" role="status" aria-live="polite">
-                  {saving() ? "Saving…" : ""}
+                  {saving() ? language.t("settings.sandbox.saving") : ""}
                 </span>
               }
             >
               <div class="settings-card settings-preferences-card">
                 <div class="settings-row settings-sandbox-control-row settings-sandbox-enable-row">
                   <div class="settings-row-copy">
-                    <strong>Sandbox agent commands</strong>
+                    <strong>{language.t("settings.sandbox.enable.title")}</strong>
                     <span>
                       {config().enabled !== false
-                        ? "On — reads and writes stay within the workspace and approved paths."
-                        : "Off — trusted projects may run with your full user authority; untrusted projects remain blocked."}
+                        ? language.t("settings.sandbox.enable.on")
+                        : language.t("settings.sandbox.enable.off")}
                     </span>
                   </div>
                   <Switch
@@ -248,16 +267,20 @@ const Sandbox: Component = () => {
                     checked={config().enabled !== false}
                     disabled={busy("enabled") || unavailable()}
                     onChange={(checked) =>
-                      patch({ enabled: checked }, "enabled", "Couldn't update the sandbox setting")
+                      patch({ enabled: checked }, "enabled", language.t("settings.sandbox.enableFailed"))
                     }
                   >
-                    Sandbox agent commands
+                    {language.t("settings.sandbox.enable.title")}
                   </Switch>
                 </div>
                 <Show
                   when={status()}
                   fallback={
-                    <div class="settings-panel-loading__rows" role="status" aria-label="Checking native containment">
+                    <div
+                      class="settings-panel-loading__rows"
+                      role="status"
+                      aria-label={language.t("settings.sandbox.checking")}
+                    >
                       <span />
                     </div>
                   }
@@ -279,15 +302,24 @@ const Sandbox: Component = () => {
                           <Icon name={s().available ? "check" : "stop"} size="small" />
                         </span>
                         <span class="settings-row-copy">
-                          <strong>{s().available ? "Native containment available" : "Sandbox unavailable"}</strong>
+                          <strong>
+                            {s().available
+                              ? language.t("settings.sandbox.available.title")
+                              : language.t("settings.sandbox.unavailable.title")}
+                          </strong>
                           <span>
                             {s().available
-                              ? `${s().backend} on ${s().platform}`
-                              : `No supported backend on ${s().platform}`}
+                              ? language.t("settings.sandbox.available.backend", {
+                                  backend: s().backend,
+                                  platform: s().platform,
+                                })
+                              : language.t("settings.sandbox.unavailable.backend", {
+                                  platform: s().platform,
+                                })}
                           </span>
                         </span>
                         <span class="settings-preference-status" data-tone={s().available ? "success" : "warning"}>
-                          {s().available ? "Available" : "Unavailable"}
+                          {language.t(s().available ? "settings.sandbox.available" : "settings.sandbox.unavailable")}
                         </span>
                         <Icon
                           name="chevron-down"
@@ -300,36 +332,36 @@ const Sandbox: Component = () => {
                         <div id={backendDetailsId} class="settings-sandbox-backend-details">
                           <dl>
                             <div>
-                              <dt>Backend</dt>
+                              <dt>{language.t("settings.sandbox.backend")}</dt>
                               <dd>{s().backend}</dd>
                             </div>
                             <div>
-                              <dt>Platform</dt>
+                              <dt>{language.t("settings.sandbox.platform")}</dt>
                               <dd>{s().platform}</dd>
                             </div>
                             <div>
-                              <dt>Tool</dt>
-                              <dd>{s().tool ?? "Not available"}</dd>
+                              <dt>{language.t("settings.sandbox.tool")}</dt>
+                              <dd>{s().tool ?? language.t("settings.sandbox.notAvailable")}</dd>
                             </div>
                             <div>
-                              <dt>File access</dt>
+                              <dt>{language.t("settings.sandbox.fileAccess")}</dt>
                               <dd>
                                 {grantOnlyEnforced()
-                                  ? "Reads and writes are limited to the workspace and approved paths."
-                                  : "Grant-only read isolation is unavailable."}
+                                  ? language.t("settings.sandbox.fileAccess.grantOnly")
+                                  : language.t("settings.sandbox.fileAccess.unavailable")}
                               </dd>
                             </div>
                             <div>
-                              <dt>Network</dt>
+                              <dt>{language.t("settings.sandbox.network")}</dt>
                               <dd>
                                 {networkDenyEnforced()
-                                  ? "All network access is denied."
-                                  : "Network isolation is unavailable."}
+                                  ? language.t("settings.sandbox.network.denied")
+                                  : language.t("settings.sandbox.network.unavailable")}
                               </dd>
                             </div>
                             <Show when={s().reason}>
                               <div>
-                                <dt>Reason</dt>
+                                <dt>{language.t("settings.sandbox.reason")}</dt>
                                 <dd>{s().reason}</dd>
                               </div>
                             </Show>
@@ -344,17 +376,17 @@ const Sandbox: Component = () => {
 
             <Show when={config().enabled !== false}>
               <Section
-                title="Policy"
-                description="Choose the default autonomy and containment policy for local commands."
+                title={language.t("settings.sandbox.policy.title")}
+                description={language.t("settings.sandbox.policy.description")}
               >
                 <div class="settings-card settings-preferences-card">
                   <div class="settings-row settings-sandbox-control-row">
                     <div class="settings-row-copy">
-                      <strong>Require project trust</strong>
+                      <strong>{language.t("settings.sandbox.trust.title")}</strong>
                       <span>
                         {config().requireProjectTrust === true
-                          ? "Every project must be trusted before it can start terminals, kernels, or local jobs."
-                          : "Sandboxed terminals, kernels, and local jobs can run immediately. Remote jobs, kernel environment changes, project extensions, and unsandboxed execution still require trust."}
+                          ? language.t("settings.sandbox.trust.on")
+                          : language.t("settings.sandbox.trust.off")}
                       </span>
                     </div>
                     <Switch
@@ -362,30 +394,32 @@ const Sandbox: Component = () => {
                       checked={config().requireProjectTrust === true}
                       disabled={busy("trust") || unavailable()}
                       onChange={(checked) =>
-                        patch({ requireProjectTrust: checked }, "trust", "Couldn't update the project trust policy")
+                        patch({ requireProjectTrust: checked }, "trust", language.t("settings.sandbox.trustFailed"))
                       }
                     >
-                      Require project trust
+                      {language.t("settings.sandbox.trust.title")}
                     </Switch>
                   </div>
 
                   <div class="settings-row settings-sandbox-control-row">
                     <div class="settings-row-copy">
-                      <strong>Network access</strong>
+                      <strong>{language.t("settings.sandbox.networkAccess.title")}</strong>
                       <span>
                         {networkDenyEnforced()
-                          ? "This backend always denies network access, including loopback, LAN, link-local, and metadata endpoints."
-                          : "Allow permits outbound network access while loopback remains blocked."}
+                          ? language.t("settings.sandbox.networkAccess.denied")
+                          : language.t("settings.sandbox.networkAccess.allow")}
                       </span>
                     </div>
                     <Select
-                      aria-label="Network access"
+                      aria-label={language.t("settings.sandbox.networkAccess.title")}
                       options={NETWORK_OPTS}
                       current={NETWORK_OPTS.find((o) => o.value === effectiveNetwork())}
                       value={(o) => o.value}
-                      label={(o) => o.label}
+                      label={(o) => language.t(o.labelKey)}
                       disabled={busy("network") || unavailable() || networkDenyEnforced()}
-                      onSelect={(o) => o && patch({ network: o.value }, "network", "Couldn't update network policy")}
+                      onSelect={(o) =>
+                        o && patch({ network: o.value }, "network", language.t("settings.sandbox.networkFailed"))
+                      }
                       variant="secondary"
                       size="small"
                       triggerVariant="settings"
@@ -394,18 +428,19 @@ const Sandbox: Component = () => {
 
                   <div class="settings-row settings-sandbox-control-row">
                     <div class="settings-row-copy">
-                      <strong>Fallback behavior</strong>
-                      <span>Choose what happens if filesystem isolation cannot start.</span>
+                      <strong>{language.t("settings.sandbox.fallback.title")}</strong>
+                      <span>{language.t("settings.sandbox.fallback.description")}</span>
                     </div>
                     <Select
-                      aria-label="Fallback behavior"
+                      aria-label={language.t("settings.sandbox.fallback.title")}
                       options={UNAVAILABLE_OPTS}
                       current={UNAVAILABLE_OPTS.find((o) => o.value === (config().onUnavailable ?? "error"))}
                       value={(o) => o.value}
-                      label={(o) => o.label}
+                      label={(o) => language.t(o.labelKey)}
                       disabled={busy("fallback") || unavailable()}
                       onSelect={(o) =>
-                        o && patch({ onUnavailable: o.value }, "fallback", "Couldn't update fallback behavior")
+                        o &&
+                        patch({ onUnavailable: o.value }, "fallback", language.t("settings.sandbox.fallbackFailed"))
                       }
                       variant="secondary"
                       size="small"
@@ -416,9 +451,9 @@ const Sandbox: Component = () => {
               </Section>
 
               <Section
-                title="Extra writable paths"
+                title={language.t("settings.sandbox.paths.title")}
                 count={(config().allowWrite ?? []).length}
-                description="Absolute paths outside the workspace and temporary directories that the sandbox may modify."
+                description={language.t("settings.sandbox.paths.description")}
               >
                 <div class="settings-card settings-preferences-card">
                   <Show
@@ -426,8 +461,8 @@ const Sandbox: Component = () => {
                     fallback={
                       <div class="settings-row settings-sandbox-control-row settings-sandbox-empty-paths">
                         <div class="settings-row-copy">
-                          <strong>Workspace only</strong>
-                          <span>No extra writable paths are approved.</span>
+                          <strong>{language.t("settings.sandbox.paths.empty")}</strong>
+                          <span>{language.t("settings.sandbox.paths.emptyDetail")}</span>
                         </div>
                         <button
                           type="button"
@@ -437,7 +472,9 @@ const Sandbox: Component = () => {
                           disabled={busy("paths") || unavailable()}
                           onClick={() => setShowPathEditor((value) => !value)}
                         >
-                          {showPathEditor() ? "Cancel" : "Add path"}
+                          {language.t(
+                            showPathEditor() ? "settings.sandbox.paths.cancel" : "settings.sandbox.paths.add",
+                          )}
                         </button>
                       </div>
                     }
@@ -451,10 +488,10 @@ const Sandbox: Component = () => {
                             class="settings-preference-action"
                             data-variant="danger"
                             disabled={busy("paths")}
-                            aria-label={`Remove writable path ${p}`}
+                            aria-label={language.t("settings.sandbox.paths.removeAria", { path: p })}
                             onClick={() => removePath(p)}
                           >
-                            Remove
+                            {language.t("settings.sandbox.paths.remove")}
                           </button>
                         </div>
                       )}
@@ -464,7 +501,7 @@ const Sandbox: Component = () => {
                     <div id={pathEditorId} class="settings-sandbox-path-editor">
                       <input
                         class="settings-field"
-                        aria-label="Add writable path"
+                        aria-label={language.t("settings.sandbox.paths.input")}
                         placeholder="/absolute/path"
                         value={newPath()}
                         disabled={busy("paths") || unavailable()}
@@ -478,7 +515,7 @@ const Sandbox: Component = () => {
                         disabled={busy("paths") || unavailable() || !newPath().trim()}
                         onClick={addPath}
                       >
-                        Add
+                        {language.t("settings.sandbox.paths.addButton")}
                       </Button>
                     </div>
                   </Show>
@@ -486,16 +523,14 @@ const Sandbox: Component = () => {
               </Section>
 
               <Section
-                title="Containment test"
-                description="Run real sandboxed commands to verify the boundaries this backend claims to enforce."
+                title={language.t("settings.sandbox.test.title")}
+                description={language.t("settings.sandbox.test.description")}
               >
                 <div class="settings-card settings-preferences-card">
                   <div class="settings-row settings-sandbox-control-row settings-sandbox-test-row">
                     <div class="settings-row-copy">
-                      <strong>Verify containment</strong>
-                      <span>
-                        Tests read and write boundaries plus effective network isolation with real sandboxed commands.
-                      </span>
+                      <strong>{language.t("settings.sandbox.test.verify")}</strong>
+                      <span>{language.t("settings.sandbox.test.verifyDetail")}</span>
                     </div>
                     <Button
                       size="small"
@@ -503,7 +538,9 @@ const Sandbox: Component = () => {
                       disabled={testing() || unavailable() || !status()?.available}
                       onClick={runTest}
                     >
-                      {testing() ? "Testing…" : "Run self-test"}
+                      {testing()
+                        ? language.t("settings.sandbox.test.testing")
+                        : language.t("settings.sandbox.test.run")}
                     </Button>
                   </div>
                   <Show when={test()}>
@@ -512,7 +549,7 @@ const Sandbox: Component = () => {
                         <div class="settings-sandbox-result__summary" role="status">
                           <span class="settings-sandbox-result__dot" data-tone={t().ok ? "success" : "danger"} />
                           <span classList={{ "text-text-success": t().ok, "text-text-danger": !t().ok }}>
-                            {t().ok ? "Containment verified." : "Containment failed — do not rely on the sandbox."}
+                            {language.t(t().ok ? "settings.sandbox.test.verified" : "settings.sandbox.test.failed")}
                           </span>
                           <button
                             type="button"
@@ -522,7 +559,9 @@ const Sandbox: Component = () => {
                             aria-controls={testDetailsId}
                             onClick={() => setShowTestDetails((value) => !value)}
                           >
-                            {showTestDetails() ? "Hide checks" : `Show ${t().checks.length} checks`}
+                            {showTestDetails()
+                              ? language.t("settings.sandbox.test.hide")
+                              : language.t("settings.sandbox.test.show", { count: t().checks.length })}
                           </button>
                         </div>
                         <Show when={showTestDetails()}>

@@ -14,6 +14,7 @@ import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
 import { useParams } from "@solidjs/router"
 import { Markdown } from "@axiomics/ui/markdown"
+import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { PdfViewer } from "@/science/renderers/documents/PdfViewer"
@@ -139,6 +140,9 @@ export function FileView(props: {
   const sdk = props.services ?? production!
   const sync = props.services ? undefined : useSync()
   const params = props.services ? undefined : useParams()
+  // The `services` prop is the standalone test seam (see FilePreview.test.ts);
+  // production always renders this view inside the language provider.
+  const language = props.services ? undefined : useLanguage()
   const directory = () =>
     props.directory || production?.directory || sync?.data.path.directory || sync?.project?.worktree || ""
   const activeSessionID = () => props.sessionID ?? (params?.id && params.id !== "new" ? params.id : undefined)
@@ -782,6 +786,7 @@ export function FileView(props: {
   return (
     <div class="atlas-file-view" data-component="file-view" data-artifact-id={context().id}>
       <FileToolbar
+        t={language?.t}
         name={name()}
         location={location()}
         description={description()}
@@ -880,8 +885,11 @@ export function FileView(props: {
               >
                 <section class="atlas-file-error" role="status" aria-live="polite">
                   <IconFile size={20} strokeWidth={1.4} />
-                  <h2>File preview interrupted</h2>
-                  <p>The read ended before it finished. Your file was not changed.</p>
+                  <h2>{language?.t("files.preview.interruptedTitle") ?? "File preview interrupted"}</h2>
+                  <p>
+                    {language?.t("files.preview.interruptedDetail") ??
+                      "The read ended before it finished. Your file was not changed."}
+                  </p>
                   <button
                     type="button"
                     class="atlas-file-button"
@@ -934,6 +942,7 @@ export function FileView(props: {
                 {/* ordinary Markdown opens as a quiet document */}
                 <Match when={kind() === "markdown" && !view.source && !manuscript()}>
                   <MarkdownDocument
+                    t={language?.t}
                     name={name()}
                     text={view.draft}
                     resolveImage={image}

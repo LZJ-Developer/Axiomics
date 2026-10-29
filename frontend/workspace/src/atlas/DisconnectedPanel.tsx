@@ -1,6 +1,7 @@
 import { Show, type JSX } from "solid-js"
 import { Button } from "@axiomics/ui/button"
 import { useDialog } from "@axiomics/ui/context/dialog"
+import { useLanguage } from "@/context/language"
 import { useServer } from "@/context/server"
 import { DialogSelectServer } from "@/components/dialog-select-server"
 import { FONT_CODE, FONT_SANS } from "@/styles/tokens"
@@ -12,6 +13,7 @@ import { FONT_CODE, FONT_SANS } from "@/styles/tokens"
  * banner clears itself on recovery.
  */
 export function DisconnectedPanel(): JSX.Element {
+  const language = useLanguage()
   const server = useServer()
   const dialog = useDialog()
 
@@ -19,7 +21,7 @@ export function DisconnectedPanel(): JSX.Element {
     <Show when={server.healthy() === false}>
       <div
         role="alert"
-        aria-label="Server connection lost"
+        aria-label={language.t("terminal.connectionLost.panel")}
         style={{
           display: "flex",
           "align-items": "center",

@@ -54,7 +54,7 @@ describe("focused workspace shell", () => {
     expect(session).not.toContain("SessionTitleEditor")
     expect(session).toContain("onRename={renameSession}")
     expect(session).toContain("await sync.session.rename(sessionID, trimmed)")
-    expect(session).toContain('return activeSession()?.title?.trim() || "Session"')
+    expect(session).toContain('return activeSession()?.title?.trim() || language.t("session.title.fallback")')
     expect(session).not.toContain("const s = sessions().find((x) => x.id === params.id)")
     expect(session).toContain('class="session-sidebar__new"')
     expect(session).toContain('language.t("workspace.sidebar.label")')
@@ -66,7 +66,7 @@ describe("focused workspace shell", () => {
     expect(session).toContain("hidden={params.id === undefined}")
     expect(session).toContain("discardUnavailableSession(id, error)")
     expect(tabs).toContain('class="workspace-tabs"')
-    expect(tabs).toContain('aria-label="Open sessions"')
+    expect(tabs).toContain('aria-label={t()("session.tabs.open")}')
     expect(header).toContain(".workspace-header.g-strip")
     expect(header).toContain("height: 44px")
     expect(header).toContain(".workspace-header__back")
@@ -106,7 +106,7 @@ describe("focused workspace shell", () => {
     expect(session).toContain('class="session-sidebar__project"')
     expect(session).toContain('language.t("workspace.sidebar.empty")')
     expect(session).toContain("data-context-open={uiStore.rightPaneOpen()")
-    expect(session).toContain('return activeSession()?.title?.trim() || "Session"')
+    expect(session).toContain('return activeSession()?.title?.trim() || language.t("session.title.fallback")')
   })
 
   test("keeps the conversation as the sole center surface", () => {

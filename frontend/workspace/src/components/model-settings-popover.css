@@ -459,11 +459,6 @@
   outline-offset: -2px;
 }
 
-.model-settings-manage {
-  flex: 0 0 36px;
-  background: var(--model-control-surface);
-}
-
 [data-model-menu-value] {
   max-width: 158px;
   gap: 6px;

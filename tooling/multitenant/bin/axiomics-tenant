@@ -153,6 +153,9 @@ run_tenant() {
   # --hostname：容器内无法自建 UTS 命名空间（rootless 下 sethostname 必 EPERM），
   # 沙箱会把 --unshare-uts/--hostname 去掉；主机名由容器本身给出，
   # 否则模型在 `hostname` 里读到的是容器 id。
+  # 内网 TLS 有两类用户：Node 系（bun 本体）只认 NODE_EXTRA_CA_CERTS；conda 环境
+  # 自带 certifi/ssl.cert.pem，必须用 SSL_CERT_FILE/REQUESTS_CA_BUNDLE 指向整包 CA
+  # 才能访问内网 HTTPS。整包 ca-bundle.crt 里已含内部 CA，覆盖公网 CA 不受影响。
   podman run -d --name "ax-$tid" \
     --init \
     --hostname axiomics \
@@ -173,10 +176,18 @@ run_tenant() {
     -e AXIOMICS_SHARED_ENVS="$SHARED_ENVS" \
     -e AXIOMICS_ENV_OVERLAY_ROOT=/data/kernel-overlay \
     -e AXIOMICS_DISABLE_TERMINAL="${AX_TERMINAL_DISABLED:-1}" \
+    -e AXIOMICS_SANDBOX_UNATTENDED=1 \
+    -e AXIOMICS_UI_LOCALE=zh \
     "${MIRROR_ARGS[@]}" \
     -e http_proxy= -e https_proxy= -e HTTP_PROXY= -e HTTPS_PROXY= \
     -e all_proxy= -e ALL_PROXY= -e no_proxy= -e NO_PROXY= \
     -e NODE_EXTRA_CA_CERTS=/etc/pki/ca-trust/source/anchors/axiomics-internal-ca.crt \
+    -e SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt \
+    -e SSL_CERT_DIR=/etc/pki/tls/certs \
+    -e REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt \
+    -e CURL_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt \
+    -e PIP_CERT=/etc/pki/tls/certs/ca-bundle.crt \
+    -e GIT_SSL_CAINFO=/etc/pki/tls/certs/ca-bundle.crt \
     -v "$ENTRYPOINT:/entrypoint.sh:ro" \
     -v "$SHARED_ENVS:$SHARED_ENVS:ro" \
     -v "$TENANTS/$tid/data:/data" -v "$TENANTS/$tid/config:/config" \
@@ -230,19 +241,18 @@ cmd_add() {
     "baseURL": "https://host.containers.internal:43001/model/v1",
     "apiKey": "tenant-$tid"
   }}},
-  "sandbox": { "enabled": false }
+  "sandbox": { "enabled": true, "network": "allow" }
 }
 JSON
-  # 这一个值同时决定两件事，没有中间档（实测）：
-  #   true  → mode=approve → bwrap 沙箱开 + 每个动作都要用户点确认
+  # 这一个值决定项目默认档位（实测）：
+  #   true  → mode=approve → bwrap 沙箱开；bash 允许执行，风险命令仍弹一次确认
   #   false → mode=full    → 无沙箱 + 不询问
-  # 本部署选 false：agent 跑在云端，容器本身就是租户间的隔离边界
-  # （一人一容器、独立 PID/net/fs），权限放开不打断长流程。
-  #
-  # 代价要记住：ScientificCapability 派发本地作业前要求「已验证的 OS 沙箱」，
-  # 关掉这一档后该要求是否仍被满足，取决于 ExecutionAuthority 的判定式
-  # （unavailable = enabled && !available && onUnavailable==="error"，enabled=false 时恒假）。
-  # 这条在真机上验证过再改这个默认值，别凭印象。
+  # 本部署选 true + network=allow：模型端要有 /home/example-user-d4f0bc 视图与
+  # .runtime/envs 覆盖层，前提是沙箱真的在执行（PathSpace.exposed() 读的就是
+  # 这里的 enabled，改文件必须重启容器才生效，Config 有进程内缓存）。
+  # network=allow 让 pip/下载照常走，牺牲的是沙箱的网络隔离，租户间仍由容器边界隔离。
+  # 逐条确认在 run_tenant 里用 AXIOMICS_SANDBOX_UNATTENDED=1 关掉：风险命令、
+  # 外部路径读、联网检索直接放行；写外部路径/compute/环境变更仍会询问。
 
   run_tenant "$tid" "$port" "$gpu"
 

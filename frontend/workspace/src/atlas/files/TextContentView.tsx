@@ -1,6 +1,7 @@
 import { For, Match, Show, Switch, type JSX } from "solid-js"
 import { Markdown } from "@axiomics/ui/markdown"
 import { DataTableView } from "@/data/DataTableView"
+import { useLanguage } from "@/context/language"
 import { MarkdownDocument } from "../MarkdownDocument"
 import type { ViewerResolution } from "./viewer-registry"
 import "../FilePreview.css"
@@ -46,11 +47,12 @@ function notebook(text: string): NotebookCell[] | undefined {
 }
 
 export function TextContentView(props: { name: string; text: string; viewer: ViewerResolution }): JSX.Element {
+  const language = useLanguage()
   const cells = () => (props.viewer.kind === "notebook" ? notebook(props.text) : undefined)
   return (
     <Switch fallback={<pre class="remote-view__text">{props.text}</pre>}>
       <Match when={props.viewer.kind === "markdown"}>
-        <MarkdownDocument name={props.name} text={props.text} />
+        <MarkdownDocument t={language.t} name={props.name} text={props.text} />
       </Match>
       <Match when={props.viewer.kind === "table" && props.viewer.table}>
         <DataTableView text={props.text} format={props.viewer.table!} name={props.name} />

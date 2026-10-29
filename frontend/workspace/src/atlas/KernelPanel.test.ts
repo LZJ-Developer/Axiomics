@@ -30,8 +30,8 @@ describe("project Compute tracker", () => {
     expect(panel).toContain('kernel.active || kernel.state === "starting" || kernel.state === "running"')
     expect(panel).not.toContain("kernel.sessionID === route() && kernel.active")
     expect(panel).toContain("Number(route() === b) - Number(route() === a)")
-    expect(panel).toContain("Other sessions")
-    expect(panel).toContain("<em>Current</em>")
+    expect(panel).toContain('t()("compute.kernel.otherSessions")')
+    expect(panel).toContain('<em>{t()("compute.kernel.current")}</em>')
     expect(panel).toContain("summary().kinds")
     expect(panel).toContain("summary().memory")
     expect(panel).toContain("summary().cpu")
@@ -63,8 +63,8 @@ describe("project Compute tracker", () => {
     const panel = source()
 
     expect(panel).toContain('setView("sample", (value) => value + 1)')
-    expect(panel).toContain("<KernelCard kernel={kernel} sample={view.sample} />")
-    expect(panel).toContain("<CommandCard command={command} sample={view.sample} />")
+    expect(panel).toContain("<KernelCard kernel={kernel} sample={view.sample} t={t()} />")
+    expect(panel).toContain("<CommandCard command={command} sample={view.sample} t={t()} />")
   })
 
   test("renders a flat passive ledger, not a tutorial or control surface", () => {

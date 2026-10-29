@@ -18,8 +18,10 @@ import { createStore } from "solid-js/store"
 import { Icon } from "@axiomics/ui/icon"
 import { showToast } from "@axiomics/ui/toast"
 import { useGlobalSDK } from "@/context/global-sdk"
+import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useGlobalSync } from "@/context/global-sync"
+import { englishT, type Translate } from "@/i18n/fallback"
 import type { Config } from "@axiomics/sdk/v2/client"
 import { installFromGit } from "./skills-settings"
 import {
@@ -132,6 +134,10 @@ export type SkillsPageServices = {
 }
 
 export default function SkillsPage(props: { embedded?: boolean; services?: SkillsPageServices }): JSX.Element {
+  // The `services` prop is the standalone test seam (see SkillsPage.test.tsx);
+  // production always renders this page inside the language provider.
+  const language = props.services ? undefined : useLanguage()
+  const t = () => language?.t ?? englishT
   const service =
     props.services ??
     (() => {
@@ -426,14 +432,14 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
               when={!props.embedded}
               fallback={
                 <>
-                  <h2>Skills</h2>
-                  <p>Your research toolkit. Choose what agents can load when it is useful.</p>
+                  <h2>{t()("settings.panel.skills")}</h2>
+                  <p>{t()("skills.page.tagline")}</p>
                 </>
               }
             >
               <>
-                <h1>Skills</h1>
-                <p>Your research toolkit. Choose what agents can load when it is useful.</p>
+                <h1>{t()("settings.panel.skills")}</h1>
+                <p>{t()("skills.page.tagline")}</p>
               </>
             </Show>
           </div>
@@ -446,7 +452,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
 
         <Show when={view() === "list"}>
           <div class="skills-workspace__toolbar">
-            <div class="skills-workspace__views" role="group" aria-label="Skill library views">
+            <div class="skills-workspace__views" role="group" aria-label={t()("skills.page.views")}>
               <For
                 each={
                   [
@@ -483,8 +489,9 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                   setSearch(value)
                   setVisibleRows(INITIAL_SKILL_ROWS)
                 }}
-                placeholder="Search skills"
-                ariaLabel="Search skills"
+                placeholder={t()("skills.page.search")}
+                ariaLabel={t()("skills.page.search")}
+                t={t()}
               />
               <button
                 type="button"
@@ -541,7 +548,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                 <label class="skills-workspace__density">
                   Rows
                   <select
-                    aria-label="Skill row density"
+                    aria-label={t()("skills.page.density")}
                     value={preferences.density}
                     onChange={(event) => {
                       const density = event.currentTarget.value === "compact" ? "compact" : "comfortable"
@@ -553,8 +560,8 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                       }
                     }}
                   >
-                    <option value="comfortable">Comfortable</option>
-                    <option value="compact">Compact</option>
+                    <option value="comfortable">{t()("skills.page.density.comfortable")}</option>
+                    <option value="compact">{t()("skills.page.density.compact")}</option>
                   </select>
                 </label>
                 <div class="skills-workspace__bulk">
@@ -608,6 +615,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
         <div class="skills-workspace__content">
           <Show when={view() === "scratch"}>
             <ScratchForm
+              t={t()}
               busy={busy()}
               onCancel={() => setView("list")}
               onCreate={async (name, description, body) => {
@@ -629,6 +637,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
 
           <Show when={view() === "github"}>
             <GithubForm
+              t={t()}
               busy={busy()}
               onCancel={() => setView("list")}
               onInstall={async (url) => {
@@ -656,7 +665,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
           <Show when={view() === "list"}>
             <Show when={skills.error && all().length > 0}>
               <div class="skills-workspace__catalog-warning" role="alert">
-                <span>The saved catalog is shown. Reconnect before changing active skills.</span>
+                <span>{t()("skills.page.catalogWarning")}</span>
                 <button type="button" onClick={() => void skillsCtl.refetch()}>
                   Retry
                 </button>
@@ -671,7 +680,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                 fallback={
                   <CatalogState
                     icon="alert-circle"
-                    title="Skills could not be loaded"
+                    title={t()("skills.page.loadFailed")}
                     hint={message(skills.error)}
                     action="Try again"
                     onAction={() => void skillsCtl.refetch()}
@@ -686,14 +695,14 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                       fallback={
                         <EmptyState
                           icon="brain"
-                          title="No skills yet"
+                          title={t()("skills.page.emptyTitle")}
                           hint="Write one from scratch, upload a SKILL.md, or import from a public GitHub repository."
                         />
                       }
                     >
                       <CatalogState
                         icon="magnifying-glass"
-                        title="No matching skills"
+                        title={t()("skills.page.noMatchTitle")}
                         hint="Try a different search, source, or category."
                         action="Clear filters"
                         onAction={clearFilters}
@@ -713,6 +722,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                             <For each={items}>
                               {(skill) => (
                                 <SkillRow
+                                  t={t()}
                                   skill={skill}
                                   on={enabled(skill.name)}
                                   pinned={pinnedNames().has(skill.name)}
@@ -775,9 +785,11 @@ export function SkillStateBadges(props: {
   action?: "allow" | "ask" | "deny"
   blocked?: boolean
   projectDisabled?: boolean
+  t?: Translate
 }): JSX.Element {
+  const t = () => props.t ?? englishT
   return (
-    <div class="skills-workspace__tags" aria-label="Skill states">
+    <div class="skills-workspace__tags" aria-label={t()("skills.state.badges")}>
       <span
         class="settings-chip"
         data-state={props.allowed ? "allowed" : "library"}
@@ -833,7 +845,9 @@ function SkillRow(props: {
   disabled: boolean
   onToggle: (v: boolean) => void
   onPin: (v: boolean) => void
+  t: Translate
 }): JSX.Element {
+  const t = () => props.t
   const source = () => sourceOf(props.skill)
   return (
     <li
@@ -863,6 +877,7 @@ function SkillRow(props: {
         </p>
         <div class="skills-workspace__badges">
           <SkillStateBadges
+            t={t()}
             allowed={props.on}
             pinned={props.pinned}
             recent={props.recent}
@@ -872,7 +887,7 @@ function SkillRow(props: {
             projectDisabled={props.skill.disabled_by === "project"}
           />
           <Show when={(props.skill.tags ?? []).length > 0}>
-            <div class="skills-workspace__tags" aria-label="Skill tags">
+            <div class="skills-workspace__tags" aria-label={t()("skills.state.tags")}>
               <For each={(props.skill.tags ?? []).slice(0, 2)}>
                 {(tag) => <span class="settings-chip">{displayLabel(tag)}</span>}
               </For>
@@ -915,7 +930,9 @@ function ScratchForm(props: {
   busy: boolean
   onCancel: () => void
   onCreate: (name: string, description: string, body: string) => void
+  t: Translate
 }): JSX.Element {
+  const t = () => props.t
   const [name, setName] = createSignal("")
   const [description, setDescription] = createSignal("")
   const [body, setBody] = createSignal("")
@@ -927,8 +944,8 @@ function ScratchForm(props: {
           <Icon name="pencil-line" size="small" />
         </div>
         <div>
-          <h3>Write a new skill</h3>
-          <p>Create a focused playbook that agents can load when it is relevant.</p>
+          <h3>{t()("skills.page.writeTitle")}</h3>
+          <p>{t()("skills.page.writeHint")}</p>
         </div>
       </div>
       <div class="skills-workspace__form-fields">
@@ -937,7 +954,7 @@ function ScratchForm(props: {
           label="Description"
           value={description()}
           onInput={setDescription}
-          placeholder="When should an agent load this skill?"
+          placeholder={t()("skills.form.descriptionPlaceholder")}
         />
         <FormField
           label="Instructions (Markdown)"
@@ -945,7 +962,7 @@ function ScratchForm(props: {
           onInput={setBody}
           multiline
           mono
-          placeholder="Step-by-step guidance, code examples, pitfalls…"
+          placeholder={t()("skills.form.bodyPlaceholder")}
         />
         <div class="skills-workspace__form-actions">
           <FormButton
@@ -960,7 +977,13 @@ function ScratchForm(props: {
   )
 }
 
-function GithubForm(props: { busy: boolean; onCancel: () => void; onInstall: (url: string) => void }): JSX.Element {
+function GithubForm(props: {
+  busy: boolean
+  onCancel: () => void
+  onInstall: (url: string) => void
+  t: Translate
+}): JSX.Element {
+  const t = () => props.t
   const [url, setUrl] = createSignal("")
   return (
     <div class="skills-workspace__form">
@@ -969,8 +992,8 @@ function GithubForm(props: { busy: boolean; onCancel: () => void; onInstall: (ur
           <Icon name="github" size="small" />
         </div>
         <div>
-          <h3>Import from GitHub</h3>
-          <p>Install one or more skills from a public repository.</p>
+          <h3>{t()("skills.page.importTitle")}</h3>
+          <p>{t()("skills.page.importHint")}</p>
         </div>
       </div>
       <div class="skills-workspace__form-fields">

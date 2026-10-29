@@ -27,7 +27,7 @@ describe("folder picker design contract", () => {
     const css = styles()
 
     expect(code).toContain('import { Icon, type IconProps } from "@axiomics/ui/icon"')
-    expect(code).toContain('<nav class="folder-picker__location" aria-label="Current folder">')
+    expect(code).toContain('<nav class="folder-picker__location" aria-label={t()("files.currentFolder")}>')
     expect(code).toContain('name="arrow-up"')
     expect(code).toContain('name="chevron-right"')
     expect(code).toContain('name="home"')
@@ -52,7 +52,7 @@ describe("folder picker design contract", () => {
     expect(code).toContain("setCwd(valid)")
     expect(code).toContain("const valid = await validateDirectoryPath(sdk.url, cwd())")
     expect(code).toContain("if (valid) pick(valid)")
-    expect(code).toContain('aria-label="Go to path"')
+    expect(code).toContain('aria-label={t()("files.picker.goToPath")}')
     expect(code).toContain("macOS can hide Desktop")
     expect(code).not.toContain("bs-local")
   })
@@ -63,7 +63,7 @@ describe("folder picker design contract", () => {
 
     expect(code).toContain('class="folder-picker__row-open"')
     expect(code).toContain('class="folder-picker__choose"')
-    expect(code).toContain('title="Choose this folder"')
+    expect(code).toContain('title={t()("files.picker.chooseThis")}')
     expect(code).toContain('size="normal" variant="ghost" onClick={cancel}')
     expect(code).toContain('size="normal"\n                  variant="primary"')
     expect(code).not.toContain('role="button"')

@@ -166,6 +166,7 @@ export default function Page(): JSX.Element {
   const server = useServer()
   const platform = usePlatform()
   const dialog = useDialog()
+  const language = useLanguage()
   const replay = () =>
     new URLSearchParams(location.search).get("replay") === "1" && Boolean(params.id && params.id !== "new")
   const exitReplay = () => {
@@ -202,7 +203,7 @@ export default function Page(): JSX.Element {
     prewarmed.delete(id)
     const target = sessionTabs.close(id)
     if (params.id === id) {
-      toast.error("Session is no longer available")
+      toast.error(language.t("session.toast.unavailable"))
       navigate(target ? `/${params.dir}/session/${target}` : `/${params.dir}/session/new`, { replace: true })
     }
     return true
@@ -292,14 +293,14 @@ export default function Page(): JSX.Element {
     try {
       await sync.session.delete(sessionID)
       const open = sessionTabs.close(sessionID)
-      toast.info("Session deleted")
+      toast.info(language.t("session.toast.deleted"))
       if (active) {
         const target = open ?? next
         navigate(target ? `/${params.dir}/session/${target}` : `/${params.dir}/session/new`)
       }
     } catch (error: unknown) {
       console.error("session.delete failed", error)
-      toast.error("Could not delete session", error instanceof Error ? error.message : String(error))
+      toast.error(language.t("session.toast.deleteFailed"), error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -311,14 +312,14 @@ export default function Page(): JSX.Element {
       return true
     } catch (error: unknown) {
       console.error("session.rename failed", error)
-      toast.error("Could not rename session", error instanceof Error ? error.message : String(error))
+      toast.error(language.t("session.toast.renameFailed"), error instanceof Error ? error.message : String(error))
       return false
     }
   }
 
   async function pinSession(sessionID: string, pinned: boolean) {
     await sync.session.pin(sessionID, pinned).catch((error: unknown) => {
-      toast.error("Could not update pin", error instanceof Error ? error.message : String(error))
+      toast.error(language.t("session.toast.pinFailed"), error instanceof Error ? error.message : String(error))
     })
   }
 
@@ -329,13 +330,13 @@ export default function Page(): JSX.Element {
       await sync.session.archive(sessionID)
       await sync.session.fetch(50)
       const open = sessionTabs.close(sessionID)
-      toast.success("Session archived", "Archived sessions remain available from project search.")
+      toast.success(language.t("session.toast.archived"), language.t("session.toast.archivedDescription"))
       if (!active) return
       const target = open ?? next
       navigate(target ? `/${params.dir}/session/${target}` : `/${params.dir}/session/new`)
     } catch (error: unknown) {
       console.error("session.archive failed", error)
-      toast.error("Could not archive session", error instanceof Error ? error.message : String(error))
+      toast.error(language.t("session.toast.archiveFailed"), error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -343,10 +344,10 @@ export default function Page(): JSX.Element {
     try {
       await sdk.client.session.update({ sessionID, time: { archived: 0 } })
       await sync.session.fetch(50)
-      toast.success("Session restored")
+      toast.success(language.t("session.toast.restored"))
     } catch (error: unknown) {
       console.error("session.restore failed", error)
-      toast.error("Could not restore session", error instanceof Error ? error.message : String(error))
+      toast.error(language.t("session.toast.restoreFailed"), error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -359,10 +360,10 @@ export default function Page(): JSX.Element {
       await sync.session.fetch(1)
       sessionTabs.open(forked.id)
       navigate(`/${params.dir}/session/${forked.id}`)
-      toast.success("Session forked", "Continue independently from the selected turn.")
+      toast.success(language.t("session.toast.forked"), language.t("session.toast.forkedDescription"))
     } catch (error: unknown) {
       console.error("session.fork failed", error)
-      toast.error("Could not fork session", error instanceof Error ? error.message : String(error))
+      toast.error(language.t("session.toast.forkFailed"), error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -493,7 +494,7 @@ export default function Page(): JSX.Element {
       const updated = session?.time?.updated ?? 0
       return {
         id,
-        title: session?.title?.trim() || "Session",
+        title: session?.title?.trim() || language.t("session.title.fallback"),
         working: Boolean(sync.data.session_status?.[id] && sync.data.session_status[id].type !== "idle"),
         dirty: sessionTabs.dirty(id),
         unread: sessionTabs.unread(id, updated),
@@ -507,7 +508,7 @@ export default function Page(): JSX.Element {
       ...tabs,
       {
         id: "new",
-        title: "New session",
+        title: language.t("session.new.title"),
         working: false,
         dirty: prompt.dirty(),
         unread: false,
@@ -644,7 +645,7 @@ export default function Page(): JSX.Element {
     const id = params.id
     if (!id || undoOperation()) return
     if (sessionBusy()) {
-      toast.info("Undo available when this response finishes")
+      toast.info(language.t("session.toast.undoPending"))
       return
     }
     const preview = undoPreview(messages(), sync.data.part, messageID, projectPath())
@@ -660,7 +661,7 @@ export default function Page(): JSX.Element {
                 everything until you send another message.
               </p>
               <Show when={preview.files.length > 0}>
-                <ul class="session-undo-preview__files" aria-label="Files that will be rolled back">
+                <ul class="session-undo-preview__files" aria-label={language.t("session.undo.files")}>
                   <For each={preview.files.slice(0, 6)}>{(file) => <li title={file}>{file}</li>}</For>
                   <Show when={preview.files.length > 6}>
                     <li class="session-undo-preview__more">+{preview.files.length - 6} more</li>
@@ -679,9 +680,12 @@ export default function Page(): JSX.Element {
         turns: result?.turns ?? preview.turns,
         files: result?.files ?? preview.files,
       }
-      toast.success("Undone", `${undoSummary(applied)} rolled back. Restore remains available below the conversation.`)
+      toast.success(
+        language.t("session.toast.undone"),
+        language.t("session.toast.undoneDescription", { summary: undoSummary(applied) }),
+      )
     } catch (error: unknown) {
-      toast.error("Undo failed", requestError(error))
+      toast.error(language.t("session.toast.undoFailed"), requestError(error))
     } finally {
       setUndoOperation(undefined)
     }
@@ -691,15 +695,18 @@ export default function Page(): JSX.Element {
     const id = params.id
     if (!id || undoOperation()) return
     if (sessionBusy()) {
-      toast.info("Restore available when this response finishes")
+      toast.info(language.t("session.toast.restorePending"))
       return
     }
     setUndoOperation({ type: "restore" })
     try {
       await sync.session.unrevert(id)
-      toast.success("Undo restored", `${undoSummary(revertedPreview())} restored.`)
+      toast.success(
+        language.t("session.toast.undoRestored"),
+        language.t("session.toast.restoredDescription", { summary: undoSummary(revertedPreview()) }),
+      )
     } catch (error: unknown) {
-      toast.error("Restore failed", requestError(error))
+      toast.error(language.t("session.toast.restoredFailed"), requestError(error))
     } finally {
       setUndoOperation(undefined)
     }
@@ -710,7 +717,6 @@ export default function Page(): JSX.Element {
   // /redo slash) so undo works again. Undo reverts the last turn; redo restores
   // a pending revert until the next message makes it permanent.
   const commands = useCommand()
-  const language = useLanguage()
   const showTerminal = () => {
     if (uiStore.context() === "terminal" && uiStore.open()) return
     openContext("terminal")
@@ -731,7 +737,7 @@ export default function Page(): JSX.Element {
     }
     void sdk.client.session.command(request).catch((error: unknown) => {
       console.error(`${name} failed`, error)
-      toast.error(`Could not run /${name}`, requestError(error))
+      toast.error(language.t("session.toast.commandFailed", { name }), requestError(error))
     })
   }
   commands.register(() => {
@@ -740,7 +746,7 @@ export default function Page(): JSX.Element {
     list.push(
       {
         id: "session.new",
-        title: "New session",
+        title: language.t("session.new.title"),
         description: "Start a new research conversation",
         category: "Session",
         onSelect: newSession,
@@ -791,7 +797,10 @@ export default function Page(): JSX.Element {
         onSelect: () => {
           showTerminal()
           void terminal.new().catch((cause: unknown) => {
-            toast.error("Could not start terminal", cause instanceof Error ? cause.message : String(cause))
+            toast.error(
+              language.t("session.toast.terminalFailed"),
+              cause instanceof Error ? cause.message : String(cause),
+            )
           })
         },
       },
@@ -854,8 +863,8 @@ export default function Page(): JSX.Element {
   // The center belongs to the conversation for the lifetime of the route.
   // Files and other research surfaces mount only in the right context pane.
   const chatTitle = createMemo(() => {
-    if (!params.id || params.id === "new") return "New session"
-    return activeSession()?.title?.trim() || "Session"
+    if (!params.id || params.id === "new") return language.t("session.new.title")
+    return activeSession()?.title?.trim() || language.t("session.title.fallback")
   })
   // Chat scroll: stick to the bottom while the agent streams; detach the
   // moment the user scrolls up (a "jump to latest" button re-attaches).
@@ -919,7 +928,7 @@ export default function Page(): JSX.Element {
         requestAnimationFrame(restore)
       })
     } catch (error: unknown) {
-      toast.error("Could not load earlier messages", error instanceof Error ? error.message : String(error))
+      toast.error(language.t("session.toast.messagesFailed"), error instanceof Error ? error.message : String(error))
     } finally {
       setHistoryLoading(false)
     }
@@ -1045,7 +1054,7 @@ export default function Page(): JSX.Element {
           <button
             type="button"
             class="session-sidebar-backdrop"
-            aria-label="Close sessions"
+            aria-label={language.t("session.sessions.close")}
             onClick={() => setMobileSessionsOpen(false)}
           />
         </Show>
@@ -1256,7 +1265,9 @@ export default function Page(): JSX.Element {
                               <div class="w-full px-4 md:px-6 md:max-w-200 md:mx-auto">
                                 <div class="min-h-12 py-1.5 flex items-center gap-2 border-b border-border-weak-base">
                                   <div class="min-w-0 flex-1">
-                                    <div class="text-[10px] tracking-[0.04em] text-text-weaker">Delegated agent</div>
+                                    <div class="text-[10px] tracking-[0.04em] text-text-weaker">
+                                      {language.t("session.delegated.label")}
+                                    </div>
                                     <div class="truncate text-xs font-medium text-text-base">
                                       {activeSession()?.title?.trim() || "Research task"}
                                     </div>
@@ -1264,12 +1275,12 @@ export default function Page(): JSX.Element {
                                   <div
                                     class="flex items-center gap-1"
                                     role="navigation"
-                                    aria-label="Delegated agent sessions"
+                                    aria-label={language.t("session.delegated.sessions")}
                                   >
                                     <button
                                       type="button"
                                       class="h-7 px-2 flex items-center gap-1 rounded-md text-xs text-text-weak hover:text-text-base hover:bg-surface-base-hover transition-colors"
-                                      aria-label="Back to parent session"
+                                      aria-label={language.t("session.delegated.back")}
                                       onClick={() => navigate(`/${params.dir}/session/${activeSession()!.parentID}`)}
                                     >
                                       <IconChevronLeft size={13} strokeWidth={1.6} />
@@ -1278,7 +1289,7 @@ export default function Page(): JSX.Element {
                                     <button
                                       type="button"
                                       class="size-7 flex items-center justify-center rounded-md text-text-weak hover:text-text-base hover:bg-surface-base-hover transition-colors disabled:opacity-30 disabled:pointer-events-none"
-                                      aria-label="Previous delegated agent"
+                                      aria-label={language.t("session.delegated.previous")}
                                       disabled={!previousChild()}
                                       onClick={() => navigate(`/${params.dir}/session/${previousChild()!.id}`)}
                                     >
@@ -1290,7 +1301,7 @@ export default function Page(): JSX.Element {
                                     <button
                                       type="button"
                                       class="size-7 flex items-center justify-center rounded-md text-text-weak hover:text-text-base hover:bg-surface-base-hover transition-colors disabled:opacity-30 disabled:pointer-events-none"
-                                      aria-label="Next delegated agent"
+                                      aria-label={language.t("session.delegated.next")}
                                       disabled={!nextChild()}
                                       onClick={() => navigate(`/${params.dir}/session/${nextChild()!.id}`)}
                                     >
@@ -1364,7 +1375,11 @@ export default function Page(): JSX.Element {
                                         container: "w-full px-4 md:px-5",
                                       }}
                                     />
-                                    <div class="session-turn-actions" role="group" aria-label="Turn actions">
+                                    <div
+                                      class="session-turn-actions"
+                                      role="group"
+                                      aria-label={language.t("session.turn.actions")}
+                                    >
                                       <Show when={!revertInfo()}>
                                         <button
                                           type="button"
@@ -1372,8 +1387,8 @@ export default function Page(): JSX.Element {
                                           disabled={Boolean(undoOperation()) || sessionBusy()}
                                           aria-busy={undoing(message.id)}
                                           onClick={() => void revertTo(message.id)}
-                                          aria-label="Undo conversation from this turn"
-                                          title="Undo from here"
+                                          aria-label={language.t("session.turn.undoAria")}
+                                          title={language.t("session.turn.undoTitle")}
                                         >
                                           <Show
                                             when={undoing(message.id)}
@@ -1388,8 +1403,8 @@ export default function Page(): JSX.Element {
                                         type="button"
                                         class="session-turn-action"
                                         onClick={() => void forkSession(nextTurnID(message.id))}
-                                        aria-label="Fork session from this turn"
-                                        title="Fork from here"
+                                        aria-label={language.t("session.turn.forkAria")}
+                                        title={language.t("session.turn.forkTitle")}
                                       >
                                         <IconSplit size={12} strokeWidth={1.5} />
                                         Fork
@@ -1512,6 +1527,7 @@ function Header(props: {
         fallback={
           <>
             <SessionTabStrip
+              t={language.t}
               tabs={props.tabs}
               active={props.active}
               onSelect={props.onSelect}

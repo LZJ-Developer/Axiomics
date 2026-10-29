@@ -30,37 +30,26 @@ describe("General preference writes", () => {
   })
 })
 
-describe("General Ace account", () => {
-  test("keeps Ace optional while providing login, logout, Wallet, and billing controls", async () => {
+describe("General deployment preferences", () => {
+  test("keeps SaaS account, wallet, and funding controls out of this deployment", async () => {
     const source = await Bun.file(new URL("./General.tsx", import.meta.url)).text()
-    expect(source).toContain('title="Ace account"')
-    expect(source).toContain('"/account/login-browser"')
-    expect(source).toContain('"/account/logout"')
-    expect(source).toContain("walletBalanceLabel")
-    expect(source).toContain("URLS.dashboardBilling")
-    expect(source).toContain("Sign in for Ace or workspace credentials")
-    expect(source).toContain('"/account/sync"')
-    expect(source).toContain("Retry sync")
-    expect(source).not.toMatch(/promotional|promo credit/i)
+    expect(source).not.toContain('title="Ace account"')
+    expect(source).not.toContain('"/account/login-browser"')
+    expect(source).not.toContain('"/account/logout"')
+    expect(source).not.toContain('"/account/sync"')
+    expect(source).not.toContain('"/account/funding-context"')
+    expect(source).not.toContain("walletBalanceLabel")
+    expect(source).not.toContain("URLS.dashboardBilling")
+    expect(source).not.toContain("Funding workspace")
+    expect(source).not.toContain("Workspace credentials")
     expect(source).not.toContain("AccountGate")
     expect(source).not.toContain("DataUse")
   })
 
-  test("switches unlocked funding context locally but reauthorizes locked workspace keys", async () => {
+  test("retains the app preference sections", async () => {
     const source = await Bun.file(new URL("./General.tsx", import.meta.url)).text()
-    const start = source.indexOf("const setWorkspace")
-    const flow = source.slice(start, source.indexOf("onMount", start))
-    expect(source).toContain('account()?.credential?.type === "organization"')
-    expect(source).toContain("account()?.credential?.legacy === false")
-    expect(flow).toContain("!canDirectlySwitchWorkspace()")
-    expect(flow).toContain('await login("workspace")')
-    expect(flow).toContain('"/account/funding-context"')
-    expect(source).toContain("Switch workspace")
-    expect(source).toContain("Personal")
-    expect(source).toContain("Unavailable")
-    expect(source).toContain('organization.membership_status === "active"')
-    expect(source).toContain("organization.funding_available !== false")
-    expect(source).toContain("organization.use_shared_wallet !== false")
+    expect(source).toContain("<AppearanceSections />")
+    expect(source).toContain('language.t("settings.general.section.context")')
   })
 })
 

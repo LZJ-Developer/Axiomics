@@ -178,6 +178,27 @@ test("kernel subprocesses cannot fall back to host Git config or credential prom
   expect(env.GIT_TERMINAL_PROMPT).toBe("0")
 })
 
+test("deployment trust-store settings reach interpreters but nothing else follows", () => {
+  // Bundled conda environments ship their own certifi copy. A deployment that
+  // installed an internal CA points these at the system bundle; dropping them
+  // would leave sandboxed Python unable to reach the same internal endpoints
+  // the shell can, while the host-side filters still reject credentials.
+  const trust = {
+    SSL_CERT_FILE: "/etc/pki/tls/certs/ca-bundle.crt",
+    SSL_CERT_DIR: "/etc/pki/tls/certs",
+    REQUESTS_CA_BUNDLE: "/etc/pki/tls/certs/ca-bundle.crt",
+    CURL_CA_BUNDLE: "/etc/pki/tls/certs/ca-bundle.crt",
+    PIP_CERT: "/etc/pki/tls/certs/ca-bundle.crt",
+    GIT_SSL_CAINFO: "/etc/pki/tls/certs/ca-bundle.crt",
+    NODE_EXTRA_CA_CERTS: "/etc/pki/ca-trust/source/anchors/axiomics-internal-ca.crt",
+  }
+  for (const filter of [Axiomics.filterEnvForSubprocess, Axiomics.filterEnvForKernel]) {
+    const filtered = filter({ PATH: "/usr/bin", ...trust, AWS_SECRET_ACCESS_KEY: "aws-secret" })
+    expect(filtered).toMatchObject(trust)
+    expect(filtered.AWS_SECRET_ACCESS_KEY).toBeUndefined()
+  }
+})
+
 test("kernel credential mask covers current Axiomics credential stores", () => {
   const paths = Axiomics.kernelSensitivePaths()
   const names = paths.map((value) => path.basename(value))

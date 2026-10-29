@@ -1,6 +1,23 @@
 import { describe, expect, test } from "bun:test"
-import { MODEL_PROVIDERS } from "./model-providers"
 import { providerLogoSource } from "./ProviderLogo"
+
+const MODEL_PROVIDER_IDS = [
+  "anthropic",
+  "openai",
+  "google",
+  "xai",
+  "meta",
+  "openrouter",
+  "togetherai",
+  "groq",
+  "fireworks-ai",
+  "mistral",
+  "deepseek",
+  "moonshotai",
+  "zai",
+  "cerebras",
+  "perplexity",
+] as const
 
 const CREDENTIALS = [
   "aws",
@@ -29,7 +46,7 @@ const CREDENTIALS = [
 
 describe("provider logos", () => {
   test("covers every model provider", () => {
-    for (const provider of MODEL_PROVIDERS) expect(providerLogoSource(provider.id).kind).not.toBe("fallback")
+    for (const id of MODEL_PROVIDER_IDS) expect(providerLogoSource(id).kind).not.toBe("fallback")
   })
 
   test("normalizes catalog aliases to real provider marks", () => {

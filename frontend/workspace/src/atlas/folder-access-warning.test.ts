@@ -12,7 +12,7 @@ describe("folder access warning", () => {
   })
 
   test("uses a clear label and a compact responsive recovery dialog", () => {
-    expect(view).toContain("Folder access")
+    expect(view).toContain('language.t("files.access.folderAccess")')
     expect(view).not.toContain(">FDA<")
     expect(view).toContain('class="folder-access-dialog"')
     expect(view).toContain("fit")

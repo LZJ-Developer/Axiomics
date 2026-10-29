@@ -1,6 +1,7 @@
 import { createEffect, createMemo, For, on, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { preloadTerminal, Terminal, type TerminalController, type TerminalSearchResult } from "@/components/terminal"
+import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
 import { useTerminal } from "@/context/terminal"
 import {
@@ -21,6 +22,7 @@ const EMPTY_RESULT: TerminalSearchResult = { current: 0, total: 0 }
 
 export function TerminalSurface(props: { active?: boolean } = {}): JSX.Element {
   preloadTerminal()
+  const language = useLanguage()
   const sdk = useSDK()
   const terminal = useTerminal()
   const authority = useExecutionAuthority("terminal")
@@ -122,7 +124,7 @@ export function TerminalSurface(props: { active?: boolean } = {}): JSX.Element {
   })
 
   return (
-    <section class="terminal-surface" aria-label="Session terminal">
+    <section class="terminal-surface" aria-label={language.t("terminal.surface")}>
       <Show when={state.error}>
         {(message) => (
           <div class="terminal-surface__error" role="alert">
@@ -151,8 +153,8 @@ export function TerminalSurface(props: { active?: boolean } = {}): JSX.Element {
             <span class="terminal-surface__empty-mark" aria-hidden="true">
               <IconTerminal size={17} strokeWidth={1.35} />
             </span>
-            <strong>Local terminal unavailable</strong>
-            <p>Connect to the local Axiomics server to run commands inside this project.</p>
+            <strong>{language.t("terminal.unavailable.title")}</strong>
+            <p>{language.t("terminal.unavailable.detail")}</p>
           </div>
         }
       >
@@ -171,8 +173,8 @@ export function TerminalSurface(props: { active?: boolean } = {}): JSX.Element {
                 <span class="terminal-surface__empty-mark" aria-hidden="true">
                   <IconTerminal size={17} strokeWidth={1.35} />
                 </span>
-                <strong>Project terminal</strong>
-                <p>Start a clean shell in this session. Open another tab only when you need parallel work.</p>
+                <strong>{language.t("terminal.project.title")}</strong>
+                <p>{language.t("terminal.project.detail")}</p>
                 <button
                   type="button"
                   onClick={launch}
@@ -186,7 +188,7 @@ export function TerminalSurface(props: { active?: boolean } = {}): JSX.Element {
             }
           >
             <div class="terminal-surface__tabs-row">
-              <nav class="terminal-surface__tabs" role="tablist" aria-label="Open terminals">
+              <nav class="terminal-surface__tabs" role="tablist" aria-label={language.t("terminal.tabs")}>
                 <For each={terminal.all()}>
                   {(pty) => (
                     <div class="terminal-surface__tab-shell" data-active={active()?.id === pty.id ? "true" : undefined}>
@@ -203,7 +205,7 @@ export function TerminalSurface(props: { active?: boolean } = {}): JSX.Element {
                       <button
                         type="button"
                         class="terminal-surface__close"
-                        aria-label={`Close ${pty.title}`}
+                        aria-label={language.t("terminal.tab.close", { title: pty.title })}
                         onClick={() => void terminal.close(pty.id)}
                       >
                         <IconX size={10} strokeWidth={1.7} />
@@ -239,8 +241,8 @@ export function TerminalSurface(props: { active?: boolean } = {}): JSX.Element {
                   ref={(node) => (search.input = node)}
                   type="search"
                   value={state.query}
-                  placeholder="Find in output"
-                  aria-label="Find in terminal output"
+                  placeholder={language.t("terminal.find.placeholder")}
+                  aria-label={language.t("terminal.find.aria")}
                   autocomplete="off"
                   onInput={(event) => {
                     setState("query", event.currentTarget.value)
@@ -258,15 +260,25 @@ export function TerminalSurface(props: { active?: boolean } = {}): JSX.Element {
                 <button
                   type="button"
                   onClick={() => find("previous")}
-                  aria-label="Previous match"
-                  title="Previous match"
+                  aria-label={language.t("terminal.find.previous")}
+                  title={language.t("terminal.find.previous")}
                 >
                   <IconChevronLeft size={12} strokeWidth={1.5} />
                 </button>
-                <button type="button" onClick={() => find("next")} aria-label="Next match" title="Next match">
+                <button
+                  type="button"
+                  onClick={() => find("next")}
+                  aria-label={language.t("terminal.find.next")}
+                  title={language.t("terminal.find.next")}
+                >
                   <IconChevronRight size={12} strokeWidth={1.5} />
                 </button>
-                <button type="button" onClick={closeSearch} aria-label="Close search" title="Close search (Esc)">
+                <button
+                  type="button"
+                  onClick={closeSearch}
+                  aria-label={language.t("terminal.find.close")}
+                  title={language.t("terminal.find.closeHint")}
+                >
                   <IconX size={11} strokeWidth={1.6} />
                 </button>
               </form>

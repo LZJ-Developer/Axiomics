@@ -2,6 +2,7 @@ import { Button } from "@axiomics/ui/button"
 import { useDialog } from "@axiomics/ui/context/dialog"
 import { Dialog } from "@axiomics/ui/dialog"
 import { IconFolder, IconFolderAdd, IconPlus, IconX } from "@/atlas/shared/Icon"
+import { useLanguage } from "@/context/language"
 import { For, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import "./dialog-create-project.css"
@@ -20,6 +21,7 @@ export function DialogCreateProject(props: {
   onCreate: (input: ProjectCreateInput) => Promise<void>
 }): JSX.Element {
   const dialog = useDialog()
+  const language = useLanguage()
   const [state, setState] = createStore({
     name: props.name ?? "",
     busy: false,
@@ -31,7 +33,7 @@ export function DialogCreateProject(props: {
     if (state.busy) return
     const name = state.name.trim()
     if (!name) {
-      setState("error", "Enter a project name.")
+      setState("error", language.t("dialog.createProject.nameRequired"))
       return
     }
 
@@ -50,8 +52,8 @@ export function DialogCreateProject(props: {
 
   return (
     <Dialog
-      title="Create project"
-      description="Name the workspace and optionally connect folders now or later."
+      title={language.t("dialog.createProject.title")}
+      description={language.t("dialog.createProject.description")}
       class="project-create-dialog"
       fit
       transition
@@ -59,7 +61,7 @@ export function DialogCreateProject(props: {
       <form class="project-create" onSubmit={submit}>
         <div class="project-create__body">
           <label class="project-create__field">
-            <span class="project-create__label">Project name</span>
+            <span class="project-create__label">{language.t("dialog.createProject.name")}</span>
             <span data-focus-frame class="project-create__input-frame">
               <span class="project-create__input-icon" aria-hidden="true">
                 <IconFolder size={16} strokeWidth={1.5} />
@@ -72,7 +74,7 @@ export function DialogCreateProject(props: {
                 disabled={state.busy}
                 maxlength={100}
                 autocomplete="off"
-                placeholder="Project name"
+                placeholder={language.t("dialog.createProject.namePlaceholder")}
                 aria-invalid={state.error ? "true" : undefined}
                 aria-describedby={state.error ? "project-create-error" : undefined}
                 class="project-create__input"
@@ -87,8 +89,8 @@ export function DialogCreateProject(props: {
 
           <section class="project-create__sources" aria-labelledby="source-folders-heading">
             <div class="project-create__section-heading">
-              <h2 id="source-folders-heading">Source folders</h2>
-              <p>Optional folders this project can access.</p>
+              <h2 id="source-folders-heading">{language.t("dialog.createProject.sources.title")}</h2>
+              <p>{language.t("dialog.createProject.sources.description")}</p>
             </div>
 
             <Show
@@ -104,8 +106,8 @@ export function DialogCreateProject(props: {
                     <IconFolderAdd size={17} strokeWidth={1.55} />
                   </span>
                   <span class="project-create__source-empty-copy">
-                    <strong>Add source folders</strong>
-                    <span>Choose with Finder or File Explorer</span>
+                    <strong>{language.t("dialog.createProject.sources.add")}</strong>
+                    <span>{language.t("dialog.createProject.sources.choose")}</span>
                   </span>
                 </button>
               }
@@ -123,8 +125,8 @@ export function DialogCreateProject(props: {
                       </span>
                       <button
                         type="button"
-                        aria-label={`Remove source folder ${path}`}
-                        title="Remove source folder"
+                        aria-label={language.t("dialog.createProject.sources.remove", { path })}
+                        title={language.t("dialog.createProject.sources.removeTitle")}
                         class="project-create__remove-source"
                         onClick={() => props.onRemoveSource?.(path)}
                       >
@@ -140,7 +142,7 @@ export function DialogCreateProject(props: {
                   onClick={props.onChooseSources}
                 >
                   <IconPlus size={13} strokeWidth={1.7} />
-                  Add folders
+                  {language.t("dialog.createProject.sources.addMore")}
                 </button>
               </div>
             </Show>
@@ -155,10 +157,10 @@ export function DialogCreateProject(props: {
 
         <div class="project-create__footer">
           <Button type="button" size="large" variant="ghost" disabled={state.busy} onClick={() => dialog.close()}>
-            Cancel
+            {language.t("dialog.createProject.cancel")}
           </Button>
           <Button type="submit" size="large" variant="primary" disabled={state.busy || !state.name.trim()}>
-            {state.busy ? "Creating…" : "Create project"}
+            {state.busy ? language.t("dialog.createProject.creating") : language.t("dialog.createProject.create")}
           </Button>
         </div>
       </form>

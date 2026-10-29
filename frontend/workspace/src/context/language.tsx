@@ -1,8 +1,10 @@
 import * as i18n from "@solid-primitives/i18n"
+import { Settings as LuxonSettings } from "luxon"
 import { createEffect, createMemo, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createSimpleContext } from "@axiomics/ui/context"
 import { Persist, persisted } from "@/utils/persist"
+import { deploymentCapabilities } from "./capabilities"
 // English (default + fallback) stays eager so first paint has strings instantly.
 // Every OTHER locale is a per-language dynamic chunk, loaded only when that
 // language is actually selected — this keeps ~130KB gzip of translations out of
@@ -120,20 +122,23 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
   name: "Language",
   init: () => {
     const [store, setStore, _, ready] = persisted(
-      Persist.global("language", ["language.v1"]),
+      // v2: the v1 store always recorded the detected locale, so it cannot
+      // distinguish "nobody chose" from "the user chose English". Starting
+      // fresh lets a deployment's default locale take effect once.
+      Persist.global("language.v2"),
       createStore({
-        locale: detectLocale() as Locale,
+        // Empty until someone chooses a language in settings. The deployment
+        // default (served with the other capabilities) then wins over the
+        // browser's own locale, and an explicit choice outlives both.
+        locale: "",
       }),
     )
 
-    const locale = createMemo<Locale>(() =>
-      (LOCALES as readonly string[]).includes(store.locale) ? (store.locale as Locale) : "en",
-    )
-
-    createEffect(() => {
-      const current = locale()
-      if (store.locale === current) return
-      setStore("locale", current)
+    const locale = createMemo<Locale>(() => {
+      if ((LOCALES as readonly string[]).includes(store.locale)) return store.locale as Locale
+      const deployed = deploymentCapabilities.locale()
+      if (deployed && (LOCALES as readonly string[]).includes(deployed)) return deployed as Locale
+      return detectLocale()
     })
 
     const base = i18n.flatten({ ...en, ...uiEn }) as Dictionary
@@ -185,6 +190,10 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
     createEffect(() => {
       if (typeof document !== "object") return
       document.documentElement.lang = locale()
+      // Relative timestamps come from Luxon, not from the dictionaries: without
+      // this an all-Chinese page still says "1 month ago". Luxon wants BCP-47,
+      // and our short tag for traditional Chinese is not one.
+      LuxonSettings.defaultLocale = locale() === "zht" ? "zh-Hant" : locale()
     })
 
     return {

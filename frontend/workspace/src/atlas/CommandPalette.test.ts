@@ -183,12 +183,12 @@ test("labels the palette as local search without overpromising", () => {
 })
 
 test("shows a searching row in flight and no-matches only after completion", () => {
-  expect(source).toContain("Searching…")
-  expect(source).toContain("No matches")
+  expect(source).toContain('language.t("palette.search.searching")')
+  expect(source).toContain('language.t("palette.search.noMatches")')
   expect(source).toContain("!searching() && !searchError() && !short() && filtered().length === 0")
-  expect(source).toContain("Type one more character")
-  expect(source).toContain("Search unavailable")
-  expect(source).toContain("Project content could not be searched")
+  expect(source).toContain('language.t("palette.search.typeMore")')
+  expect(source).toContain('language.t("palette.search.unavailable")')
+  expect(source).toContain('language.t("palette.search.unavailableHint")')
   expect(source).toContain("Retry")
   expect(source).toContain('aria-live="polite"')
 })

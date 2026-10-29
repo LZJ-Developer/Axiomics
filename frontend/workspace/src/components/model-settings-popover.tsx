@@ -5,10 +5,10 @@ import { Icon } from "@axiomics/ui/icon"
 import { IconButton } from "@axiomics/ui/icon-button"
 import { ProviderIcon } from "@axiomics/ui/provider-icon"
 import { iconNames, type IconName } from "@axiomics/ui/icons/provider"
-import { useDialog } from "@axiomics/ui/context/dialog"
 import { Switch } from "@axiomics/ui/switch"
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type Component, type JSX } from "solid-js"
 import { useLocal } from "@/context/local"
+import { useLanguage } from "@/context/language"
 import { useSync } from "@/context/sync"
 import {
   COMPOSER_MODEL_ROSTER,
@@ -21,7 +21,6 @@ import {
   parseModelRoute,
   preservedModelRoute,
 } from "@/context/model-catalog"
-import { DialogSettings } from "./dialog-settings"
 import { modelGroup, modelGroupLabel, modelGroupLabelRank } from "./model-groups"
 import { exactRouteFastMode } from "./model-fast"
 import { modelControl } from "./model-presentation"
@@ -188,6 +187,7 @@ type ModelPopoverSurfaceProps = {
 }
 
 const ModelPopoverSurface: Component<ModelPopoverSurfaceProps> = (props) => {
+  const language = useLanguage()
   let content: HTMLElement | undefined
 
   return (
@@ -223,7 +223,7 @@ const ModelPopoverSurface: Component<ModelPopoverSurfaceProps> = (props) => {
                 variant="ghost"
                 class="model-settings-popover__back"
                 data-model-menu-back={props.kind}
-                aria-label={props.backLabel ?? "Back"}
+                aria-label={props.backLabel ?? language.t("model.back")}
                 onClick={onBack()}
               />
             )}
@@ -234,7 +234,7 @@ const ModelPopoverSurface: Component<ModelPopoverSurfaceProps> = (props) => {
             icon="close"
             variant="ghost"
             class="model-settings-popover__close"
-            aria-label={`Close ${props.kind === "model" ? "model selector" : "model options"}`}
+            aria-label={language.t(props.kind === "model" ? "model.close.model" : "model.close.options")}
             onClick={props.close}
           />
         </header>
@@ -261,58 +261,63 @@ type ModelEffortPanelProps = {
   onContextSelect?: (id: string) => void
 }
 
-export const ModelEffortPanel: Component<ModelEffortPanelProps> = (props) => (
-  <div data-model-effort-panel>
-    <Show when={props.options.length > 0}>
-      <section
-        class="model-settings-option-section"
-        aria-label={
-          props.options.some((option) => option.id.endsWith("-tokens")) ? "Thinking budget" : "Reasoning effort"
-        }
-      >
-        <div class="model-settings-heading">
-          {props.options.some((option) => option.id.endsWith("-tokens")) ? "Thinking budget" : "Effort"}
-        </div>
-        <ModelOptionList
-          id="model-effort-options"
-          kind="effort"
-          title={props.options.some((option) => option.id.endsWith("-tokens")) ? "Thinking budget" : "Reasoning effort"}
-          current={props.current}
-          options={props.options}
-          compact
-          onSelect={props.onEffortSelect}
-        />
-      </section>
-    </Show>
-    <Show when={props.fast}>
-      {(fast) => (
-        <section class="model-settings-option-section model-settings-speed-section" aria-label="Fast mode">
-          <div data-model-fast-toggle>
-            <Switch checked={fast().active} onChange={(checked) => props.onTierSelect(checked ? "fast" : "standard")}>
-              <span class="model-settings-fast-label">Fast mode</span>
-            </Switch>
+export const ModelEffortPanel: Component<ModelEffortPanelProps> = (props) => {
+  const language = useLanguage()
+  const budget = () => props.options.some((option) => option.id.endsWith("-tokens"))
+  return (
+    <div data-model-effort-panel>
+      <Show when={props.options.length > 0}>
+        <section
+          class="model-settings-option-section"
+          aria-label={language.t(budget() ? "model.effort.thinkingBudget" : "model.effort.reasoning")}
+        >
+          <div class="model-settings-heading">
+            {language.t(budget() ? "model.effort.thinkingBudget" : "model.effort.label")}
           </div>
-        </section>
-      )}
-    </Show>
-    <Show when={props.context && props.context.options.length > 1 ? props.context : undefined}>
-      {(context) => (
-        <section class="model-settings-option-section" aria-label="Context window">
-          <div class="model-settings-heading">Context window</div>
           <ModelOptionList
-            id="model-context-options"
-            kind="context"
-            title="Context window"
-            current={context().current}
-            options={context().options}
+            id="model-effort-options"
+            kind="effort"
+            title={language.t(budget() ? "model.effort.thinkingBudget" : "model.effort.reasoning")}
+            current={props.current}
+            options={props.options}
             compact
-            onSelect={(id) => props.onContextSelect?.(id)}
+            onSelect={props.onEffortSelect}
           />
         </section>
-      )}
-    </Show>
-  </div>
-)
+      </Show>
+      <Show when={props.fast}>
+        {(fast) => (
+          <section
+            class="model-settings-option-section model-settings-speed-section"
+            aria-label={language.t("model.fastMode")}
+          >
+            <div data-model-fast-toggle>
+              <Switch checked={fast().active} onChange={(checked) => props.onTierSelect(checked ? "fast" : "standard")}>
+                <span class="model-settings-fast-label">{language.t("model.fastMode")}</span>
+              </Switch>
+            </div>
+          </section>
+        )}
+      </Show>
+      <Show when={props.context && props.context.options.length > 1 ? props.context : undefined}>
+        {(context) => (
+          <section class="model-settings-option-section" aria-label={language.t("model.contextWindow")}>
+            <div class="model-settings-heading">{language.t("model.contextWindow")}</div>
+            <ModelOptionList
+              id="model-context-options"
+              kind="context"
+              title={language.t("model.contextWindow")}
+              current={context().current}
+              options={context().options}
+              compact
+              onSelect={(id) => props.onContextSelect?.(id)}
+            />
+          </section>
+        )}
+      </Show>
+    </div>
+  )
+}
 
 type ModelEffortPopoverProps = ModelEffortPanelProps & {
   value: string
@@ -322,6 +327,7 @@ type ModelEffortPopoverProps = ModelEffortPanelProps & {
 }
 
 export const ModelEffortPopover: Component<ModelEffortPopoverProps> = (props) => {
+  const language = useLanguage()
   const [internalOpen, setInternalOpen] = createSignal(false)
   let trigger: HTMLButtonElement | undefined
   let content: HTMLElement | undefined
@@ -345,16 +351,25 @@ export const ModelEffortPopover: Component<ModelEffortPopoverProps> = (props) =>
         data-model-effort-chip
         aria-label={
           props.options.length > 0
-            ? `Reasoning effort: ${props.value}.${props.fast?.active ? " Fast mode on." : ""} Reasoning options`
+            ? language.t("model.aria.reasoning", {
+                value: props.value,
+                fast: props.fast?.active ? language.t("model.aria.fastOn") : "",
+              })
             : props.fast
-              ? `Fast mode: ${props.fast.active ? "on" : "off"}. Model options`
-              : `Context window: ${props.context?.options.find((option) => option.id === props.context?.current)?.label ?? "Default"}. Model options`
+              ? language.t(props.fast.active ? "model.aria.fastOnState" : "model.aria.fastOffState")
+              : language.t("model.aria.context", {
+                  current:
+                    props.context?.options.find((option) => option.id === props.context?.current)?.label ??
+                    language.t("model.default"),
+                })
         }
       >
-        <strong>{props.options.length > 0 ? props.value : props.fast ? "Fast" : "Context"}</strong>
+        <strong>
+          {props.options.length > 0 ? props.value : props.fast ? language.t("model.fast") : language.t("model.context")}
+        </strong>
         <Show when={props.fast?.active && props.options.length > 0}>
           <span data-model-fast-indicator aria-hidden="true">
-            Fast
+            {language.t("model.fast")}
           </span>
         </Show>
         <Icon name="chevron-down" size="small" aria-hidden="true" />
@@ -362,7 +377,7 @@ export const ModelEffortPopover: Component<ModelEffortPopoverProps> = (props) =>
       <ModelPopoverSurface
         kind="effort"
         view="effort"
-        title="Model options"
+        title={language.t("model.options.title")}
         close={() => setOpen(false)}
         initialFocus={
           props.options.length > 0
@@ -390,7 +405,7 @@ export const ModelEffortPopover: Component<ModelEffortPopoverProps> = (props) =>
 export const ModelSettingsPopover: Component<{ trigger?: "label" | "icon" }> = (props) => {
   const local = useLocal()
   const sync = useSync()
-  const dialog = useDialog()
+  const language = useLanguage()
   const mobile = createMediaQuery("(max-width: 719px)")
   const [open, setOpen] = createSignal(false)
   const [effortOpen, setEffortOpen] = createSignal(false)
@@ -575,8 +590,10 @@ export const ModelSettingsPopover: Component<{ trigger?: "label" | "icon" }> = (
   createEffect(() => {
     const value = control()
     const updates = [
-      value.reset.effort ? `Effort reset to ${value.effort?.value ?? "Standard"}.` : undefined,
-      value.reset.speed ? `Speed reset to ${value.speed?.value ?? "Standard"}.` : undefined,
+      value.reset.effort
+        ? language.t("model.toast.effortReset", { value: value.effort?.value ?? "Standard" })
+        : undefined,
+      value.reset.speed ? language.t("model.toast.speedReset", { value: value.speed?.value ?? "Standard" }) : undefined,
     ].filter((message): message is string => Boolean(message))
     if (updates.length > 0) setNotice(updates.join(" "))
     if (value.reset.effort) local.model.variant.set(value.reset.effort)
@@ -624,11 +641,6 @@ export const ModelSettingsPopover: Component<{ trigger?: "label" | "icon" }> = (
     }
     setView("models")
     focus("[data-model-catalog-search]", true)
-  }
-
-  const manage = () => {
-    close()
-    queueMicrotask(() => dialog.show(() => <DialogSettings initial="models" />))
   }
 
   const onMenuKeyDown = (event: KeyboardEvent) => {
@@ -723,7 +735,7 @@ export const ModelSettingsPopover: Component<{ trigger?: "label" | "icon" }> = (
                 <div
                   class="model-settings-models"
                   role="radiogroup"
-                  aria-label="Model"
+                  aria-label={language.t("model.picker")}
                   aria-orientation="vertical"
                   onKeyDown={focusModelRadio}
                 >
@@ -771,17 +783,8 @@ export const ModelSettingsPopover: Component<{ trigger?: "label" | "icon" }> = (
                   onClick={choose}
                 >
                   <span class="model-settings-setting">
-                    <span data-model-menu-label>More models</span>
-                    <small>Browse models from your connected providers.</small>
-                  </span>
-                  <span aria-hidden="true" data-model-menu-value>
-                    ›
-                  </span>
-                </button>
-                <button type="button" data-model-menu-item class={`${row} model-settings-manage`} onClick={manage}>
-                  <span class="model-settings-setting">
-                    <span data-model-menu-label>Manage models</span>
-                    <small>Choose which models appear here.</small>
+                    <span data-model-menu-label>{language.t("model.more")}</span>
+                    <small>{language.t("model.moreHint")}</small>
                   </span>
                   <span aria-hidden="true" data-model-menu-value>
                     ›
@@ -801,18 +804,21 @@ export const ModelSettingsPopover: Component<{ trigger?: "label" | "icon" }> = (
                     type="search"
                     value={query()}
                     onInput={(event) => searchCatalog(event.currentTarget.value)}
-                    placeholder="Find a model or provider"
-                    aria-label="Find a model or provider"
+                    placeholder={language.t("model.pickerSearch")}
+                    aria-label={language.t("model.pickerSearch")}
                   />
                 </label>
                 <div
                   class="model-settings-catalog"
                   role="radiogroup"
-                  aria-label="Available models"
+                  aria-label={language.t("model.pickerAvailable")}
                   aria-orientation="vertical"
                   onKeyDown={focusModelRadio}
                 >
-                  <Show when={catalogReady()} fallback={<p class="model-settings-empty">Loading models…</p>}>
+                  <Show
+                    when={catalogReady()}
+                    fallback={<p class="model-settings-empty">{language.t("model.pickerLoading")}</p>}
+                  >
                     <For each={visibleGroups()}>
                       {(group) => (
                         <section class="model-settings-group" aria-label={group[0]}>
@@ -881,16 +887,6 @@ export const ModelSettingsPopover: Component<{ trigger?: "label" | "icon" }> = (
                     </Show>
                   </Show>
                 </div>
-                <div class="model-settings-divider" />
-                <button type="button" data-model-menu-item class={`${row} model-settings-manage`} onClick={manage}>
-                  <span class="model-settings-setting">
-                    <span data-model-menu-label>Manage models</span>
-                    <small>Choose which connected models appear here.</small>
-                  </span>
-                  <span aria-hidden="true" data-model-menu-value>
-                    ›
-                  </span>
-                </button>
               </div>
             </div>
           </Show>

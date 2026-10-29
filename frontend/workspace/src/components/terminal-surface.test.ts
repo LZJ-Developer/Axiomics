@@ -30,7 +30,7 @@ describe("contextual project terminal", () => {
     expect(action).toContain('ariaLabel="Open project terminal"')
     expect(action).toContain('props.onContext("terminal")')
     expect(action).toContain("onWarm={preloadTerminal}")
-    expect(surface).toContain('aria-label="Session terminal"')
+    expect(surface).toContain('aria-label={language.t("terminal.surface")}')
     expect(surface).toContain("useExecutionAuthority")
     expect(surface).toContain("!authority.allowed()")
     expect(surface).toContain('class="terminal-surface__tabs-row"')

@@ -69,6 +69,7 @@ const glyphLabel: Record<ToolOutcome, UiI18nKey> = {
 }
 
 function ToolFailure(props: { tool: string; error: string }) {
+  const i18n = useI18n()
   const display = () => toolErrorDisplay(props.tool, props.error)
   return (
     <Card variant="error" data-slot="basic-tool-failure">
@@ -91,7 +92,7 @@ function ToolFailure(props: { tool: string; error: string }) {
           <Show when={display().details}>
             {(details) => (
               <details data-slot="message-part-tool-error-details">
-                <summary>Technical details</summary>
+                <summary>{i18n.t("ui.tool.details")}</summary>
                 <pre>{details()}</pre>
               </details>
             )}

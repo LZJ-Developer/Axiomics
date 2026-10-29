@@ -621,7 +621,7 @@ export function RightPane(
                 {(current) => <StoredArtifactView artifact={current()} />}
               </Match>
               <Match when={context() === "kernels"}>
-                <ComputeSurface />
+                <ComputeSurface t={language.t} />
               </Match>
             </Switch>
           </Suspense>

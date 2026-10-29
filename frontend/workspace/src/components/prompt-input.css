@@ -904,10 +904,6 @@ form.workspace-composer .workspace-composer__research-setting-value {
   white-space: nowrap;
 }
 
-form.workspace-composer .workspace-composer__research-connectors > [data-component="icon"] {
-  color: var(--text-weaker);
-}
-
 form.workspace-composer .workspace-composer__research-choice {
   position: relative;
 }

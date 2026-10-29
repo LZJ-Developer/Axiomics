@@ -92,7 +92,7 @@ export function ArtifactCard(props: CardProps): JSX.Element {
         }
         onClick={() => props.onOpen(props.artifact)}
       >
-        <ArtifactThumb artifact={props.artifact} read={props.read} highlight={props.highlight} />
+        <ArtifactThumb artifact={props.artifact} read={props.read} highlight={props.highlight} t={props.t} />
         <span class="artifact-card__label">
           <span class="artifact-card__name">{props.artifact.title}</span>
           <span class="artifact-card__sub" data-card-meta>

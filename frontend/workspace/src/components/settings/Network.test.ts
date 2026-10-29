@@ -36,10 +36,10 @@ test("network loading keeps the section structure stable and saving stays non-bl
   const component = await source
 
   expect(component).toContain('class="settings-panel-loading__rows settings-network-loading-rows"')
-  expect(component).toContain('aria-label="Loading service groups"')
-  expect(component).toContain('aria-label="Loading allowed domains"')
+  expect(component).toContain('aria-label={language.t("settings.network.groups.loading")}')
+  expect(component).toContain('aria-label={language.t("settings.network.domains.loading")}')
   expect(component).toContain('class="settings-network-save-state"')
-  expect(component).toContain('{saving() ? "Saving…" : ""}')
+  expect(component).toContain('{saving() ? language.t("settings.network.saving") : ""}')
   expect(component).not.toContain("Loading network settings…")
 })
 
