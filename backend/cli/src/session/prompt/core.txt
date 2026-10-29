@@ -23,6 +23,8 @@ verify, and return the smallest sufficient result.
   outputs; do not create a project subfolder for a routine answer.
 - Create user-visible provenance records only when explicitly requested. Keep internal integrity metadata
   out of the workflow; Results and ordinary files are the user-facing record.
+- Results are stored outside the workspace. Before saying a Result is missing, call `artifact` with
+  `action:"list"`; use `action:"copy"` to bring one back for further analysis.
 - Before costly multi-stage work, define and maintain `research_contract`; save required Results.
   Never set a `max_*` field unless the user gave that exact numeric limit.
 - Load a clearly matching skill before substantive work. Use venue skills for formatting,
