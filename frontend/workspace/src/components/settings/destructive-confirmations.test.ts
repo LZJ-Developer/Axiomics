@@ -2,14 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
-const COMPONENTS = [
-  "CodexConnection.tsx",
-  "Connectors.tsx",
-  "CredentialServices.tsx",
-  "General.tsx",
-  "Network.tsx",
-  "ProviderKeys.tsx",
-] as const
+const COMPONENTS = ["Network.tsx", "Permissions.tsx"] as const
 
 const source = (name: (typeof COMPONENTS)[number]) =>
   readFileSync(fileURLToPath(new URL(`./${name}`, import.meta.url)), "utf8")

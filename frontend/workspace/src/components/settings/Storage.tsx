@@ -1,10 +1,13 @@
 // Storage — real on-disk footprint of the Axiomics data directory.
 // Backed by /settings/storage (routes/settings/storage.ts).
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import { DateTime } from "luxon"
 import { Button } from "@axiomics/ui/button"
 import { Icon } from "@axiomics/ui/icon"
 import { useGlobalSDK } from "@/context/global-sdk"
+import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
+import { dict as en } from "@/i18n/en"
 import { settingsApi } from "./api"
 import { PanelBody, PanelHeader, PanelScroll, Section } from "./_shared"
 import "./preference-panels.css"
@@ -33,6 +36,7 @@ type Usage = {
   scanning?: boolean
   updated_at?: string | null
   scan_error?: string | null
+  skipped_entries?: number
   relocation?: Relocation | null
 }
 
@@ -68,45 +72,48 @@ export async function storageLocationChoice(open: () => Promise<string | string[
     )
 }
 
-export function storageRelocationCopy(value: Relocation) {
+type TranslationKey = keyof typeof en
+type Translate = (key: TranslationKey) => string
+
+export function storageRelocationCopy(value: Relocation, t: Translate = (key) => en[key]) {
   if (value.phase === "recovery_required") {
     return {
-      title: "Storage move needs attention",
-      detail: value.error ?? "Axiomics could not safely read the recovery record.",
+      title: t("settings.storage.relocation.recovery.title"),
+      detail: value.error ?? t("settings.storage.relocation.recovery.detail"),
       tone: "critical" as const,
     }
   }
   if (!value.active) {
     return {
-      title: "Storage move was interrupted",
-      detail: "Your current data is still protected. Resume to recover the verified transaction safely.",
+      title: t("settings.storage.relocation.interrupted.title"),
+      detail: t("settings.storage.relocation.interrupted.detail"),
       tone: "warning" as const,
     }
   }
   if (value.phase === "copying") {
     return {
-      title: "Copying and verifying data",
-      detail: "The current location remains active until the verified copy is ready.",
+      title: t("settings.storage.relocation.copying.title"),
+      detail: t("settings.storage.relocation.copying.detail"),
       tone: "neutral" as const,
     }
   }
   if (value.phase === "ready" || value.phase === "publishing") {
     return {
-      title: "Preparing the verified copy",
-      detail: "The current location remains active while the destination is committed.",
+      title: t("settings.storage.relocation.preparing.title"),
+      detail: t("settings.storage.relocation.preparing.detail"),
       tone: "neutral" as const,
     }
   }
   if (value.phase === "published") {
     return {
-      title: "Switching storage location",
-      detail: "The verified destination is ready. Axiomics is switching running servers together.",
+      title: t("settings.storage.relocation.switching.title"),
+      detail: t("settings.storage.relocation.switching.detail"),
       tone: "neutral" as const,
     }
   }
   return {
-    title: "Finalizing storage location",
-    detail: "The new location is active. Axiomics is finishing recovery metadata.",
+    title: t("settings.storage.relocation.finalizing.title"),
+    detail: t("settings.storage.relocation.finalizing.detail"),
     tone: "neutral" as const,
   }
 }
@@ -114,6 +121,7 @@ export function storageRelocationCopy(value: Relocation) {
 export const Storage: Component = () => {
   const sdk = useGlobalSDK()
   const platform = usePlatform()
+  const language = useLanguage()
 
   const base = () => sdk.url
   const fetchFn = () => platform.fetch ?? fetch
@@ -173,10 +181,13 @@ export const Storage: Component = () => {
     setPicker(undefined)
     if (!platform.openDirectoryPickerDialog) return
     const choice = await storageLocationChoice(() =>
-      platform.openDirectoryPickerDialog!({ title: "Choose a new Axiomics data location", serverUrl: sdk.url }),
+      platform.openDirectoryPickerDialog!({
+        title: language.t("settings.storage.picker.title"),
+        serverUrl: sdk.url,
+      }),
     )
     if (choice.kind === "error") {
-      setPicker(`The system folder picker could not open. ${choice.message} Enter a path manually below.`)
+      setPicker(language.t("settings.storage.picker.failed", { message: choice.message }))
       return
     }
     if (choice.kind === "selected") setTarget(choice.path)
@@ -200,7 +211,12 @@ export const Storage: Component = () => {
       setEditing(false)
       setTarget("")
       setStatus(
-        `Moved ${fmt(result.bytes)} across ${result.files} files. Every running Axiomics server now uses ${result.target}.${result.warning ? ` ${result.warning}` : ""}`,
+        language.t("settings.storage.toast.moved", {
+          size: fmt(result.bytes),
+          files: result.files,
+          target: result.target,
+          warning: result.warning ? ` ${result.warning}` : "",
+        }),
       )
       await load({ refresh: true })
     } catch (err) {
@@ -224,9 +240,16 @@ export const Storage: Component = () => {
         { method: "DELETE" },
       )
       setStatus(
-        (result.backup
-          ? `Returned to ${result.target}. The previous default directory is preserved at ${result.backup}.`
-          : `Returned to ${result.target}.`) + (result.warning ? ` ${result.warning}` : ""),
+        result.backup
+          ? language.t("settings.storage.toast.returnedBackup", {
+              target: result.target,
+              backup: result.backup,
+              warning: result.warning ? ` ${result.warning}` : "",
+            })
+          : language.t("settings.storage.toast.returned", {
+              target: result.target,
+              warning: result.warning ? ` ${result.warning}` : "",
+            }),
       )
       await load({ refresh: true })
     } catch (err) {
@@ -245,7 +268,11 @@ export const Storage: Component = () => {
       const result = await settingsApi<{ ok: true; entries: number }>(base(), fetchFn(), "/settings/storage/cache", {
         method: "DELETE",
       })
-      setStatus(result.entries === 1 ? "Local cache cleared." : `Local cache cleared (${result.entries} entries).`)
+      setStatus(
+        result.entries === 1
+          ? language.t("settings.storage.cache.cleared")
+          : language.t("settings.storage.cache.clearedCount", { count: result.entries }),
+      )
       await load({ refresh: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -255,18 +282,27 @@ export const Storage: Component = () => {
   }
 
   const maxBytes = createMemo(() => Math.max(1, ...(usage()?.entries.map((e) => e.bytes) ?? [1])))
+  // `updated_at` is set only by a scan that finished. Without one the server
+  // has no size, so "0 B" and "nothing stored" would assert something it never
+  // measured — report the figure as unavailable instead.
+  const unavailable = () => Boolean(usage()?.scan_error) && !usage()?.updated_at
   const updatedLabel = createMemo(() => {
     const value = usage()?.updated_at
     if (!value) return undefined
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return undefined
-    return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+    // Format through Luxon so the timestamp follows the app language, not the
+    // browser's own locale (a Chinese UI otherwise printed "Oct 29, 2026, 5:05 PM").
+    const date = DateTime.fromISO(value)
+    if (!date.isValid) return undefined
+    return date.toLocaleString(DateTime.DATETIME_MED)
   })
 
   return (
     <PanelScroll>
       <div class="settings-preferences-panel settings-preferences-panel--storage">
-        <PanelHeader title="Storage" description="Manage local data and review its disk usage." />
+        <PanelHeader
+          title={language.t("settings.storage.title")}
+          description={language.t("settings.storage.description")}
+        />
         <PanelBody>
           <Show when={error()}>
             <div class="settings-alert whitespace-pre-wrap" data-tone="critical" role="alert">
@@ -278,7 +314,7 @@ export const Storage: Component = () => {
                 disabled={loading()}
                 onClick={() => void retry()}
               >
-                Retry
+                {language.t("settings.storage.retry")}
               </Button>
             </div>
           </Show>
@@ -302,25 +338,31 @@ export const Storage: Component = () => {
                   disabled={busy()}
                   onClick={() => void chooseLocation()}
                 >
-                  Try again
+                  {language.t("settings.storage.tryAgain")}
                 </Button>
               </div>
             )}
           </Show>
           <Show when={usage()?.scan_error}>
-            {(message) => (
-              <div class="settings-alert" data-tone="warning" role="status">
+            <div class="settings-alert" data-tone="warning" role="status">
+              <Icon name="alert-circle" size="small" class="shrink-0 text-icon-weak-base" />
+              <span>{language.t("settings.storage.scanError")}</span>
+              <Button size="small" variant="secondary" class="settings-panel-action" onClick={() => void retry()}>
+                {language.t("settings.storage.retry")}
+              </Button>
+            </div>
+          </Show>
+          <Show when={usage()?.skipped_entries}>
+            {(count) => (
+              <div class="settings-alert" data-tone="neutral" role="status">
                 <Icon name="alert-circle" size="small" class="shrink-0 text-icon-weak-base" />
-                <span>Disk usage could not be refreshed. Cached values remain visible. {message()}</span>
-                <Button size="small" variant="secondary" class="settings-panel-action" onClick={() => void retry()}>
-                  Retry
-                </Button>
+                <span>{language.t("settings.storage.skipped", { count: count() })}</span>
               </div>
             )}
           </Show>
           <Show when={usage()?.relocation}>
             {(relocation) => {
-              const copy = () => storageRelocationCopy(relocation())
+              const copy = () => storageRelocationCopy(relocation(), language.t)
               return (
                 <div class="settings-alert" data-tone={copy().tone} role="status" aria-live="polite">
                   <Icon
@@ -352,7 +394,7 @@ export const Storage: Component = () => {
                       disabled={busy()}
                       onClick={() => void relocate(relocation().target)}
                     >
-                      Resume safely
+                      {language.t("settings.storage.resume")}
                     </button>
                   </Show>
                 </div>
@@ -364,7 +406,11 @@ export const Storage: Component = () => {
             when={!loading() && !error() && usage()}
             fallback={
               <Show when={loading()}>
-                <div class="settings-panel-loading__rows" role="status" aria-label="Loading storage settings">
+                <div
+                  class="settings-panel-loading__rows"
+                  role="status"
+                  aria-label={language.t("settings.storage.loading")}
+                >
                   <span />
                   <span />
                   <span />
@@ -372,7 +418,10 @@ export const Storage: Component = () => {
               </Show>
             }
           >
-            <Section title="Data location" description="Sessions, credentials, skills, and logs live here.">
+            <Section
+              title={language.t("settings.storage.location.title")}
+              description={language.t("settings.storage.location.description")}
+            >
               <div class="settings-card settings-preferences-card">
                 <div class="settings-storage-location">
                   <div class="settings-row-copy">
@@ -381,13 +430,21 @@ export const Storage: Component = () => {
                         {usage()?.data_dir ?? "…"}
                       </strong>
                       <Show when={usage()?.pointer}>
-                        <span class="settings-preference-status">Custom</span>
+                        <span class="settings-preference-status">{language.t("settings.storage.custom")}</span>
                       </Show>
                     </div>
                     <span class="settings-storage-size">
-                      {usage()?.scanning && !usage()?.updated_at
-                        ? "Calculating disk usage…"
-                        : `${fmt(usage()!.total_bytes)} total${usage()?.scanning ? " · Updating…" : ""}${updatedLabel() ? ` · Updated ${updatedLabel()}` : ""}`}
+                      {unavailable()
+                        ? language.t("settings.storage.unavailable")
+                        : usage()?.scanning && !usage()?.updated_at
+                          ? language.t("settings.storage.calculating")
+                          : language.t("settings.storage.summary", {
+                              size: fmt(usage()!.total_bytes),
+                              updating: usage()?.scanning ? language.t("settings.storage.updating") : "",
+                              updated: updatedLabel()
+                                ? language.t("settings.storage.updated", { time: updatedLabel()! })
+                                : "",
+                            })}
                     </span>
                   </div>
                   <div class="settings-storage-location__actions flex shrink-0 items-center gap-1">
@@ -399,7 +456,7 @@ export const Storage: Component = () => {
                         disabled={busy() || !usage()?.managed}
                         onClick={() => void resetLocation()}
                       >
-                        Use default
+                        {language.t("settings.storage.useDefault")}
                       </button>
                     </Show>
                     <Show when={!editing()}>
@@ -409,7 +466,7 @@ export const Storage: Component = () => {
                         disabled={busy() || !usage()?.managed}
                         onClick={() => void chooseLocation()}
                       >
-                        Change location…
+                        {language.t("settings.storage.change")}
                       </button>
                     </Show>
                   </div>
@@ -417,7 +474,7 @@ export const Storage: Component = () => {
                 <Show when={editing()}>
                   <div class="settings-inline-editor">
                     <label for="storage-location-input" class="text-12-medium text-text-strong">
-                      New data directory
+                      {language.t("settings.storage.newDirectory")}
                     </label>
                     <input
                       id="storage-location-input"
@@ -434,8 +491,7 @@ export const Storage: Component = () => {
                       }}
                     />
                     <p class="max-w-[68ch] text-12-regular text-text-weak">
-                      Axiomics verifies files and SQLite data, pauses active writes, and switches every running server
-                      together. The current directory remains untouched as a safety copy.
+                      {language.t("settings.storage.verifyDetail")}
                     </p>
                     <div class="settings-inline-editor__actions">
                       <Show when={platform.openDirectoryPickerDialog}>
@@ -446,7 +502,7 @@ export const Storage: Component = () => {
                           disabled={busy()}
                           onClick={() => void chooseLocation()}
                         >
-                          Browse…
+                          {language.t("settings.storage.browse")}
                         </button>
                       </Show>
                       <button
@@ -460,7 +516,7 @@ export const Storage: Component = () => {
                           setPicker(undefined)
                         }}
                       >
-                        Cancel
+                        {language.t("settings.storage.cancel")}
                       </button>
                       <button
                         type="button"
@@ -469,7 +525,7 @@ export const Storage: Component = () => {
                         disabled={busy() || !target().trim()}
                         onClick={() => void relocate()}
                       >
-                        {busy() ? "Moving…" : "Move data"}
+                        {busy() ? language.t("settings.storage.moving") : language.t("settings.storage.move")}
                       </button>
                     </div>
                   </div>
@@ -477,23 +533,30 @@ export const Storage: Component = () => {
                 <Show when={usage() && !usage()!.managed}>
                   <div class="settings-alert m-3 mt-0" data-tone="neutral">
                     <Icon name="alert-circle" size="small" class="shrink-0 text-icon-weak-base" />
-                    <span>AXIOMICS_DATA_DIR owns this process, so change that environment setting to move it.</span>
+                    <span>{language.t("settings.storage.envLocked")}</span>
                   </div>
                 </Show>
               </div>
             </Section>
 
-            <Section title="Local cache" description="Downloaded runtime packages and metadata. Recreated when needed.">
+            <Section
+              title={language.t("settings.storage.cache.title")}
+              description={language.t("settings.storage.cache.description")}
+            >
               <div class="settings-card settings-preferences-card">
                 <div class="settings-storage-cache settings-row settings-preference-row">
                   <div class="settings-row-copy">
-                    <strong>Axiomics cache</strong>
+                    <strong>{language.t("settings.storage.cache.name")}</strong>
                     <code class="min-w-0 truncate text-11-regular text-text-weak" title={usage()?.cache_dir}>
                       {usage()?.cache_dir}
                     </code>
                   </div>
                   <span class="settings-storage-metric text-12-regular text-text-weak">
-                    {usage()?.scanning && !usage()?.updated_at ? "Calculating…" : fmt(usage()?.cache_bytes ?? 0)}
+                    {unavailable()
+                      ? language.t("settings.storage.unavailable")
+                      : usage()?.scanning && !usage()?.updated_at
+                        ? language.t("settings.storage.cache.calculating")
+                        : fmt(usage()?.cache_bytes ?? 0)}
                   </span>
                   <button
                     type="button"
@@ -503,18 +566,20 @@ export const Storage: Component = () => {
                     onClick={() => void clearCache()}
                   >
                     <Icon name="trash" size="small" />
-                    {clearing() ? "Clearing…" : "Clear cache"}
+                    {clearing()
+                      ? language.t("settings.storage.cache.clearing")
+                      : language.t("settings.storage.cache.clear")}
                   </button>
                 </div>
               </div>
             </Section>
 
             <Section
-              title="Disk usage"
+              title={language.t("settings.storage.usage.title")}
               description={
                 usage()?.scanning
-                  ? "Calculating allocated disk usage. Cached entries remain visible while the scan runs."
-                  : "Top-level entries inside the data directory, largest first."
+                  ? language.t("settings.storage.usage.descriptionScanning")
+                  : language.t("settings.storage.usage.description")
               }
             >
               <Show
@@ -522,7 +587,11 @@ export const Storage: Component = () => {
                 fallback={
                   <div class="settings-card settings-preferences-card">
                     <p class="settings-card-empty" role="status">
-                      {usage()?.scanning ? "Calculating disk usage…" : "Nothing stored yet."}
+                      {unavailable()
+                        ? language.t("settings.storage.unavailable")
+                        : usage()?.scanning
+                          ? language.t("settings.storage.usage.emptyScanning")
+                          : language.t("settings.storage.usage.empty")}
                     </p>
                   </div>
                 }
@@ -541,7 +610,7 @@ export const Storage: Component = () => {
                         <div
                           class="settings-storage-meter"
                           role="progressbar"
-                          aria-label={`${entry.name} relative disk usage`}
+                          aria-label={language.t("settings.storage.usage.meter", { name: entry.name })}
                           aria-valuemin="0"
                           aria-valuemax={maxBytes()}
                           aria-valuenow={entry.bytes}

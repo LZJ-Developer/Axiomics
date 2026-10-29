@@ -1,6 +1,7 @@
 import { Show, type JSX } from "solid-js"
 import { IconCpu, IconFolder, IconTerminal } from "@/atlas/shared/Icon"
 import { preloadTerminal } from "@/components/terminal"
+import { deploymentCapabilities } from "@/context/capabilities"
 import "./session-sidebar.css"
 
 export type SessionContext = "files" | "terminal" | "canvas" | "kernels" | "trace" | "artifact"
@@ -134,17 +135,19 @@ export function SessionSidebarActions(props: {
         >
           <IconFolder size={16} strokeWidth={1.5} />
         </SidebarAction>
-        <SidebarAction
-          label={copy().terminal}
-          detail={copy().projectShell}
-          ariaLabel={copy().openTerminal}
-          shortcut="⌃`"
-          active={props.context === "terminal" && props.contextOpen}
-          onWarm={preloadTerminal}
-          onClick={(_event?: Event) => props.onContext("terminal")}
-        >
-          <IconTerminal size={16} strokeWidth={1.5} />
-        </SidebarAction>
+        <Show when={deploymentCapabilities.terminal()}>
+          <SidebarAction
+            label={copy().terminal}
+            detail={copy().projectShell}
+            ariaLabel={copy().openTerminal}
+            shortcut="⌃`"
+            active={props.context === "terminal" && props.contextOpen}
+            onWarm={preloadTerminal}
+            onClick={(_event?: Event) => props.onContext("terminal")}
+          >
+            <IconTerminal size={16} strokeWidth={1.5} />
+          </SidebarAction>
+        </Show>
         <SidebarAction
           label={copy().compute}
           detail={copy().computeDetail}

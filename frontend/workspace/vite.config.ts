@@ -1,11 +1,13 @@
 import { createReadStream, existsSync, readFileSync, readdirSync, realpathSync } from "node:fs"
 import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
+import { createRequire } from "node:module"
 import { defineConfig, searchForWorkspaceRoot, type Plugin } from "vite"
 import desktopPlugin from "./vite"
 
 const MOLSTAR_PACKAGE_ROOT = "/node_modules/molstar/"
-const PDF_CMAP_ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.resolve("pdfjs-dist/package.json"))), "cmaps"))
+const PDF_CMAP_ROOT = realpathSync(
+  join(dirname(createRequire(import.meta.url).resolve("pdfjs-dist/package.json")), "cmaps"),
+)
 
 function pdfResources(): Plugin {
   return {
@@ -24,7 +26,11 @@ function pdfResources(): Plugin {
     buildStart() {
       for (const name of readdirSync(PDF_CMAP_ROOT)) {
         if (!name.endsWith(".bcmap")) continue
-        this.emitFile({ type: "asset", fileName: `pdfjs/cmaps/${name}`, source: readFileSync(join(PDF_CMAP_ROOT, name)) })
+        this.emitFile({
+          type: "asset",
+          fileName: `pdfjs/cmaps/${name}`,
+          source: readFileSync(join(PDF_CMAP_ROOT, name)),
+        })
       }
     },
   }

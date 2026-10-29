@@ -26,10 +26,10 @@ test("skills catalog keeps readable type, aligned controls, and semantic states"
   const page = source()
   const css = styles()
 
-  expect(page).toContain('placeholder="Search skills"')
-  expect(page).toContain('label: "All categories"')
+  expect(page).toContain('placeholder={t()("skills.page.search")}')
+  expect(page).toContain('t()("skills.source.allCategories")')
   expect(page).toContain('icon="alert-circle"')
-  expect(page).toContain('action="Try again"')
+  expect(page).toContain('t()("skills.page.tryAgain")')
   expect(page).toContain('class="skills-workspace__skill-icon"')
   expect(page).toContain("skillIconFor")
   expect(page).toContain("words === words.toUpperCase()")

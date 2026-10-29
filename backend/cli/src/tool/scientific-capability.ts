@@ -9,6 +9,7 @@ import { CapabilityRegistry } from "@/science/capability/registry"
 import { CapabilityRuntime } from "@/science/capability/runtime"
 import { CapabilityWorkload } from "@/science/capability/schema"
 import { validateCapabilitySmoke } from "@/science/capability/validation"
+import { KernelEnvironmentMutation } from "@/science/kernel/environment-mutation"
 import { SessionFilesystem } from "@/session/filesystem"
 import { createComputeJobTool } from "./compute-job"
 import { Tool } from "./tool"
@@ -32,6 +33,45 @@ const ACTIONS = [
 ] as const
 type Action = (typeof ACTIONS)[number]
 const LIFECYCLE = new Set<Action>(["status", "wait", "logs", "artifacts", "cancel", "retry_delivery", "release"])
+
+/** The project-scoped directories the platform already wires into every kernel
+ * and Bash launch. Reported by doctor so an install's landing zone is an
+ * observed path rather than something the caller has to infer (or invent) —
+ * the same paths `pythonRuntime`/`rRuntime` export, read without provisioning
+ * anything, so doctor stays cheap. */
+async function writablePackages() {
+  const targets = [
+    {
+      language: "python",
+      path: path.join(KernelEnvironmentMutation.managedRoot("python", "python"), "site-packages"),
+      mechanism: "PIP_TARGET + PYTHONPATH",
+    },
+    {
+      language: "r",
+      path: path.join(KernelEnvironmentMutation.managedRoot("r", "r"), "library"),
+      mechanism: "R_LIBS_USER",
+    },
+  ]
+  return Promise.all(
+    targets.map(async (target) => {
+      const entries = await fs.readdir(target.path).catch(() => [] as string[])
+      const repository =
+        target.language === "python"
+          ? KernelEnvironmentMutation.pythonIndexUrl()
+          : KernelEnvironmentMutation.cranMirror()
+      return {
+        ...target,
+        scope: "project",
+        ...(repository ? { repository } : {}),
+        exists: await fs
+          .access(target.path)
+          .then(() => true)
+          .catch(() => false),
+        entries: entries.length,
+      }
+    }),
+  )
+}
 const needsID = new Set<Action>(["describe", "doctor", "setup", "plan", "start", "smoke", "verify"])
 const needsJob = new Set<Action>([...LIFECYCLE, "verify"])
 
@@ -181,6 +221,7 @@ export const ScientificCapabilityTool = Tool.define<typeof ScientificCapabilityP
       "For scRNA, spatial transcriptomics, scATAC, Hi-C, or imaging/spatial proteomics, call this before the first Bash, Python, or R environment probe. The default mappings are scanpy, squidpy, snapatac2, open2c, and mcmicro; choose ArchR only when the task specifically needs it.",
       "Use list/describe/doctor before setup or spend. For catalog-managed omics tools, use start instead of installing or activating an environment in Bash: the platform injects the registered runtime. plan never dispatches. setup may create an exact pinned Python pack; managed toolchains are provisioned only by infrastructure and setup merely verifies them. start dispatches a packaged workload or sends a strict BYOK NVIDIA NIM request. smoke dispatches a bounded canonical local/Modal check, and verify validates its captured artifacts before recording evidence.",
       "describe includes the hosted request_schema. Build payload from that schema, then plan validates all cross-field requirements without sending data or spending credits.",
+      "doctor reports writable_packages: the project-scoped Python site-packages and R library the platform already exports as PIP_TARGET/PYTHONPATH and R_LIBS_USER. When the catalog has no tool for a long-tail need, install into them with a plain `pip install <package>` (or `install.packages`) in Bash — do not invent a directory, and do not pass --target or set PYTHONPATH yourself; the next command and kernel import it without extra wiring.",
       "status/wait/logs/artifacts/cancel/retry_delivery/release accept only jobs created by scientific_capability and may report stale_binding when the catalog changed. Callers cannot override pinned packages, images, GPU, or secrets.",
     ].join(" "),
     parameters: ScientificCapabilityParameters,
@@ -296,6 +337,7 @@ export const ScientificCapabilityTool = Tool.define<typeof ScientificCapabilityP
               environment: runtime.local.environment,
               lock_sha256: runtime.local.lock_sha256,
               integrity: runtime.local.integrity,
+              writable_packages: await writablePackages(),
             },
             ...(item.runtime?.kind === "managed_toolchain" ? { next: next(item.id) } : {}),
             ...(hosted ? { hosted } : {}),

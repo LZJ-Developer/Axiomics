@@ -18,6 +18,7 @@ import { BashArity } from "@/permission/arity"
 import { Truncate } from "./truncation"
 import { Axiomics } from "@/axiomics"
 import { Sandbox } from "@/sandbox/sandbox"
+import { VIEW_TMP } from "@/sandbox/view"
 import { SessionFilesystem } from "@/session/filesystem"
 import { Filesystem } from "@/util/filesystem"
 import { Provenance } from "@/science/provenance/store"
@@ -27,6 +28,7 @@ import { CommandRuntime } from "@/science/command/registry"
 import { AuthoritySignal } from "@/project/authority-signal"
 import { KernelEnvironmentMutation } from "@/science/kernel/environment-mutation"
 import { ManagedInstallPolicy } from "@/science/capability/install-policy"
+import { PathSpace } from "@/session/path-space"
 
 const MAX_METADATA_LENGTH = 30_000
 const DEFAULT_TIMEOUT = Flag.AXIOMICS_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 0
@@ -171,6 +173,8 @@ export const BashTool = Tool.define("bash", async () => {
   log.info("bash tool using shell", { shell })
 
   return {
+    pathFields: ["workdir"],
+    localizeOutput: true,
     description: DESCRIPTION.replaceAll("${directory}", "the session workspace")
       .replaceAll("${maxLines}", String(Truncate.MAX_LINES))
       .replaceAll("${maxBytes}", String(Truncate.MAX_BYTES)),
@@ -200,6 +204,8 @@ export const BashTool = Tool.define("bash", async () => {
       const writable = authority.writable
       const readable = new Set(authority.readable)
       const workspace = authority.workspace
+      // The session boundary already translated the declared path fields, so
+      // this is a host path by the time it arrives.
       const requested = params.workdir || workspace
       const target = path.isAbsolute(requested) ? requested : path.resolve(workspace, requested)
       const cwd = (await Filesystem.canonical(target)) ?? path.resolve(target)
@@ -351,6 +357,18 @@ export const BashTool = Tool.define("bash", async () => {
         },
       })
 
+      // A shell command is how a long-tail dependency actually gets installed,
+      // so recognize the mutation here the way the Python tool does. Detection
+      // is conservative (pip/uv/conda/install.packages and friends) and the
+      // caller approves it; the approval is what lets this one launch write
+      // the project package root and reach a repository. Every later launch
+      // imports the result through the exported PIP_TARGET/PYTHONPATH or
+      // R_LIBS_USER, so the model never has to repeat a path.
+      const mutation =
+        KernelEnvironmentMutation.detect({ language: "python", environment: "python", code: params.command }) ??
+        KernelEnvironmentMutation.detect({ language: "r", environment: "r", code: params.command })
+      if (mutation) await ctx.ask(KernelEnvironmentMutation.permission(mutation))
+
       // Seed the BYOK secret cache so redact() below masks the user's own
       // provider keys (auth.json + shell env), not just synced managed ones.
       await Axiomics.refreshByokSecrets(process.env).catch(() => {})
@@ -369,8 +387,50 @@ export const BashTool = Tool.define("bash", async () => {
       // the generation check below still rejects any authority change before
       // the subprocess is created. This keeps independent shell launches from
       // timing out behind environment maintenance.
-      const runtime = await KernelEnvironmentMutation.pythonRuntime("python")
+      const runtime = await KernelEnvironmentMutation.pythonRuntime("python", mutation?.language === "python")
       if (runtime.env?.PIP_TARGET) readable.add(runtime.env.PIP_TARGET)
+      // A shared interpreter root is granted by its own rule: the sandbox adds
+      // <env>/bin from PATH, and for a conda-managed starter it also infers the
+      // whole <data>/conda/envs/<name>. A site-provisioned root such as
+      // /…/envs/omics-stamo-1.0.0 matches neither, so only its bin was readable
+      // and Python died on the missing stdlib ("No module named 'encodings'").
+      const sharedPython = KernelEnvironmentMutation.sharedBase("python")
+      if (sharedPython?.binary) readable.add(path.dirname(path.dirname(sharedPython.binary)))
+      // R reaches a shell the same way Python does, and its project library has
+      // to be exported on every launch, not only on the install — otherwise the
+      // package one command installed is invisible to the next. rRuntime would
+      // start a kernel we do not need here, so assemble the same overlay: the
+      // shared R bin on PATH, R_HOME, and the project library on R_LIBS_USER.
+      // Writing that library (and reaching a repository) still requires the
+      // mutation grant below.
+      const rBase = KernelEnvironmentMutation.sharedBase("r")
+      const rLibrary = rBase ? path.join(KernelEnvironmentMutation.managedRoot("r", "r"), "library") : undefined
+      const runtimeEnv = { ...(runtime.env ?? {}) }
+      if (rBase && rLibrary) {
+        // R warns or fails when R_LIBS_USER names a missing directory, so create
+        // it on the same terms rRuntime does.
+        await import("node:fs/promises").then((fs) => fs.mkdir(rLibrary, { recursive: true }))
+        runtimeEnv.PATH = [rBase.binary && path.dirname(rBase.binary), runtimeEnv.PATH]
+          .filter(Boolean)
+          .join(path.delimiter)
+        // R_HOME is deliberately not exported: Rscript resolves its own home
+        // from its installation and answers a mismatched exported value with
+        // "WARNING: ignoring environment value of R_HOME" on every command.
+        runtimeEnv.R_LIBS_USER = rLibrary
+        readable.add(rLibrary)
+        // A configured CRAN mirror reaches the shell the same way rRuntime
+        // hands it to a kernel: through a profile file, since R has no
+        // environment variable for the repository list.
+        const profile = KernelEnvironmentMutation.rProfile("r")
+        if (profile) {
+          runtimeEnv.R_PROFILE_USER = profile
+          readable.add(path.dirname(profile))
+        }
+        // The interpreter itself lives in the read-only shared root, which is
+        // outside the project grant; without it `Rscript` is not launchable
+        // inside the sandbox even though it is on PATH.
+        if (rBase.env?.R_HOME) readable.add(rBase.env.R_HOME)
+      }
 
       const started = Date.now()
       const streams = { stdout: "", stderr: "" }
@@ -422,26 +482,105 @@ export const BashTool = Tool.define("bash", async () => {
         }
         // Build the wrapper only after the final authority check, while trust
         // and filesystem mutations are excluded through durable registration.
+        const options = mutation ? { ...current.sandbox, network: "allow" as const } : current.sandbox
+        // A command run without an enforced sandbox keeps host spellings: the
+        // view is only truthful when bubblewrap actually assembles it.
+        const view =
+          options.enabled === false || Sandbox.backend() !== "bubblewrap"
+            ? undefined
+            : await PathSpace.view(ctx.sessionID, cwd)
+        // Per-project copy-on-write view of the shared environment tree:
+        // installs persist for the project instead of touching the shared base.
+        const envOverlay = Sandbox.envOverlay(Instance.project.id)
+        // When the view is active the project roots appear only under the
+        // synthetic home; leaving them in the policy would mount the same
+        // directories at their host spelling and defeat the whole point.
+        const viewRoots = view ? PathSpace.hostRoots(view.roots) : []
+        const outsideView = (value: string) =>
+          !viewRoots.some((root) => value === root || value.startsWith(root + path.sep))
+        // Variables the payload sees inside the namespace. They are applied
+        // with bwrap --setenv, never on the spawn environment: the host-side
+        // launch gate boots this binary before bwrap exists and must keep
+        // host spellings for its own data/config root. The payload receives a
+        // complete environment, so the sandbox can drop everything else it
+        // would otherwise inherit from the launcher.
+        if (view) {
+          const cache = Sandbox.cacheEnvironment(current.workspace)
+          view.env = PathSpace.payloadEnv(view, {
+            ...Axiomics.filterEnvForSubprocess({ ...process.env, ...runtimeEnv, ...cache }),
+            ...Axiomics.filterEnvForKernel(runtimeEnv),
+            ...runtimeEnv,
+            XDG_STATE_HOME: path.join(current.workspace, ".axiomics", "state"),
+            // A nested Axiomics process would try to create its data root on
+            // the read-only synthetic home; give it the private temp mount.
+            AXIOMICS_DATA_DIR: `${VIEW_TMP}/data`,
+          })
+        }
+        // The shim symlink inside the sandbox temp root must point at the
+        // canonical, view-visible interpreter: a lexical host path behind the
+        // managed data-root link would dangle inside the namespace.
+        const pythonHost = runtime.binary ?? Bun.which("python3") ?? Bun.which("python") ?? undefined
+        const pythonBinary =
+          pythonHost && view
+            ? PathSpace.toModel(view.roots, pythonHost) !== pythonHost
+              ? PathSpace.toModel(view.roots, pythonHost)
+              : PathSpace.remapHome(view.relocate, pythonHost)
+            : pythonHost
         const sandbox = Sandbox.plan({
           command: Shell.pipefail(shell, params.command),
           shell,
           cwd,
-          workspace: current.writable,
-          readable: [...readable],
+          workspace: [
+            ...current.writable.filter(outsideView),
+            ...(runtime.extraWritable ?? []),
+            ...(mutation?.language === "r" && rLibrary ? [rLibrary] : []),
+          ],
+          readable: [...readable].filter(outsideView),
           unreadable: Axiomics.kernelSensitivePaths(),
           runtime: {
-            python: runtime.binary ?? Bun.which("python3") ?? Bun.which("python") ?? undefined,
-            path: runtime.env?.PATH,
+            // The shim symlink inside the sandbox temp root must point at the
+            // canonical, view-visible interpreter: a lexical host path behind
+            // the managed data-root link would dangle inside the namespace.
+            python: pythonHost,
+            pythonVisible: pythonBinary,
+            // `withTempEnvironment` writes PATH itself, so the view has to be
+            // applied here as well as on the spawn env.
+            path: view
+              ? PathSpace.translateValue(view.roots, view.relocate, runtimeEnv.PATH ?? process.env.PATH ?? "")
+              : runtimeEnv.PATH,
           },
-          options: current.sandbox,
+          view,
+          envOverlay,
+          options,
         })
         return Axiomics.withSubprocessEnv(process.env, async (env, overlay) => {
+          // Host-spelled cache roots: the launch gate runs on the host, and
+          // the payload's virtual spellings arrive through view.env.
           const cache = sandbox.sandboxed ? Sandbox.cacheEnvironment(current.workspace) : {}
           let child: ReturnType<typeof spawn>
+          // A nested Axiomics process started from this shell inherits the
+          // synthetic home; give it an ephemeral data root instead of letting
+          // it create one on the read-only home tmpfs.
+          const shellData = view && sandbox.temporary ? path.join(sandbox.temporary, "data") : undefined
           const wrapped = await CommandRuntime.wrap({
             file: sandbox.file,
             args: sandbox.args ?? [],
             shell: sandbox.sandboxed ? false : sandbox.useShell,
+          })
+          log.debug("spawn plan", {
+            sandboxed: sandbox.sandboxed,
+            backend: sandbox.backend,
+            wrapped: wrapped.file,
+            payload: wrapped.args.slice(0, 2),
+            cwd,
+            envHome: env.HOME,
+            envData: shellData,
+            runtimePath: runtimeEnv.PATH?.slice(0, 80),
+            python: pythonHost,
+            pythonVisible: pythonBinary,
+            view: view
+              ? { home: view.home, cwd: view.cwd, relocate: view.relocate, envKeys: Object.keys(view.env ?? {}) }
+              : undefined,
           })
           try {
             child = spawn(wrapped.file, wrapped.args, {
@@ -451,7 +590,15 @@ export const BashTool = Tool.define("bash", async () => {
               // overlays must never restore a managed token or re-pair a
               // user's key with the Ace managed proxy after subprocessEnv ran.
               env: {
-                ...Axiomics.filterEnvForSubprocess({ ...env, ...(runtime.env ?? {}), ...cache }),
+                ...Axiomics.filterEnvForSubprocess({ ...env, ...runtimeEnv, ...cache }),
+                // The subprocess filter rebuilds by allowlist, so the runtime
+                // overlay's own keys (PYTHONPATH, PIP_TARGET, R_LIBS_USER, …)
+                // are dropped even though pythonRuntime just computed them.
+                // Re-admit them through the kernel allowlist, which admits no
+                // provider or service credential key: an install made with the
+                // exported PIP_TARGET stays importable by the next command
+                // without the caller having to re-state PYTHONPATH.
+                ...Axiomics.filterEnvForKernel(runtimeEnv),
                 // The final overlay pass re-sanitizes runtime/cache values and
                 // therefore drops control variables. Restore only the fixed
                 // Git policy from subprocessEnv so Git never falls back to a
@@ -459,6 +606,7 @@ export const BashTool = Tool.define("bash", async () => {
                 GIT_CONFIG_NOSYSTEM: env.GIT_CONFIG_NOSYSTEM,
                 GIT_CONFIG_GLOBAL: env.GIT_CONFIG_GLOBAL,
                 GIT_TERMINAL_PROMPT: env.GIT_TERMINAL_PROMPT,
+                ...(shellData ? { AXIOMICS_DATA_DIR: shellData } : {}),
               },
               stdio: ["ignore", "pipe", "pipe"],
               detached: process.platform !== "win32",

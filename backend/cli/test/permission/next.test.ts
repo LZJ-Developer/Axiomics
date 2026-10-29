@@ -1262,6 +1262,71 @@ test("project action modes are execution-time authority floors", () => {
   ).toBe("deny")
 })
 
+test("unattended deployments keep the sandbox but stop asking for routine work", () => {
+  const read = { filesystem: { path: "/etc", access: "read" } }
+  const write = { filesystem: { path: "/etc", access: "write" } }
+  process.env.AXIOMICS_SANDBOX_UNATTENDED = "1"
+  try {
+    expect(
+      PermissionNext.modeAction({
+        mode: "approve",
+        permission: "bash",
+        configured: "allow",
+        granted: "ask",
+        metadata: { shell: { command: "rm -rf build" } },
+      }),
+    ).toBe("allow")
+    expect(
+      PermissionNext.modeAction({
+        mode: "approve",
+        permission: "external_directory",
+        configured: "ask",
+        granted: "ask",
+        metadata: read,
+      }),
+    ).toBe("allow")
+    // Widening the boundary still stops for a human.
+    expect(
+      PermissionNext.modeAction({
+        mode: "approve",
+        permission: "external_directory",
+        configured: "ask",
+        granted: "ask",
+        metadata: write,
+      }),
+    ).toBe("ask")
+    // A network read is routine too: it brings data in and changes nothing on
+    // the host. Egress that becomes a side effect keeps asking.
+    expect(
+      PermissionNext.modeAction({ mode: "approve", permission: "network", configured: "ask", granted: "ask" }),
+    ).toBe("allow")
+    expect(
+      PermissionNext.modeAction({ mode: "approve", permission: "generate_image", configured: "ask", granted: "ask" }),
+    ).toBe("ask")
+    expect(
+      PermissionNext.modeAction({ mode: "approve", permission: "network", configured: "deny", granted: "allow" }),
+    ).toBe("deny")
+    expect(PermissionNext.modeAction({ mode: "ask", permission: "edit", configured: "allow", granted: "allow" })).toBe(
+      "ask",
+    )
+  } finally {
+    delete process.env.AXIOMICS_SANDBOX_UNATTENDED
+  }
+  expect(
+    PermissionNext.modeAction({
+      mode: "approve",
+      permission: "bash",
+      configured: "allow",
+      granted: "ask",
+      metadata: { shell: { command: "rm -rf build" } },
+    }),
+  ).toBe("ask")
+  // Outside an unattended deployment the network still needs a human.
+  expect(
+    PermissionNext.modeAction({ mode: "approve", permission: "network", configured: "ask", granted: "ask" }),
+  ).toBe("ask")
+})
+
 test("Ask risky shell floor cannot be weakened by standing approval or pending settlement", async () => {
   await using tmp = await tmpdir({ git: true })
   await Instance.provide({

@@ -69,9 +69,12 @@ export const AppearanceSections: Component = () => {
     <>
       <SettingsSection title={language.t("settings.general.section.appearance")}>
         <div class="settings-card">
-          <SettingsRow title="Theme" description="Choose a complete color system for the workspace.">
+          <SettingsRow
+            title={language.t("settings.theme.title")}
+            description={language.t("settings.theme.description")}
+          >
             <Select
-              aria-label="Theme"
+              aria-label={language.t("settings.theme.title")}
               options={themeOptions()}
               current={themeOptions().find((option) => option.value === theme.themeId())}
               value={(option) => option.value}

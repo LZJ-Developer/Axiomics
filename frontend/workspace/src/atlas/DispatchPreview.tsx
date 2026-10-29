@@ -1,5 +1,6 @@
 import { For, type JSX } from "solid-js"
 import { FONT_MONO, FONT_SANS } from "@/styles/tokens"
+import { englishT, type Translate } from "@/i18n/fallback"
 
 // Mirrors backend/cli/src/compute/jobs.ts truthfully: the final scheduler
 // wrapper (sbatch/qsub argv, job name, log path) is composed server-side at
@@ -107,7 +108,8 @@ function resourceText(resources: NonNullable<Staged["resources"]>) {
     .join(" · ")
 }
 
-export function DispatchPreview(props: { staged: Staged }): JSX.Element {
+export function DispatchPreview(props: { staged: Staged; t?: Translate }): JSX.Element {
+  const t = () => props.t ?? englishT
   const rows = () => {
     const staged = props.staged
     return [
@@ -125,7 +127,7 @@ export function DispatchPreview(props: { staged: Staged }): JSX.Element {
   }
   return (
     <section aria-label="Dispatch preview" data-testid="dispatch-preview" style={card}>
-      <strong style={heading}>This will run:</strong>
+      <strong style={heading}>{t()("session.dispatch.preview")}</strong>
       <div style={box}>
         <span style={{ color: "var(--color-text-faint)", "user-select": "none" }}>$</span>
         <span>{props.staged.command}</span>

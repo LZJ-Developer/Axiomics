@@ -5,8 +5,11 @@ import DESCRIPTION from "./glob.txt"
 import { Ripgrep } from "../file/ripgrep"
 import { Instance } from "../project/instance"
 import { assertExternalDirectory, sessionToolDirectory } from "./external-directory"
+import { PathSpace } from "@/session/path-space"
 
 export const GlobTool = Tool.define("glob", {
+  pathFields: ["path"],
+  localizeOutput: true,
   description: DESCRIPTION,
   parameters: z.object({
     pattern: z.string().describe("The glob pattern to match files against"),
@@ -29,7 +32,8 @@ export const GlobTool = Tool.define("glob", {
     })
 
     const directory = await sessionToolDirectory(ctx)
-    let search = params.path ?? directory
+    const requested = params.path ? params.path : undefined
+    let search = requested ?? directory
     search = path.isAbsolute(search) ? search : path.resolve(directory, search)
     using authorized = await assertExternalDirectory(ctx, search, { kind: "directory" })
     search = authorized?.path ?? search

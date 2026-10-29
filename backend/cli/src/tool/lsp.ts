@@ -20,6 +20,7 @@ const operations = [
 ] as const
 
 export const LspTool = Tool.define("lsp", {
+  pathFields: ["filePath"],
   description: DESCRIPTION,
   parameters: z.object({
     operation: z.enum(operations).describe("The LSP operation to perform"),

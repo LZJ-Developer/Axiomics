@@ -97,29 +97,34 @@ export function scientificCapabilityTarget(record: ScientificCapabilityRecord): 
   if (record.runtime?.targets?.includes("modal") && usable(record.current_availability.hosted)) return "modal"
 }
 
+import { translate } from "@/i18n/fallback"
+
 export function actionableScientificCapabilities(records: ScientificCapabilityRecord[]) {
   return records.filter((record) => scientificCapabilityTarget(record) !== undefined)
 }
 
 export function capabilityState(record: ScientificCapabilityRecord) {
   const target = scientificCapabilityTarget(record)
-  if (!target) return { label: "Unavailable", tone: "danger" as const, action: undefined }
+  if (!target) return { label: translate("settings.scientificTools.state.unavailable"), tone: "danger" as const, action: undefined }
   const availability = target === "local" ? record.current_availability.local : record.current_availability.hosted
+  // Only a local package install has an in-panel action. Hosted tools need an
+  // account configured outside this surface, so their status is read-only.
   if (availability === "degraded")
     return {
-      label: "Needs attention",
+      label: translate("settings.scientificTools.state.needsAttention"),
       tone: "warning" as const,
-      action:
-        target === "local" ? ("setup" as const) : target === "nvidia" ? ("credentials" as const) : ("compute" as const),
+      action: target === "local" ? ("setup" as const) : undefined,
     }
   if (availability === "configured" && target === "nvidia")
-    return { label: "Connected", tone: "neutral" as const, action: undefined }
+    return { label: translate("settings.scientificTools.state.connected"), tone: "neutral" as const, action: undefined }
   if (availability === "ready" || availability === "configured")
-    return { label: "Ready", tone: "success" as const, action: undefined }
+    return { label: translate("settings.scientificTools.state.ready"), tone: "success" as const, action: undefined }
   return {
-    label: target === "local" ? "Not installed" : "Setup needed",
+    label:
+      target === "local"
+        ? translate("settings.scientificTools.state.notInstalled")
+        : translate("settings.scientificTools.state.setupNeeded"),
     tone: "neutral" as const,
-    action:
-      target === "local" ? ("setup" as const) : target === "nvidia" ? ("credentials" as const) : ("compute" as const),
+    action: target === "local" ? ("setup" as const) : undefined,
   }
 }

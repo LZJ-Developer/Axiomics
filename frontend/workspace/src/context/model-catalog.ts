@@ -41,7 +41,8 @@ export const COMPOSER_MODEL_ROSTER = [
   { key: "anthropic/claude-opus-5", label: "Opus 5", provider: "anthropic" },
   { key: "moonshotai/kimi-k3", label: "Kimi K3", provider: "moonshotai" },
   { key: "zai/glm-5-3", label: "GLM 5.3", provider: "zai" },
-  { key: "deepseek/deepseek-v4-flash", label: "DeepSeek V4 Flash", provider: "deepseek" },
+  { key: "deepseek/deepseek-v4-pro", label: "DeepSeek V4 Pro", provider: "deepseek" },
+  { key: "deepseek/deepseek-flash", label: "DeepSeek V4.1 Flash", provider: "deepseek" },
   { key: "anthropic/claude-fable-5", label: "Fable 5", provider: "anthropic" },
   { key: "xai/grok-4-6", label: "Grok 4.6", provider: "xai" },
 ] as const
@@ -87,7 +88,7 @@ export const FRONTIER_MODELS: ReadonlySet<string> = new Set([
   "moonshotai/kimi-k2-7-code",
   "moonshotai/kimi-k3",
   "deepseek/deepseek-v4-pro",
-  "deepseek/deepseek-v4-flash",
+  "deepseek/deepseek-flash",
 ])
 
 export function openrouterModelAlias(providerID: string, modelID: string): ModelKey | undefined {

@@ -5,6 +5,7 @@ import { IconFolder, IconPlus } from "@/atlas/shared/Icon"
 import { Wordmark } from "@/atlas/Wordmark"
 import { settingsApi } from "@/components/settings/api"
 import type { ProjectCreateInput } from "@/components/dialog-create-project"
+import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import type { Platform } from "@/context/platform"
 import { useServer } from "@/context/server"
@@ -122,8 +123,9 @@ export function createOnboardingProjectFlow(input: {
 }
 
 export function DesktopOnboardingLoading() {
+  const language = useLanguage()
   return (
-    <main class="desktop-onboarding" aria-label="Loading desktop setup">
+    <main class="desktop-onboarding" aria-label={language.t("onboarding.loading")}>
       <section class="desktop-onboarding__shell desktop-onboarding__shell--loading">
         <Wordmark size="sm" />
         <div class="desktop-onboarding__loading" role="status" aria-live="polite">
@@ -143,6 +145,7 @@ type OnboardingServer = {
 export function DesktopOnboardingController(
   props: ParentProps & { server: OnboardingServer; platform: Platform; desktop?: boolean },
 ) {
+  const language = useLanguage()
   const desktop = props.desktop ?? new URLSearchParams(window.location.search).get("desktop") === "1"
   // A completed onboarding is remembered on this device so the shell paints
   // before the preferences round trip; the fetch still verifies it below and
@@ -278,20 +281,23 @@ export function DesktopOnboardingController(
             <section class="desktop-onboarding__shell">
               <header class="desktop-onboarding__header">
                 <Wordmark size="sm" />
-                <span class="desktop-onboarding__account-state">Local workspace</span>
+                <span class="desktop-onboarding__account-state">{language.t("onboarding.account.local")}</span>
               </header>
 
               <div class="desktop-onboarding__content">
                 <div class="desktop-onboarding__intro">
-                  <p>YOUR FIRST WORKSPACE</p>
-                  <h1 id="desktop-onboarding-title">Start with your research</h1>
+                  <p>{language.t("onboarding.eyebrow")}</p>
+                  <h1 id="desktop-onboarding-title">{language.t("onboarding.title")}</h1>
                   <span>
                     Open an existing folder to keep files, sessions, and results together. You can change model and
                     compute access anytime in Customize. Projects and credentials stay on this device.
                   </span>
                 </div>
 
-                <div class="desktop-onboarding__workspace-actions" aria-label="Choose your first workspace">
+                <div
+                  class="desktop-onboarding__workspace-actions"
+                  aria-label={language.t("onboarding.chooseWorkspace")}
+                >
                   <button
                     type="button"
                     class="desktop-onboarding__workspace-action desktop-onboarding__workspace-action--primary"
@@ -317,7 +323,7 @@ export function DesktopOnboardingController(
                     </span>
                     <span>
                       <strong>{busy() === "blank" ? "Creating project…" : "Start a blank project"}</strong>
-                      <small>Create a clean workspace and connect folders later</small>
+                      <small>{language.t("onboarding.blank.hint")}</small>
                     </span>
                   </button>
                 </div>
@@ -325,7 +331,7 @@ export function DesktopOnboardingController(
                 <details class="desktop-onboarding__models">
                   <summary>
                     <span>
-                      <strong>Model access</strong>
+                      <strong>{language.t("onboarding.modelAccess")}</strong>
                       <small>Optional · set up now or later</small>
                     </span>
                     <span aria-hidden="true">+</span>
@@ -333,12 +339,12 @@ export function DesktopOnboardingController(
                   <div class="desktop-onboarding__model-options">
                     <section class="desktop-onboarding__model-option desktop-onboarding__model-option--key">
                       <div class="desktop-onboarding__model-copy">
-                        <strong>Provider key</strong>
-                        <small>Stored locally and billed directly by the provider.</small>
+                        <strong>{language.t("onboarding.providerKey")}</strong>
+                        <small>{language.t("onboarding.providerKeyHint")}</small>
                       </div>
                       <div class="desktop-onboarding__credentials">
                         <label>
-                          <span>Provider</span>
+                          <span>{language.t("onboarding.provider")}</span>
                           <select
                             value={provider()}
                             disabled={Boolean(busy())}
@@ -348,14 +354,14 @@ export function DesktopOnboardingController(
                           </select>
                         </label>
                         <label class="desktop-onboarding__field">
-                          <span>API key</span>
+                          <span>{language.t("onboarding.apiKey")}</span>
                           <TextField
                             hideLabel
                             type="password"
                             value={key()}
                             disabled={Boolean(busy())}
                             onChange={setKey}
-                            placeholder="Paste provider key"
+                            placeholder={language.t("onboarding.providerKeyPlaceholder")}
                             autocomplete="off"
                             onKeyDown={(event: KeyboardEvent) => {
                               if (event.key !== "Enter") return
@@ -389,7 +395,7 @@ export function DesktopOnboardingController(
               </Show>
 
               <footer class="desktop-onboarding__footer">
-                <span>Model setup is optional. Axiomics works with credentials and runtimes you control.</span>
+                <span>{language.t("onboarding.optional")}</span>
               </footer>
             </section>
           </main>

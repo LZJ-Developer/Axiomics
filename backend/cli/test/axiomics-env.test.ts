@@ -147,6 +147,10 @@ test("kernel env filtering keeps runtime configuration but drops credentials", (
     VIRTUAL_ENV: "/work/.venv",
     PYTHONPATH: "/work/python",
     R_LIBS: "/work/R",
+    PIP_TARGET: "/work/python/site-packages",
+    PIP_INDEX_URL: "https://mirror.example/simple",
+    PIP_TRUSTED_HOST: "mirror.example",
+    R_PROFILE_USER: "/work/Rprofile",
     ATLAS_API_KEY: "thk_atlas",
     OPENROUTER_API_KEY: "sk-or-user-owned",
     AWS_SECRET_ACCESS_KEY: "aws-secret",
@@ -160,6 +164,10 @@ test("kernel env filtering keeps runtime configuration but drops credentials", (
     VIRTUAL_ENV: "/work/.venv",
     PYTHONPATH: "/work/python",
     R_LIBS: "/work/R",
+    PIP_TARGET: "/work/python/site-packages",
+    PIP_INDEX_URL: "https://mirror.example/simple",
+    PIP_TRUSTED_HOST: "mirror.example",
+    R_PROFILE_USER: "/work/Rprofile",
   })
 })
 
@@ -168,6 +176,27 @@ test("kernel subprocesses cannot fall back to host Git config or credential prom
   expect(env.GIT_CONFIG_NOSYSTEM).toBe("1")
   expect(env.GIT_CONFIG_GLOBAL).toBe("/dev/null")
   expect(env.GIT_TERMINAL_PROMPT).toBe("0")
+})
+
+test("deployment trust-store settings reach interpreters but nothing else follows", () => {
+  // Bundled conda environments ship their own certifi copy. A deployment that
+  // installed an internal CA points these at the system bundle; dropping them
+  // would leave sandboxed Python unable to reach the same internal endpoints
+  // the shell can, while the host-side filters still reject credentials.
+  const trust = {
+    SSL_CERT_FILE: "/etc/pki/tls/certs/ca-bundle.crt",
+    SSL_CERT_DIR: "/etc/pki/tls/certs",
+    REQUESTS_CA_BUNDLE: "/etc/pki/tls/certs/ca-bundle.crt",
+    CURL_CA_BUNDLE: "/etc/pki/tls/certs/ca-bundle.crt",
+    PIP_CERT: "/etc/pki/tls/certs/ca-bundle.crt",
+    GIT_SSL_CAINFO: "/etc/pki/tls/certs/ca-bundle.crt",
+    NODE_EXTRA_CA_CERTS: "/etc/pki/ca-trust/source/anchors/axiomics-internal-ca.crt",
+  }
+  for (const filter of [Axiomics.filterEnvForSubprocess, Axiomics.filterEnvForKernel]) {
+    const filtered = filter({ PATH: "/usr/bin", ...trust, AWS_SECRET_ACCESS_KEY: "aws-secret" })
+    expect(filtered).toMatchObject(trust)
+    expect(filtered.AWS_SECRET_ACCESS_KEY).toBeUndefined()
+  }
 })
 
 test("kernel credential mask covers current Axiomics credential stores", () => {

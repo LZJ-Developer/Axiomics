@@ -2,6 +2,7 @@ import { For, Show, createSignal, createUniqueId, type JSX, type ParentComponent
 import { Icon } from "@axiomics/ui/icon"
 import type { IconProps } from "@axiomics/ui/icon"
 import { DropdownMenu } from "@axiomics/ui/dropdown-menu"
+import { englishT, type Translate } from "@/i18n/fallback"
 
 // These menus render inside the modal settings Dialog. Kobalte portals a
 // dropdown to document.body by default, which lands OUTSIDE the dialog's
@@ -152,32 +153,37 @@ export const SearchInput: Component<{
   onInput: (v: string) => void
   placeholder?: string
   ariaLabel?: string
-}> = (props) => (
-  <div class={`${controlBase} settings-control--search max-w-full`}>
-    <Icon name="magnifying-glass" size="small" class="text-icon-weak-base flex-shrink-0" />
-    <input
-      type="text"
-      aria-label={props.ariaLabel ?? props.placeholder ?? "Search"}
-      value={props.value}
-      placeholder={props.placeholder ?? "Search"}
-      spellcheck={false}
-      autocapitalize="off"
-      autocomplete="off"
-      class="min-w-0 flex-1 bg-transparent outline-none text-text-strong placeholder:text-text-weak/60"
-      onInput={(e) => props.onInput(e.currentTarget.value)}
-    />
-    <Show when={props.value}>
-      <button
-        type="button"
-        class="shrink-0 text-icon-weak-base hover:text-text-strong"
-        aria-label="Clear search"
-        onClick={() => props.onInput("")}
-      >
-        <Icon name="circle-x" size="small" />
-      </button>
-    </Show>
-  </div>
-)
+  /** Translator for embeds that render outside the LanguageProvider. */
+  t?: Translate
+}> = (props) => {
+  const t = () => props.t ?? englishT
+  return (
+    <div class={`${controlBase} settings-control--search max-w-full`}>
+      <Icon name="magnifying-glass" size="small" class="text-icon-weak-base flex-shrink-0" />
+      <input
+        type="text"
+        aria-label={props.ariaLabel ?? props.placeholder ?? t()("settings.search.default")}
+        value={props.value}
+        placeholder={props.placeholder ?? t()("settings.search.default")}
+        spellcheck={false}
+        autocapitalize="off"
+        autocomplete="off"
+        class="min-w-0 flex-1 bg-transparent outline-none text-text-strong placeholder:text-text-weak/60"
+        onInput={(e) => props.onInput(e.currentTarget.value)}
+      />
+      <Show when={props.value}>
+        <button
+          type="button"
+          class="shrink-0 text-icon-weak-base hover:text-text-strong"
+          aria-label={t()("settings.search.clear")}
+          onClick={() => props.onInput("")}
+        >
+          <Icon name="circle-x" size="small" />
+        </button>
+      </Show>
+    </div>
+  )
+}
 
 export interface FilterOption {
   id: string

@@ -8,6 +8,7 @@ import { Shell } from "@/shell/shell"
 import { Instance } from "@/project/instance"
 import { Axiomics } from "@/axiomics"
 import { SessionFilesystem } from "@/session/filesystem"
+import { PathSpace } from "@/session/path-space"
 import { Sandbox } from "@/sandbox/sandbox"
 import { KernelQueue } from "@/science/kernel/queue"
 import { KernelProcessIdentity } from "@/science/kernel/process"
@@ -326,19 +327,44 @@ class PythonKernel implements Kernel {
     this.cachePath = cachePath
 
     const interpreter = await findPython(opts?.binary)
-    const workspace = opts?.authorizedWritable
-      ? [...opts.authorizedWritable]
-      : opts?.sessionID
-        ? await SessionFilesystem.processWriteRoots(opts.sessionID)
-        : [Instance.directory, Instance.worktree]
-    const readable = opts?.authorizedReadable
-      ? [...opts.authorizedReadable]
-      : opts?.sessionID
-        ? await SessionFilesystem.processReadRoots(opts.sessionID)
-        : [Instance.directory, Instance.worktree]
+    const cwd = opts?.cwd ?? (opts?.sessionID ? await SessionFilesystem.workspace(opts.sessionID) : Instance.directory)
+    // Kernel code is arbitrary agent-authored code: it must see the same
+    // machine the shell does, or a path learned from the prompt fails here.
+    const view =
+      policy.enabled === false || Sandbox.backend() !== "bubblewrap"
+        ? undefined
+        : await PathSpace.view(opts?.sessionID ?? "", cwd)
+    const viewRoots = view ? PathSpace.hostRoots(view.roots) : []
+    const outsideView = (value: string) =>
+      !viewRoots.some((root) => value === root || value.startsWith(root + path.sep))
+    const workspace = (
+      opts?.authorizedWritable
+        ? [...opts.authorizedWritable]
+        : opts?.sessionID
+          ? await SessionFilesystem.processWriteRoots(opts.sessionID)
+          : [Instance.directory, Instance.worktree]
+    ).filter(outsideView)
+    const readable = (
+      opts?.authorizedReadable
+        ? [...opts.authorizedReadable]
+        : opts?.sessionID
+          ? await SessionFilesystem.processReadRoots(opts.sessionID)
+          : [Instance.directory, Instance.worktree]
+    ).filter(outsideView)
     // Confine the kernel to the workspace when the execution sandbox is on: the
     // runtime runs arbitrary agent-authored code — the same threat model as the
     // bash tool — so it must not be able to escape the boundary bash respects.
+    const env = Axiomics.kernelEnv(process.env, {
+      ...Axiomics.pythonThreadCapEnv(process.env),
+      ...(opts?.env ?? {}),
+      ATLAS_CLI_CONFIG_PATH: configPath,
+      MPLCONFIGDIR: path.join(cachePath, "matplotlib"),
+      XDG_CACHE_HOME: path.join(cachePath, "xdg"),
+      PYTHONPYCACHEPREFIX: path.join(cachePath, "pycache"),
+      PYTHONUNBUFFERED: "1",
+    })
+    if (view) view.env = PathSpace.payloadEnv(view, env)
+    const envOverlay = Sandbox.envOverlay(Instance.project.id)
     const sandboxed = Sandbox.wrapArgv({
       file: interpreter.binary,
       args: ["-u", scriptPath],
@@ -346,6 +372,9 @@ class PythonKernel implements Kernel {
       readable,
       extraWritable: [scriptPath, configPath, cachePath, ...(opts?.extraWritable ?? [])],
       unreadable: Axiomics.kernelSensitivePaths(),
+      view,
+      envOverlay,
+      path: view ? PathSpace.translateValue(view.roots, view.relocate, process.env.PATH ?? "") : undefined,
       options: {
         enabled: policy.enabled,
         network: opts?.sandboxNetwork ?? policy.network,
@@ -353,7 +382,6 @@ class PythonKernel implements Kernel {
         onUnavailable: policy.onUnavailable,
       },
     })
-    const cwd = opts?.cwd ?? (opts?.sessionID ? await SessionFilesystem.workspace(opts.sessionID) : Instance.directory)
     this.environment = {
       cwd,
       interpreter: {
@@ -380,15 +408,7 @@ class PythonKernel implements Kernel {
     try {
       proc = spawn(wrapped.file, wrapped.args, {
         cwd,
-        env: Axiomics.kernelEnv(process.env, {
-          ...Axiomics.pythonThreadCapEnv(process.env),
-          ...(opts?.env ?? {}),
-          ATLAS_CLI_CONFIG_PATH: configPath,
-          MPLCONFIGDIR: path.join(cachePath, "matplotlib"),
-          XDG_CACHE_HOME: path.join(cachePath, "xdg"),
-          PYTHONPYCACHEPREFIX: path.join(cachePath, "pycache"),
-          PYTHONUNBUFFERED: "1",
-        }),
+        env,
         stdio: ["pipe", "pipe", "pipe"],
         // Own process group so killing the kernel reaps its children too — a scanpy
         // run forks joblib/BLAS workers that would otherwise be orphaned and keep

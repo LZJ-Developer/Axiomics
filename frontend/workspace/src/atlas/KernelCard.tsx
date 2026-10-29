@@ -1,6 +1,7 @@
 import { Show, createEffect, createSignal, onCleanup, type JSX } from "solid-js"
 import { FileIcon } from "@axiomics/ui/file-icon"
 import { kernelLabel, kernelLanguageLabel, kernelMemoryLabel, type KernelStatus } from "@/atlas/kernel-runtime"
+import { englishT, type Translate } from "@/i18n/fallback"
 
 const age = (then: number | null, now: number) => {
   if (!then) return ""
@@ -47,7 +48,8 @@ const environment = (kernel: KernelStatus) => {
   return name
 }
 
-export function KernelCard(props: { kernel: KernelStatus; sample?: number }): JSX.Element {
+export function KernelCard(props: { kernel: KernelStatus; sample?: number; t?: Translate }): JSX.Element {
+  const t = () => props.t ?? englishT
   const [now, setNow] = createSignal(Date.now())
 
   createEffect(() => {
@@ -73,7 +75,7 @@ export function KernelCard(props: { kernel: KernelStatus; sample?: number }): JS
           <Show when={environment(props.kernel)}>{(name) => ` · ${name()}`}</Show>
         </span>
       </div>
-      <div class="compute-row__telemetry" aria-label="Current kernel resources">
+      <div class="compute-row__telemetry" aria-label={t()("compute.kernel.resources")}>
         <span data-metric="memory">{memory(props.kernel.resources?.memory_bytes)}</span>
         <span data-metric="cpu">{cores(props.kernel.resources?.cpu_percent)}</span>
       </div>

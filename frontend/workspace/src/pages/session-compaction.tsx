@@ -1,6 +1,7 @@
 import type { Message, Part } from "@axiomics/sdk/v2"
 import { Show, type JSX } from "solid-js"
 import { IconChevronDown } from "@/atlas/shared/Icon"
+import { useLanguage } from "@/context/language"
 import "./session-compaction.css"
 
 type Boundary = Extract<Part, { type: "compaction" }>
@@ -20,10 +21,11 @@ export function CompactionBoundary(props: {
   summary?: string
   onOpenFile: (path: string) => void
 }): JSX.Element {
+  const language = useLanguage()
   const detail = () => {
-    if (props.part?.trigger === "overflow") return "Recovered from a full context window"
-    if (props.part?.auto || props.part?.trigger === "proactive") return "Automatic context handoff"
-    return "Manual context handoff"
+    if (props.part?.trigger === "overflow") return language.t("session.compaction.recovered")
+    if (props.part?.auto || props.part?.trigger === "proactive") return language.t("session.compaction.automatic")
+    return language.t("session.compaction.manual")
   }
 
   return (
@@ -31,7 +33,7 @@ export function CompactionBoundary(props: {
       <summary>
         <span class="session-compaction__rule" aria-hidden="true" />
         <span class="session-compaction__label">
-          Context compacted
+          {language.t("session.compaction.label")}
           <span>{detail()}</span>
         </span>
         <IconChevronDown size={12} strokeWidth={1.5} />
@@ -41,15 +43,15 @@ export function CompactionBoundary(props: {
         <Show when={props.part?.focus}>
           {(focus) => (
             <div>
-              <strong>Focus</strong>
+              <strong>{language.t("session.compaction.focus")}</strong>
               <p>{focus()}</p>
             </div>
           )}
         </Show>
-        <Show when={props.summary} fallback={<p>The next turn continues from a compact context handoff.</p>}>
+        <Show when={props.summary} fallback={<p>{language.t("session.compaction.continue")}</p>}>
           {(summary) => (
             <div>
-              <strong>Handoff</strong>
+              <strong>{language.t("session.compaction.handoff")}</strong>
               <pre>{summary()}</pre>
             </div>
           )}
@@ -57,7 +59,7 @@ export function CompactionBoundary(props: {
         <Show when={props.part?.handoffFile}>
           {(path) => (
             <button type="button" class="session-compaction__file" onClick={() => props.onOpenFile(path())}>
-              Open {path()}
+              {language.t("session.compaction.open", { path: path() })}
             </button>
           )}
         </Show>

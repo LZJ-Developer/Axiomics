@@ -3,6 +3,7 @@ import { Dialog } from "@axiomics/ui/dialog"
 import { Icon } from "@axiomics/ui/icon"
 import { IconButton } from "@axiomics/ui/icon-button"
 import { useDialog } from "@axiomics/ui/context/dialog"
+import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import {
   SETTINGS_PANELS,
@@ -1374,6 +1375,7 @@ const SETTINGS_STYLES = `
 export const DialogSettings: Component<{ initial?: SettingsPanelId }> = (props) => {
   const platform = usePlatform()
   const dialog = useDialog()
+  const language = useLanguage()
   const initial = findPanel(props.initial ?? DEFAULT_PANEL)
 
   // Browser-style history so back/forward chevrons are real navigation.
@@ -1479,7 +1481,7 @@ export const DialogSettings: Component<{ initial?: SettingsPanelId }> = (props) 
     <>
       <style>{SETTINGS_STYLES}</style>
       <Dialog
-        title="Settings"
+        title={language.t("settings.dialog.title")}
         action={<span aria-hidden="true" />}
         size="x-large"
         class="settings-dialog"
@@ -1490,11 +1492,11 @@ export const DialogSettings: Component<{ initial?: SettingsPanelId }> = (props) 
           <nav
             ref={nav}
             class="settings-nav"
-            aria-label="Settings sections"
+            aria-label={language.t("settings.dialog.sections")}
             data-mobile-open={navOpen() ? "true" : undefined}
             data-dialog-escape-scope={navOpen() ? "true" : undefined}
           >
-            <div class="settings-nav__title">Settings</div>
+            <div class="settings-nav__title">{language.t("settings.dialog.nav")}</div>
             <button
               type="button"
               ref={navTrigger}
@@ -1504,14 +1506,14 @@ export const DialogSettings: Component<{ initial?: SettingsPanelId }> = (props) 
               onClick={() => setNavOpen((value) => !value)}
             >
               <Icon name={current().icon} size="small" />
-              <span>{current().title}</span>
+              <span>{language.t(current().titleKey)}</span>
               <Icon name="chevron-down" size="small" classList={{ "rotate-180": navOpen() }} />
             </button>
             <div id="settings-section-menu" class="settings-nav__sections" ref={navSections}>
               <For each={SETTINGS_SECTIONS}>
                 {(section) => (
                   <div class="settings-nav__section">
-                    <span class="settings-nav__label">{section.label}</span>
+                    <span class="settings-nav__label">{language.t(section.labelKey)}</span>
                     <For each={SETTINGS_PANELS.filter((p) => p.section === section.id)}>
                       {(panel) => (
                         <button
@@ -1526,7 +1528,7 @@ export const DialogSettings: Component<{ initial?: SettingsPanelId }> = (props) 
                           aria-current={current().id === panel.id ? "page" : undefined}
                         >
                           <Icon name={panel.icon} size="normal" class="flex-shrink-0" />
-                          <span class="truncate">{panel.title}</span>
+                          <span class="truncate">{language.t(panel.titleKey)}</span>
                         </button>
                       )}
                     </For>
@@ -1545,33 +1547,44 @@ export const DialogSettings: Component<{ initial?: SettingsPanelId }> = (props) 
             {/* Header */}
             <header class="settings-main__header">
               <div class="flex items-center gap-1 min-w-0">
-                <IconButton icon="arrow-left" variant="ghost" disabled={!canBack()} onClick={back} aria-label="Back" />
+                <IconButton
+                  icon="arrow-left"
+                  variant="ghost"
+                  disabled={!canBack()}
+                  onClick={back}
+                  aria-label={language.t("settings.dialog.back")}
+                />
                 <IconButton
                   icon="arrow-right"
                   variant="ghost"
                   disabled={!canForward()}
                   onClick={forward}
-                  aria-label="Forward"
+                  aria-label={language.t("settings.dialog.forward")}
                 />
               </div>
               <div class="settings-main__context" aria-live="polite">
-                <span>{current().title}</span>
+                <span>{language.t(current().titleKey)}</span>
               </div>
               <div class="flex items-center gap-1 flex-shrink-0">
                 <IconButton
                   icon={expanded() ? "collapse" : "expand"}
                   variant="ghost"
                   onClick={() => setExpanded((v) => !v)}
-                  aria-label={expanded() ? "Collapse" : "Expand"}
+                  aria-label={language.t(expanded() ? "settings.dialog.collapse" : "settings.dialog.expand")}
                 />
-                <IconButton icon="close" variant="ghost" onClick={() => dialog.close()} aria-label="Close" />
+                <IconButton
+                  icon="close"
+                  variant="ghost"
+                  onClick={() => dialog.close()}
+                  aria-label={language.t("settings.dialog.close")}
+                />
               </div>
             </header>
 
             {/* Body */}
             <div class="settings-main__viewport" data-panel={current().id}>
               <SettingsNavContext.Provider value={(id) => void navigate(id)}>
-                <SettingsPanelStack active={() => current().id} panels={mounted} />
+                <SettingsPanelStack active={() => current().id} panels={mounted} t={language.t} />
               </SettingsNavContext.Provider>
             </div>
           </div>

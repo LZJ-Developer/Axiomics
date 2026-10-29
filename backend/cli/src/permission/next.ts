@@ -1,6 +1,7 @@
 import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { Config } from "@/config/config"
+import { Flag } from "@/flag/flag"
 import { Identifier } from "@/id/id"
 import { Instance } from "@/project/instance"
 import { Storage } from "@/storage/storage"
@@ -96,6 +97,20 @@ export namespace PermissionNext {
    * automatic action. Full access retains its explicit no-prompt shell
    * behavior, while unknown permission kinds remain fail-closed.
    */
+  /** Permissions that only read: with the sandbox boundary in force they add
+   * no durable power, so an unattended deployment lets them through. A network
+   * read belongs here: a page fetched or a search run brings data in without
+   * touching the host, and anything that would turn egress into a side effect
+   * (a download onto disk, an image render, a compute job) asks its own
+   * permission. */
+  const UNATTENDED_READ = new Set(["webfetch", "websearch", "codesearch", "network"])
+
+  function externalRead(metadata: Record<string, unknown> | undefined) {
+    const filesystem = metadata?.filesystem
+    if (!filesystem || typeof filesystem !== "object") return false
+    return (filesystem as { access?: unknown }).access === "read"
+  }
+
   export function modeAction(input: {
     mode: ProjectAccess.Mode
     permission: string
@@ -108,7 +123,24 @@ export namespace PermissionNext {
     if (input.mode === "full" && input.permission === "bash") return input.configured
     if (level === "unknown") return "ask"
     if (input.mode === "ask" && level !== "passive") return "ask"
-    if (input.mode === "approve" && input.permission === "bash" && level === "risky") return "ask"
+    // Unattended deployments (one tenant, one container, an enforced OS
+    // sandbox) keep the sandbox but stop interrupting routine work: a shell
+    // command whose reach the sandbox already bounds, read access to paths
+    // outside the workspace, and network reads proceed without a human. Grants
+    // that widen the boundary (write to an external path, compute, environment
+    // mutation, provider spend or MCP endpoints) still ask their own
+    // permission.
+    if (input.mode === "approve" && input.permission === "bash" && level === "risky") {
+      return Flag.AXIOMICS_SANDBOX_UNATTENDED ? "allow" : "ask"
+    }
+    if (
+      input.mode === "approve" &&
+      Flag.AXIOMICS_SANDBOX_UNATTENDED &&
+      (UNATTENDED_READ.has(input.permission) ||
+        (input.permission === "external_directory" && externalRead(input.metadata)))
+    ) {
+      return "allow"
+    }
     if (input.mode === "approve" && level === "risky") {
       return input.granted === "allow" ? "allow" : "ask"
     }

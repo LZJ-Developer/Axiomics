@@ -168,7 +168,7 @@ describe("Storage Settings integration", () => {
     await script(workspace, source)
   })
 
-  test("reports scan failures instead of presenting unreadable storage as empty", async () => {
+  test("counts unreadable subtrees instead of blanking the whole panel", async () => {
     if (process.platform === "win32") return
     const workspace = await root()
     const source = [
@@ -179,16 +179,49 @@ describe("Storage Settings integration", () => {
       'const blocked = path.join(Global.Path.data, "blocked")',
       "await fs.mkdir(blocked, { recursive: true })",
       'await fs.writeFile(path.join(blocked, "payload.bin"), "payload")',
+      'await fs.writeFile(path.join(Global.Path.data, "readable.bin"), "readable")',
       "await fs.chmod(blocked, 0)",
+      "const settle = async (url = \"/\") => {",
+      '  let body = await (await StorageRoutes().request(url)).json()',
+      "  const deadline = Date.now() + 10_000",
+      '  while (body.scanning && Date.now() < deadline) { await Bun.sleep(20); body = await (await StorageRoutes().request("/")).json() }',
+      '  if (body.scanning) throw new Error("usage scan did not settle")',
+      "  return body",
+      "}",
+      "try {",
+      "  const body = await settle()",
+      '  if (body.scan_error) throw new Error(`one unreadable subtree blanked the panel: ${body.scan_error}`)',
+      '  if (body.updated_at === null) throw new Error("a partial scan reported no completion time")',
+      '  if (body.skipped_entries !== 1) throw new Error(`unreadable subtree was not counted: ${body.skipped_entries}`)',
+      '  if (!body.entries.some((entry) => entry.name === "readable.bin" && entry.bytes > 0)) throw new Error("readable data was not measured")',
+      '  if (JSON.stringify(body).includes(blocked)) throw new Error("usage response exposed the unreadable absolute path")',
+      "} finally { await fs.chmod(blocked, 0o700) }",
+      'const recovered = await settle("/?refresh=1")',
+      'if (recovered.skipped_entries !== 0) throw new Error(`skipped count did not recover: ${recovered.skipped_entries}`)',
+    ].join("\n")
+    await script(workspace, source)
+  })
+
+  test("reports a generic code, never the OS message, when the data directory cannot be read", async () => {
+    if (process.platform === "win32") return
+    const workspace = await root()
+    const source = [
+      `import { StorageRoutes } from ${JSON.stringify(routes)}`,
+      `import { Global } from ${JSON.stringify(globalModule)}`,
+      'import fs from "node:fs/promises"',
+      "await fs.chmod(Global.Path.data, 0)",
       "try {",
       '  let body = await (await StorageRoutes().request("/")).json()',
       "  const deadline = Date.now() + 10_000",
       '  while (body.scanning && Date.now() < deadline) { await Bun.sleep(20); body = await (await StorageRoutes().request("/")).json() }',
       '  if (body.scanning) throw new Error("usage scan did not settle")',
-      '  if (!body.scan_error) throw new Error("unreadable storage was silently reported as a successful scan")',
-      "} finally { await fs.chmod(blocked, 0o700) }",
-      'const cached = await (await StorageRoutes().request("/")).json()',
-      'if (cached.scanning || !cached.scan_error) throw new Error("the ordinary request did not honor the error retry TTL")',
+      '  if (body.scan_error !== "scan_failed") throw new Error(`scan error exposed server detail: ${body.scan_error}`)',
+      '  const wire = JSON.stringify(body)',
+      '  if (/EACCES|EPERM|permission denied|scandir/i.test(wire)) throw new Error(`response leaked the OS error: ${wire}`)',
+      '  if (body.updated_at !== null) throw new Error("a failed first scan reported a completion time")',
+      '  const cached = await (await StorageRoutes().request("/")).json()',
+      '  if (cached.scanning || cached.scan_error !== "scan_failed") throw new Error("the ordinary request did not honor the error retry TTL")',
+      "} finally { await fs.chmod(Global.Path.data, 0o700) }",
       'let retried = await (await StorageRoutes().request("/?refresh=1")).json()',
       'if (!retried.scanning || retried.scan_error) throw new Error("explicit retry did not start a truthful fresh scan")',
       "const deadline = Date.now() + 10_000",

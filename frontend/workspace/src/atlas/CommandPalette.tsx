@@ -5,6 +5,7 @@ import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { usePlatform } from "@/context/platform"
 import { useCommand } from "@/context/command"
+import { useLanguage } from "@/context/language"
 import { uiStore } from "@/atlas/store/ui"
 import { IconBolt, IconFile, IconFolder, IconMessageSquare, IconSearch } from "@/atlas/shared/Icon"
 import { projectHref, projectPathname, resolveProjectRoute } from "@/utils/project-route"
@@ -61,6 +62,7 @@ function reveal(messageID: string) {
 }
 
 export function CommandPalette(props: CommandPaletteProps): JSX.Element {
+  const language = useLanguage()
   const [query, setQuery] = createSignal("")
   const [highlighted, setHighlighted] = createSignal(0)
   const [hits, setHits] = createSignal<Hits>()
@@ -427,7 +429,7 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
               id="command-palette-results"
               class="command-palette__results"
               role="listbox"
-              aria-label="Commands and search results"
+              aria-label={language.t("palette.results")}
               aria-busy={searching()}
             >
               <For each={grouped()}>
@@ -475,22 +477,22 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
             <Show when={searching()}>
               <div class="command-palette__state command-palette__state--loading" role="status" aria-live="polite">
                 <span class="command-palette__state-indicator" aria-hidden="true" />
-                <span>Searching…</span>
+                <span>{language.t("palette.search.searching")}</span>
               </div>
             </Show>
             <Show when={short() && filtered().length === 0}>
               <div class="command-palette__state" role="status" aria-live="polite">
                 <span class="command-palette__state-copy">
-                  <strong>Type one more character</strong>
-                  <span>Project search starts after two characters.</span>
+                  <strong>{language.t("palette.search.typeMore")}</strong>
+                  <span>{language.t("palette.search.begins")}</span>
                 </span>
               </div>
             </Show>
             <Show when={searchError() && !searching()}>
               <div class="command-palette__state command-palette__state--error" role="alert">
                 <span class="command-palette__state-copy">
-                  <strong>Search unavailable</strong>
-                  <span>Project content could not be searched. Local actions are still available.</span>
+                  <strong>{language.t("palette.search.unavailable")}</strong>
+                  <span>{language.t("palette.search.unavailableHint")}</span>
                 </span>
                 <button type="button" onClick={() => setSearchRetry((value) => value + 1)}>
                   Retry
@@ -500,8 +502,8 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
             <Show when={!searching() && !searchError() && !short() && filtered().length === 0}>
               <div class="command-palette__state" role="status" aria-live="polite">
                 <span class="command-palette__state-copy">
-                  <strong>No matches</strong>
-                  <span>Try a session, message, file, or action.</span>
+                  <strong>{language.t("palette.search.noMatches")}</strong>
+                  <span>{language.t("palette.search.noMatchesHint")}</span>
                 </span>
               </div>
             </Show>

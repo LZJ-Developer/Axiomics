@@ -167,4 +167,17 @@ export const dict = {
   "ui.question.review.notAnswered": "(未回答)",
   "ui.question.multiHint": "(可多选)",
   "ui.question.custom.placeholder": "输入你的答案...",
+  "ui.message.revert": "从此处撤销",
+  "ui.permission.scopeGlobal": "全局",
+  "ui.permission.scopeOnce": "仅一次",
+
+  "ui.tool.details": "技术详情",
+  "ui.tool.kernel.stopped": "内核已停止",
+  "ui.messagePart.image.generate": "生成图片",
+  "ui.messagePart.image.saved": "图片已保存到工作区，打开文件即可预览。",
+  "ui.messagePart.plan.updated": "计划已更新",
+  "ui.messagePart.code": "代码",
+  "ui.messagePart.delegation.currentActivity": "当前活动",
+  "ui.messagePart.delegation.activity": "活动",
+  "ui.messagePart.delegation.details": "委派研究详情",
 } satisfies Partial<Record<Keys, string>>

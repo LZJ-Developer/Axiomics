@@ -45,7 +45,7 @@ describe("Storage settings recovery", () => {
 
     const source = readFileSync(fileURLToPath(new URL("./Storage.tsx", import.meta.url)), "utf8")
     expect(source).toContain("const [picker, setPicker] = createSignal<string>()")
-    expect(source).toContain("Enter a path manually below.")
+    expect(source).toContain('"settings.storage.picker.failed"')
     expect(source).toContain("<Show when={picker()}>")
     expect(source).not.toContain("setError(`The system folder picker could not open.")
   })
@@ -63,7 +63,7 @@ describe("Storage settings recovery", () => {
     })
 
     const source = readFileSync(fileURLToPath(new URL("./Storage.tsx", import.meta.url)), "utf8")
-    expect(source).toContain("Resume safely")
+    expect(source).toContain('"settings.storage.resume"')
     expect(source).not.toContain("aria-valuenow={relocation")
   })
 
@@ -72,8 +72,9 @@ describe("Storage settings recovery", () => {
 
     expect(source).toContain('"/settings/storage/cache"')
     expect(source).toContain('{ method: "DELETE" }')
-    expect(source).toContain("Local cache cleared")
-    expect(source).toContain('clearing() ? "Clearing…" : "Clear cache"')
+    expect(source).toContain('"settings.storage.cache.cleared"')
+    expect(source).toContain('"settings.storage.cache.clearing"')
+    expect(source).toContain('"settings.storage.cache.clear"')
     expect(source).not.toMatch(/account|sign[ -]?in|hosted service/iu)
   })
 })

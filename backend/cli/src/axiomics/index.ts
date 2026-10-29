@@ -114,6 +114,18 @@ const SAFE_ENV_KEYS = new Set([
   ...BYOK_LLM_ENV_KEYS,
   ...BYOK_LLM_BASE_URL_KEYS,
   ...SYNCED_SERVICE_ENV_KEYS,
+  // Trust-store configuration, not a credential: a deployment that installed
+  // its own CA (an internal mirror, a gateway) points these at the bundle it
+  // trusts. Bundled interpreters carry their own certifi copy, so without the
+  // inherited setting a conda environment cannot reach the same internal TLS
+  // endpoints the host can.
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "REQUESTS_CA_BUNDLE",
+  "CURL_CA_BUNDLE",
+  "PIP_CERT",
+  "GIT_SSL_CAINFO",
+  "NODE_EXTRA_CA_CERTS",
   "AXIOMICS_RUNTIME",
   "TEXMFCONFIG",
   "TEXMFVAR",
@@ -124,6 +136,16 @@ const KERNEL_RUNTIME_KEYS = new Set([
   "TEMP",
   "PYTHONPATH",
   "PYTHONHOME",
+  // Project-scoped install target the platform sets on every kernel and Bash
+  // launch; without it here the subprocess filter would drop it and a pip
+  // install would land somewhere no later command can import from.
+  "PIP_TARGET",
+  // Site-configured package sources. These are deployment config, not caller
+  // credentials: a mirror that needs a token still has to reach the installer
+  // that uses it, and the agent could set the same variable in a shell.
+  "PIP_INDEX_URL",
+  "PIP_TRUSTED_HOST",
+  "R_PROFILE_USER",
   "VIRTUAL_ENV",
   "CONDA_PREFIX",
   "CONDA_DEFAULT_ENV",
@@ -132,6 +154,16 @@ const KERNEL_RUNTIME_KEYS = new Set([
   "R_LIBS_USER",
   "LD_LIBRARY_PATH",
   "DYLD_LIBRARY_PATH",
+  // Same trust-store settings as SAFE_ENV_KEYS: kernels and language servers
+  // start the interpreter directly, so they need the deployment's CA bundle
+  // even when no shell is involved.
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "REQUESTS_CA_BUNDLE",
+  "CURL_CA_BUNDLE",
+  "PIP_CERT",
+  "GIT_SSL_CAINFO",
+  "NODE_EXTRA_CA_CERTS",
   "SYSTEMROOT",
   "WINDIR",
   "PATHEXT",

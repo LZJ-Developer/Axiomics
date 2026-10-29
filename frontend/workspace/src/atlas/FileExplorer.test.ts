@@ -33,10 +33,10 @@ describe("file explorer surface", () => {
     const value = source()
 
     expect(value).toContain("export function ExternalFileAccess")
-    expect(value).toContain('aria-label="File access required"')
+    expect(value).toContain('aria-label={language.t("files.access.required")}')
     expect(value).toContain("outside this project")
     expect(value).toContain("findFilesystemGrant")
-    expect(value).toContain("Connect folder")
+    expect(value).toContain("files.access.connectFolder")
     expect(value).toContain('class="external-file-access"')
     expect(value).not.toContain('"font-weight": 600')
   })

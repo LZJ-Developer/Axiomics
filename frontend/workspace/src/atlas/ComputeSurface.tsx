@@ -2,11 +2,14 @@ import type { Component, JSX } from "solid-js"
 import { Dynamic } from "solid-js/web"
 import { HostStrip } from "@/atlas/HostStrip"
 import { KernelPanel } from "@/atlas/KernelPanel"
+import { englishT, type Translate } from "@/i18n/fallback"
 import "@/atlas/ComputeSurface.css"
 
 type ComputeSurfaceProps = {
   strip?: Component
   kernels?: Component
+  /** Translator for embeds that render outside the LanguageProvider. */
+  t?: Translate
 }
 
 /**
@@ -18,14 +21,15 @@ type ComputeSurfaceProps = {
  * configuration, lifecycle controls, or completed-history workflow.
  */
 export function ComputeSurface(props: ComputeSurfaceProps = {}): JSX.Element {
+  const t = () => props.t ?? englishT
   const strip = props.strip ?? HostStrip
   const kernels = props.kernels ?? KernelPanel
 
   return (
-    <section class="activity-surface compute-surface" aria-label="Compute">
-      <Dynamic component={strip} />
+    <section class="activity-surface compute-surface" aria-label={t()("compute.surface")}>
+      <Dynamic component={strip} t={t()} />
       <div class="compute-surface__panel" data-compute-child="kernels">
-        <Dynamic component={kernels} />
+        <Dynamic component={kernels} t={t()} />
       </div>
     </section>
   )

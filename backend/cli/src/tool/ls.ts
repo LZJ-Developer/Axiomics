@@ -5,6 +5,7 @@ import DESCRIPTION from "./ls.txt"
 import { Instance } from "../project/instance"
 import { Ripgrep } from "../file/ripgrep"
 import { assertExternalDirectory, isAuthorizedPath, sessionToolDirectory } from "./external-directory"
+import { PathSpace } from "@/session/path-space"
 
 export const IGNORE_PATTERNS = [
   "node_modules/",
@@ -36,13 +37,16 @@ export const IGNORE_PATTERNS = [
 const LIMIT = 100
 
 export const ListTool = Tool.define("list", {
+  pathFields: ["path"],
+  localizeOutput: true,
   description: DESCRIPTION,
   parameters: z.object({
     path: z.string().describe("The absolute path to the directory to list (must be absolute, not relative)").optional(),
     ignore: z.array(z.string()).describe("List of glob patterns to ignore").optional(),
   }),
   async execute(params, ctx) {
-    let searchPath = path.resolve(await sessionToolDirectory(ctx), params.path || ".")
+    const requestedPath = params.path ? params.path : "."
+    let searchPath = path.resolve(await sessionToolDirectory(ctx), requestedPath)
     const retained = isAuthorizedPath(ctx.extra?.["fileAuthorization"]) ? ctx.extra?.["fileAuthorization"] : undefined
     if (retained && retained.path !== searchPath) {
       throw new Error("Retained directory authorization does not match the requested path")

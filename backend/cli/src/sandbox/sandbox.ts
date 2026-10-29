@@ -5,6 +5,7 @@ import { spawn, spawnSync } from "child_process"
 import { lazy } from "@/util/lazy"
 import { Log } from "@/util/log"
 import { Shell } from "@/shell/shell"
+import { ENV_OVERLAY_MOUNT, VIEW_TMP, overlayScript, relocate as relocatePrefix } from "./view"
 
 const log = Log.create({ service: "sandbox" })
 
@@ -62,10 +63,57 @@ export namespace Sandbox {
     destination: string
   }
 
+  /** A model-facing view of the workspace inside the Linux mount namespace.
+   * The process sees `home` as its home directory and the mounted roots under
+   * it; the host spellings of those roots are never mounted. Only bubblewrap
+   * can express this — Seatbelt has no mount namespace, so callers must not
+   * pass a view there. */
+  export interface View {
+    home: string
+    cwd: string
+    mounts: MountAlias[]
+    /** View mounts that must stay read-only (read-only connected folders). */
+    readOnlyMounts?: MountAlias[]
+    /** Rewrite every policy mount sourced from the host home to the synthetic
+     * home. Without this, runtime roots such as `~/.local/share/uv/python`
+     * remain bound at their host spelling, bwrap recreates the real user's
+     * home as a directory, and `ls /home` shows a name the model was never
+     * meant to learn. Masks are relocated too: a secret left at its host
+     * spelling would stay readable under the relocated mount. */
+    relocate?: { from: string; to: string }
+    /** Host roots that appear under a different spelling inside the namespace
+     * even though they are not the relocated home (the shared environment
+     * tree). Applied to argv and to path-like environment values. */
+    remap?: { from: string; to: string }[]
+    /** Variables the payload sees inside the namespace. They are applied with
+     * bwrap `--setenv`, never on the spawn environment: the host-side launch
+     * gate boots this binary before bwrap exists and must keep host spellings
+     * for its own data/config root. */
+    env?: Record<string, string>
+    /** Synthetic identity files generated in the plan's temp root. They keep
+     * `ls -l`, `id` and `hostname` consistent with the synthetic home instead
+     * of exposing the host account. */
+    identity?: { passwd: string; group: string; hostname: string }
+    /** The per-spawn temp root, mounted at a stable virtual path so TMPDIR and
+     * runtime shims do not name a host directory. */
+    temporary?: { source: string; destination: string }
+  }
+
   /** A ready-to-spawn argv: `spawn(file, args)` with no shell wrapping. */
   export interface Spec {
     file: string
     args: string[]
+  }
+
+  /** Per-project copy-on-write view of the shared environment tree. The
+   * overlay is mounted one level outside bwrap and bound over `target`, so
+   * installs land in `upper` while every project still shares one read-only
+   * lower. */
+  export interface EnvOverlay {
+    lower: string
+    upper: string
+    work: string
+    target: string
   }
 
   /** User-facing config knobs (mirrors Config.Sandbox, kept dependency-free). */
@@ -205,6 +253,46 @@ export namespace Sandbox {
   /** Allocate a temp root for one spawned sandbox. Sharing one per server lets
    * mutually untrusted projects/sessions read and overwrite each other's temp
    * files, even when the main workspace grants are disjoint. */
+  /** Identity files the namespace can mount over /etc/passwd, /etc/group and
+   * /etc/hostname. File ownership is still the real uid; only the *name* a
+   * listing prints changes, which is exactly what the model reads. */
+  function identityFiles(temporary: string, view: View) {
+    const directory = path.join(temporary, "identity")
+    fs.mkdirSync(directory, { recursive: true })
+    const uid = process.getuid?.()
+    const gid = process.getgid?.()
+    const read = (file: string) =>
+      fs
+        .readFileSync(file, "utf8")
+        .replace(/\n+$/, "")
+        .split("\n")
+        .filter(Boolean)
+    const replace = (file: string, id: number | undefined, line: string) => {
+      const lines = read(file)
+      if (id === undefined) return lines
+      const index = lines.findIndex((entry) => Number(entry.split(":")[2]) === id)
+      if (index === -1) return [...lines, line]
+      lines[index] = line
+      return lines
+    }
+    // Root's own entry names a privilege level, not a person; leave it alone.
+    const person = uid !== undefined && uid > 0
+    const passwd = person
+      ? replace("/etc/passwd", uid, `agent:x:${uid}:${gid}:Agent:${view.home}:/bin/bash`)
+      : read("/etc/passwd")
+    const group = person && gid !== undefined ? replace("/etc/group", gid, `agent:x:${gid}:`) : read("/etc/group")
+    const write = (name: string, lines: string[]) => {
+      const file = path.join(directory, name)
+      fs.writeFileSync(file, lines.join("\n") + "\n")
+      return file
+    }
+    return {
+      passwd: write("passwd", passwd),
+      group: write("group", group),
+      hostname: write("hostname", ["axiomics"]),
+    }
+  }
+
   function privateTemp(): string {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), `axiomics-sandbox-${process.pid}-`))
     fs.chmodSync(directory, 0o700)
@@ -232,7 +320,13 @@ export namespace Sandbox {
     for (const temporary of [...temporaryRoots]) cleanup({ temporary })
   })
 
-  function withTempEnvironment(argv: string[], temporary: string, runtime?: { python?: string; path?: string }) {
+  function withTempEnvironment(
+    argv: string[],
+    temporary: string,
+    runtime?: { python?: string; pythonVisible?: string; path?: string },
+    visibleTemporary?: string,
+  ) {
+    const visible = visibleTemporary ?? temporary
     const bin = (() => {
       if (!runtime?.python) return
       const value = path.join(temporary, "runtime", "bin")
@@ -250,15 +344,21 @@ export namespace Sandbox {
     const inherited = runtime?.path ?? process.env.PATH
     return [
       "/usr/bin/env",
-      `TMPDIR=${temporary}`,
-      `TMP=${temporary}`,
-      `TEMP=${temporary}`,
+      `TMPDIR=${visible}`,
+      `TMP=${visible}`,
+      `TEMP=${visible}`,
       // zsh does not use TMPDIR for here-documents or process substitutions.
       // Its independent TMPPREFIX defaults to /tmp/zsh, which is deliberately
       // read-only inside the sandbox. Keep those files in the same private,
       // owner-only temp root as every other runtime.
-      `TMPPREFIX=${path.join(temporary, "zsh")}`,
-      ...(bin ? [`PATH=${[bin, inherited].filter(Boolean).join(path.delimiter)}`] : []),
+      `TMPPREFIX=${path.join(visible, "zsh")}`,
+      ...(bin
+        ? [
+            `PATH=${[visibleTemporary ? path.join(visible, "runtime", "bin") : bin, inherited]
+              .filter(Boolean)
+              .join(path.delimiter)}`,
+          ]
+        : []),
       ...argv,
     ]
   }
@@ -659,6 +759,15 @@ export namespace Sandbox {
       "/etc/services",
       "/etc/localtime",
       "/etc/timezone",
+      // Distribution identity: `platform`, `lsb_release`, and most installers
+      // read these before choosing a package manager or a wheel tag. They name
+      // the runtime image, never a host user, and without them a normal
+      // `python -m platform` fails inside the namespace.
+      "/etc/os-release",
+      "/etc/lsb-release",
+      "/etc/debian_version",
+      "/etc/redhat-release",
+      "/etc/system-release",
       "/etc/ssl/certs",
       "/etc/ssl/cert.pem",
       "/etc/ssl/openssl.cnf",
@@ -671,6 +780,20 @@ export namespace Sandbox {
       ...runtimeMimeTypeFiles(),
     ].filter((value) => fs.existsSync(value))
   }
+
+  /** Can this process set a hostname in a fresh UTS namespace? Rootless
+   * containers cannot: the UTS namespace belongs to the container's user
+   * namespace, so a mapped root inside a nested one is not its owner. The
+   * tenant image therefore sets `--hostname axiomics` on the container and the
+   * sandbox omits the flags here. Probed once per process with the same bwrap
+   * the command will use. */
+  const hostnameCapable = lazy(() => {
+    if (process.platform !== "linux" || backend() !== "bubblewrap") return false
+    const probe = spawnSync("bwrap", ["--ro-bind", "/", "/", "--unshare-uts", "--hostname", "axiomics", "--", "/bin/true"], {
+      stdio: "ignore",
+    })
+    return probe.status === 0
+  })
 
   /** Preserve conventional merged-/usr aliases without exposing anything
    * beyond the corresponding host runtime directory. */
@@ -688,11 +811,20 @@ export namespace Sandbox {
     return args
   }
 
-  export function bubblewrapArgs(policy: Policy): string[] {
+  export function bubblewrapArgs(policy: Policy, view?: View, overlay?: EnvOverlay): string[] {
     // Bubblewrap creates an empty tmpfs root. Populate only runtime and policy
     // grants; never bind the host root, even read-only, because doing so exposes
     // every same-user secret to arbitrary project code.
     const args = ["--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"]
+    // The synthetic home is scaffolding, not a grant: it starts empty and only
+    // the mounts below give it contents. Creating it before the binds lets
+    // bwrap place nested destinations without inheriting a host directory.
+    if (view) args.push("--dir", view.home)
+    // Every policy path keeps its host source but may change its destination.
+    // The mapping is a pure prefix rewrite, so two sources can never collide
+    // on one destination.
+    const relocate = view?.relocate
+    const destination = (value: string) => relocatePrefix(relocate, value)
     if (policy.gpu) {
       for (const value of ["/sys/module/nvidia", "/sys/module/nvidia_uvm", "/sys/devices/system"]) {
         if (fs.existsSync(value)) args.push("--ro-bind", value, value)
@@ -705,9 +837,16 @@ export namespace Sandbox {
     }
     for (const value of linuxRuntimeMounts()) args.push("--ro-bind", value, value)
     args.push(...linuxRuntimeAliases())
-    for (const value of dedupe(policy.readable ?? [])) args.push("--ro-bind-try", value, value)
+    // Identity comes after the runtime mounts so it overrides the host's
+    // /etc/passwd and /etc/group rather than being hidden by them.
+    if (view?.identity) {
+      args.push("--ro-bind", view.identity.passwd, "/etc/passwd")
+      args.push("--ro-bind", view.identity.group, "/etc/group")
+      args.push("--ro-bind", view.identity.hostname, "/etc/hostname")
+    }
+    for (const value of dedupe(policy.readable ?? [])) args.push("--ro-bind-try", value, destination(value))
     for (const alias of safeMountAliases(policy.readableAliases)) {
-      args.push("--ro-bind-try", alias.source, alias.destination)
+      args.push("--ro-bind-try", alias.source, destination(alias.destination))
     }
     const tmpRoots = new Set(dedupe(["/tmp"]))
     for (const p of dedupe(policy.writable)) {
@@ -716,25 +855,42 @@ export namespace Sandbox {
       // still needs binding on top of the tmpfs, or its writes vanish.
       if (tmpRoots.has(p)) continue
       // --bind-try: don't abort if the source path doesn't exist.
-      args.push("--bind-try", p, p)
+      args.push("--bind-try", p, destination(p))
     }
     // Writable aliases deliberately follow readable aliases so an identical
     // destination is upgraded rather than accidentally left read-only.
     for (const alias of safeMountAliases(policy.writableAliases)) {
-      args.push("--bind-try", alias.source, alias.destination)
+      args.push("--bind-try", alias.source, destination(alias.destination))
+    }
+    // View mounts are the only spelling under which these sources appear. A
+    // destination outside the synthetic home would shadow a runtime path the
+    // policy already assembled, so refuse it rather than trusting the caller.
+    if (view?.temporary) args.push("--bind-try", view.temporary.source, view.temporary.destination)
+    for (const mount of view?.readOnlyMounts ?? []) {
+      if (!path.isAbsolute(mount.source) || !path.isAbsolute(mount.destination)) continue
+      if (mount.destination !== view!.home && !mount.destination.startsWith(view!.home + path.sep)) continue
+      args.push("--ro-bind-try", mount.source, mount.destination)
+    }
+    for (const mount of view?.mounts ?? []) {
+      if (!path.isAbsolute(mount.source) || !path.isAbsolute(mount.destination)) continue
+      if (mount.destination !== view!.home && !mount.destination.startsWith(view!.home + path.sep)) {
+        log.warn("refusing a sandbox view mount outside the synthetic home", { destination: mount.destination })
+        continue
+      }
+      args.push("--bind-try", mount.source, mount.destination)
     }
     // Re-apply immutable runtime mounts after every writable ancestor. A
     // writable project bind can otherwise hide an earlier nested ro-bind.
-    for (const value of dedupe(policy.readOnly ?? [])) args.push("--ro-bind-try", value, value)
+    for (const value of dedupe(policy.readOnly ?? [])) args.push("--ro-bind-try", value, destination(value))
     for (const alias of safeMountAliases(policy.readOnlyAliases)) {
-      args.push("--ro-bind-try", alias.source, alias.destination)
+      args.push("--ro-bind-try", alias.source, destination(alias.destination))
     }
     const unreadable = new Map<string, string>()
-    for (const value of dedupe(policy.unreadable ?? [])) unreadable.set(value, value)
+    for (const value of dedupe(policy.unreadable ?? [])) unreadable.set(destination(value), value)
     // A mask may safely name a broad source because only its file type is
     // consulted; the source is never mounted into the namespace.
     for (const alias of safeMountAliases(policy.unreadableAliases, true)) {
-      unreadable.set(alias.destination, alias.source)
+      unreadable.set(destination(alias.destination), alias.source)
     }
     for (const [destination, source] of unreadable) {
       // bwrap's *-try only tolerates a missing source. With /dev/null as the
@@ -746,6 +902,11 @@ export namespace Sandbox {
       if (fs.statSync(source).isDirectory()) args.push("--tmpfs", destination)
       else args.push("--ro-bind-try", "/dev/null", destination)
     }
+    // The per-project overlay replaces the read-only shared tree: the wrapper
+    // one level outside has already mounted the merged view at a fixed path,
+    // and binding it read-write is what lets an install land in the project's
+    // upper layer instead of the shared lower.
+    if (overlay) args.push("--bind", ENV_OVERLAY_MOUNT, overlay.target)
     // Bubblewrap creates missing destination ancestors in the empty root while
     // assembling nested mounts. Those directories are scaffolding, not policy
     // grants: for example, mounting /home/user/.bun read-only must not leave
@@ -754,6 +915,26 @@ export namespace Sandbox {
     // writable binds, the private /tmp tmpfs, /dev, and /proc keep their own
     // intended mount permissions.
     args.push("--remount-ro", "/")
+    // Applied after every mount: the child starts in the virtual workspace and
+    // reports the synthetic home, so `pwd`, `ls` and `~` never name the host.
+    if (view) {
+      // bubblewrap 0.4 has no --clearenv, so drop every inherited variable the
+      // view's environment does not define. Without this pass an allowlisted
+      // variable the caller never thought about (XDG_DATA_DIRS, a runtime
+      // root) reaches the payload still spelling the host home.
+      if (view.env) {
+        for (const key of Object.keys(process.env)) {
+          if (!(key in view.env)) args.push("--unsetenv", key)
+        }
+      }
+      args.push("--setenv", "HOME", view.home)
+      for (const [key, value] of Object.entries(view.env ?? {})) args.push("--setenv", key, value)
+      args.push("--chdir", view.cwd)
+      // A private UTS namespace keeps `hostname`/`uname -n` from naming the
+      // host machine. Where the environment cannot own a UTS namespace (the
+      // tenant container), the container's own hostname is already synthetic.
+      if (hostnameCapable()) args.push("--unshare-uts", "--hostname", "axiomics")
+    }
     // Bubblewrap shares the host network namespace only for an explicitly
     // network-enabled execution. Denied jobs receive an empty network
     // namespace and cannot reach either the internet or host loopback.
@@ -771,12 +952,34 @@ export namespace Sandbox {
   }
 
   /** Wrap an arbitrary argv under the active backend, or null when unavailable. */
-  function specForArgv(argv: string[], policy: Policy): Spec | null {
+  function specForArgv(argv: string[], policy: Policy, view?: View, overlay?: EnvOverlay): Spec | null {
     switch (backend()) {
       case "seatbelt":
         return { file: "sandbox-exec", args: ["-p", seatbeltProfile(policy), ...argv] }
-      case "bubblewrap":
-        return { file: "bwrap", args: [...bubblewrapArgs(policy), "--", ...argv] }
+      case "bubblewrap": {
+        const bwrap = ["bwrap", ...bubblewrapArgs(policy, view, overlay), "--", ...argv]
+        if (!overlay) return { file: "bwrap", args: bwrap.slice(1) }
+        // Assemble the overlay in a private user+mount namespace, then exec
+        // bwrap inside it. bwrap creates its own namespace on top and binds
+        // the merged tree in; the host kernel allows nested user namespaces,
+        // so this needs no extra container capability.
+        return {
+          file: "unshare",
+          args: [
+            "-Urm",
+            "--map-root-user",
+            "/bin/sh",
+            "-c",
+            overlayScript(),
+            "sh",
+            ENV_OVERLAY_MOUNT,
+            overlay.lower,
+            overlay.upper,
+            overlay.work,
+            ...bwrap,
+          ],
+        }
+      }
       default:
         return null
     }
@@ -812,6 +1015,21 @@ export namespace Sandbox {
   }
 
   /**
+   * Per-project copy-on-write view of the shared environment tree, or
+   * undefined when the deployment did not configure one. `upper` and `work`
+   * live under the project's data root, so installs persist across the
+   * project's sessions and disappear when the project is reclaimed.
+   */
+  export function envOverlay(projectID: string): EnvOverlay | undefined {
+    const lower = process.env.AXIOMICS_SHARED_ENVS
+    const root = process.env.AXIOMICS_ENV_OVERLAY_ROOT
+    if (!lower || !root) return
+    if (!/^[A-Za-z0-9_-]+$/.test(projectID)) return
+    const base = path.join(root, projectID)
+    return { lower, target: lower, upper: path.join(base, "upper"), work: path.join(base, "work") }
+  }
+
+  /**
    * Decide how to run a shell command given the sandbox config and the
    * workspace. Never throws unless `onUnavailable: "error"` and no backend
    * exists. The `cwd` is *not* granted write access unless it lies within the
@@ -831,7 +1049,12 @@ export namespace Sandbox {
     /** Exact host credential files to mask from the process. */
     unreadable?: string[]
     /** Canonical local runtime used by both persistent kernels and shell reruns. */
-    runtime?: { python?: string; path?: string }
+    runtime?: { python?: string; pythonVisible?: string; path?: string }
+    /** Model-facing home and mounted roots. Linux bubblewrap only; ignored by
+     * backends without mount namespaces. */
+    view?: View
+    /** Per-project copy-on-write view of the shared environment tree. */
+    envOverlay?: EnvOverlay
     options?: Options
   }): Plan {
     const { backend: b, warning } = decide(input.options)
@@ -849,7 +1072,27 @@ export namespace Sandbox {
         entrypoints: [input.shell, input.runtime?.python].filter((value): value is string => !!value),
         options: input.options!,
       })
-      const s = specForArgv(withTempEnvironment([input.shell, "-c", input.command], temporary, input.runtime), policy)!
+      const view =
+        b === "bubblewrap" && input.view
+          ? {
+              ...input.view,
+              identity: input.view.identity ?? identityFiles(temporary, input.view),
+              temporary: input.view.temporary ?? { source: temporary, destination: VIEW_TMP },
+            }
+          : undefined
+      const s = specForArgv(
+        withTempEnvironment(
+          [input.shell, "-c", input.command],
+          temporary,
+          input.runtime
+            ? { ...input.runtime, python: input.runtime.pythonVisible ?? input.runtime.python }
+            : undefined,
+          view?.temporary?.destination,
+        ),
+        policy,
+        view,
+        input.envOverlay,
+      )!
       log.info("sandboxing command", { backend: b, network: policy.network, writable: policy.writable.length })
       return { file: s.file, args: s.args, useShell: false, sandboxed: true, backend: b, temporary, warning }
     } catch (error) {
@@ -879,6 +1122,14 @@ export namespace Sandbox {
     extraWritable?: string[]
     /** Exact host credential files to mask from the process. */
     unreadable?: string[]
+    /** Model-facing view. Kernel payloads run arbitrary agent-authored code,
+     * so they need the same virtual home as the shell. */
+    view?: View
+    /** PATH the payload should receive. Callers pass the already-remapped
+     * value when a view is active. */
+    path?: string
+    /** Per-project copy-on-write view of the shared environment tree. */
+    envOverlay?: EnvOverlay
     options?: Options
   }): Wrapped {
     const { backend: b, warning } = decide(input.options)
@@ -897,7 +1148,50 @@ export namespace Sandbox {
         entrypoints: [input.file],
         options: input.options!,
       })
-      const s = specForArgv(withTempEnvironment([input.file, ...input.args], temporary), { ...policy, gpu: input.gpu })!
+      const view =
+        b === "bubblewrap" && input.view
+          ? {
+              ...input.view,
+              identity: input.view.identity ?? identityFiles(temporary, input.view),
+              temporary: input.view.temporary ?? { source: temporary, destination: VIEW_TMP },
+            }
+          : undefined
+      // The interpreter and generated script may live under the host home,
+      // which the view relocates. The policy was built from the host paths
+      // above; only the argv the payload executes is rewritten.
+      const relocate = view?.relocate
+      const remap = (value: string) => {
+        // Resolve first: the interpreter often sits behind an absolute symlink
+        // (a managed data-root link). The payload derives its install prefix
+        // from the path it was executed as, so it must name the canonical
+        // location that the policy actually mounted — otherwise Python looks
+        // for its stdlib under the symlink's host target and exits.
+        let resolved = value
+        try {
+          resolved = fs.realpathSync.native(value)
+        } catch {}
+        // The shared environment tree is mounted under its model spelling but
+        // is not part of the relocated home; its alias is applied first.
+        for (const alias of view?.remap ?? []) {
+          const moved = relocatePrefix(alias, resolved)
+          if (moved !== resolved) return moved
+          const lexical = relocatePrefix(alias, value)
+          if (lexical !== value) return lexical
+        }
+        if (!relocate) return value
+        return relocatePrefix(relocate, resolved)
+      }
+      const s = specForArgv(
+        withTempEnvironment(
+          [remap(input.file), ...input.args.map(remap)],
+          temporary,
+          { path: input.path },
+          view?.temporary?.destination,
+        ),
+        { ...policy, gpu: input.gpu },
+        view,
+        input.envOverlay,
+      )!
       log.info("sandboxing process", { backend: b, network: policy.network, writable: policy.writable.length })
       return { file: s.file, args: s.args, sandboxed: true, backend: b, temporary, warning }
     } catch (error) {

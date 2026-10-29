@@ -8,7 +8,9 @@ import { Global } from "@/global"
 import { DataRelocation } from "@/global/data-relocation"
 import { lazy } from "@/util/lazy"
 import { Lock } from "@/util/lock"
+import { Log } from "@/util/log"
 
+const log = Log.create({ service: "settings-storage" })
 const pointerPath = path.join(Global.Path.config, "data-location")
 
 function allocatedBytes(stat: NonNullable<Awaited<ReturnType<typeof fs.stat>>>) {
@@ -25,6 +27,15 @@ function missing(error: unknown) {
   return !!error && typeof error === "object" && "code" in error && error.code === "ENOENT"
 }
 
+/** A subtree the process may not read. Sandbox overlay work dirs are mode 000. */
+function denied(error: unknown) {
+  if (!error || typeof error !== "object" || !("code" in error)) return false
+  return error.code === "EACCES" || error.code === "EPERM"
+}
+
+/** How many paths the scan had to skip; reported so the totals are not read as exact. */
+type Skipped = { count: number }
+
 async function optional<T>(operation: Promise<T>): Promise<T | undefined> {
   return operation.catch((error) => {
     if (missing(error)) return undefined
@@ -32,8 +43,21 @@ async function optional<T>(operation: Promise<T>): Promise<T | undefined> {
   })
 }
 
-async function dirSize(target: string, seen: Set<string>): Promise<number> {
-  const entries = (await optional(fs.readdir(target, { withFileTypes: true }))) ?? []
+async function tolerated<T>(operation: Promise<T>, skipped: Skipped): Promise<T | undefined> {
+  return operation.catch((error) => {
+    if (missing(error)) return undefined
+    if (denied(error)) {
+      // One unreadable subtree (a bwrap overlay work dir, say) must not blank
+      // the whole panel. Count it and keep measuring what is readable.
+      skipped.count += 1
+      return undefined
+    }
+    throw error
+  })
+}
+
+async function dirSize(target: string, seen: Set<string>, skipped: Skipped): Promise<number> {
+  const entries = (await tolerated(fs.readdir(target, { withFileTypes: true }), skipped)) ?? []
   const directories: string[] = []
   const files: string[] = []
   for (const entry of entries) {
@@ -47,7 +71,7 @@ async function dirSize(target: string, seen: Set<string>): Promise<number> {
   for (let index = 0; index < files.length; index += 64) {
     const sizes = await Promise.all(
       files.slice(index, index + 64).map(async (file) => {
-        const stat = await optional(fs.stat(file))
+        const stat = await tolerated(fs.stat(file), skipped)
         if (!stat?.isFile()) return 0
         const identity = `${stat.dev}:${stat.ino}`
         if (seen.has(identity)) return 0
@@ -57,7 +81,7 @@ async function dirSize(target: string, seen: Set<string>): Promise<number> {
     )
     bytes += sizes.reduce((sum, size) => sum + size, 0)
   }
-  for (const directory of directories) bytes += await dirSize(directory, seen)
+  for (const directory of directories) bytes += await dirSize(directory, seen, skipped)
   return bytes
 }
 
@@ -84,12 +108,19 @@ const Usage = z.object({
   scanning: z.boolean(),
   updated_at: z.string().nullable(),
   scan_error: z.string().nullable(),
+  skipped_entries: z.number(),
   relocation: Relocation.nullable(),
   entries: z.array(z.object({ name: z.string(), path: z.string(), bytes: z.number(), kind: z.enum(["dir", "file"]) })),
 })
 
 type UsageEntry = z.infer<typeof Usage>["entries"][number]
-type ScanResult = { total_bytes: number; cache_bytes: number; entries: UsageEntry[]; updated_at: string }
+type ScanResult = {
+  total_bytes: number
+  cache_bytes: number
+  entries: UsageEntry[]
+  updated_at: string
+  skipped_entries: number
+}
 const usageScan: {
   root?: string
   generation: number
@@ -103,14 +134,15 @@ async function scanUsage(dataDir: string, cacheDir: string): Promise<ScanResult>
   const dirents = await fs.readdir(dataDir, { withFileTypes: true })
   const entries: UsageEntry[] = []
   const seen = new Set<string>()
+  const skipped: Skipped = { count: 0 }
   for (const entry of dirents
     .filter((item) => !item.isSymbolicLink())
     .toSorted((a, b) => a.name.localeCompare(b.name))) {
     const full = path.join(dataDir, entry.name)
-    const stat = entry.isDirectory() ? undefined : await optional(fs.stat(full))
+    const stat = entry.isDirectory() ? undefined : await tolerated(fs.stat(full), skipped)
     const identity = stat?.isFile() ? `${stat.dev}:${stat.ino}` : undefined
     const bytes = entry.isDirectory()
-      ? await dirSize(full, seen)
+      ? await dirSize(full, seen, skipped)
       : !stat?.isFile() || (identity && seen.has(identity))
         ? 0
         : allocatedBytes(stat)
@@ -123,12 +155,13 @@ async function scanUsage(dataDir: string, cacheDir: string): Promise<ScanResult>
     })
   }
   entries.sort((a, b) => b.bytes - a.bytes || a.name.localeCompare(b.name))
-  const cacheBytes = await dirSize(cacheDir, new Set())
+  const cacheBytes = await dirSize(cacheDir, new Set(), skipped)
   return {
     total_bytes: entries.reduce((sum, entry) => sum + entry.bytes, 0),
     cache_bytes: cacheBytes,
     entries,
     updated_at: new Date().toISOString(),
+    skipped_entries: skipped.count,
   }
 }
 
@@ -162,7 +195,11 @@ function refreshUsage(dataDir: string, cacheDir: string, refresh = false) {
     })
     .catch((error) => {
       if (usageScan.root !== root || usageScan.generation !== generation) return
-      usageScan.error = message(error)
+      // The raw error names absolute tenant paths and OS accounts. Keep it in
+      // the server log and tell the browser only that the scan failed; the UI
+      // says so generically and keeps showing the last good numbers.
+      log.warn("disk usage scan failed", { error: message(error) })
+      usageScan.error = "scan_failed"
       usageScan.errorAt = Date.now()
     })
     .finally(() => {
@@ -203,7 +240,9 @@ export const StorageRoutes = lazy(() =>
       }),
       validator("query", z.object({ refresh: z.literal("1").optional() })),
       async (c) => {
-        const dataDir = await fs.realpath(Global.Path.data)
+        // A resolve failure is reported through the scan's generic error code;
+        // throwing from realpath here would return the OS message verbatim.
+        const dataDir = await fs.realpath(Global.Path.data).catch(() => path.resolve(Global.Path.data))
         const cacheDir = await fs.realpath(Global.Path.cache).catch(() => path.resolve(Global.Path.cache))
         refreshUsage(dataDir, cacheDir, c.req.valid("query").refresh === "1")
         const [pointer, relocation] = await Promise.all([
@@ -226,6 +265,7 @@ export const StorageRoutes = lazy(() =>
           scanning: Boolean(usageScan.promise),
           updated_at: usageScan.value?.updated_at ?? null,
           scan_error: usageScan.error ?? null,
+          skipped_entries: usageScan.value?.skipped_entries ?? 0,
           relocation,
         })
       },
@@ -248,7 +288,7 @@ export const StorageRoutes = lazy(() =>
         await Promise.all(
           removable.map((entry) => fs.rm(path.join(Global.Path.cache, entry), { recursive: true, force: true })),
         )
-        const dataDir = await fs.realpath(Global.Path.data)
+        const dataDir = await fs.realpath(Global.Path.data).catch(() => path.resolve(Global.Path.data))
         const cacheDir = await fs.realpath(Global.Path.cache).catch(() => path.resolve(Global.Path.cache))
         invalidateUsage(`${dataDir}\0${cacheDir}`)
         return c.json({ ok: true as const, entries: removable.length })

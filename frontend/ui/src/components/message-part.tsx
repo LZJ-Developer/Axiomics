@@ -253,7 +253,7 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
     case "generate_image":
       return {
         icon: "photo",
-        title: "Generate image",
+        title: i18n.t("ui.messagePart.image.generate"),
         subtitle: input.output_path,
       }
     case "apply_patch":
@@ -272,7 +272,7 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
     case "planwrite":
       return {
         icon: "checklist",
-        title: "Plan updated",
+        title: i18n.t("ui.messagePart.plan.updated"),
       }
     case "todoread":
       return {
@@ -381,9 +381,7 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
   )
 
   const text = createMemo(() =>
-    (textPart()?.text ?? "")
-      .replace(/^(?:[ \t]*\r?\n)+/, "")
-      .replace(/(?:\r?\n[ \t]*)+$/, ""),
+    (textPart()?.text ?? "").replace(/^(?:[ \t]*\r?\n)+/, "").replace(/(?:\r?\n[ \t]*)+$/, ""),
   )
 
   createEffect(() => {
@@ -847,6 +845,7 @@ PART_MAPPING["reasoning"] = function ReasoningPartDisplay(props) {
 }
 
 function KernelTool(props: ToolProps & { language: "python" | "r"; label: "Python" | "R" }) {
+  const i18n = useI18n()
   const store = useData()
   const code = () => (typeof props.input.code === "string" ? props.input.code : "")
   const kernel = () => (typeof props.input.kernel === "string" ? props.input.kernel : props.language)
@@ -876,7 +875,7 @@ function KernelTool(props: ToolProps & { language: "python" | "r"; label: "Pytho
       <BasicTool
         {...props}
         icon="circle-check"
-        trigger={{ title: "Kernel stopped", subtitle: `${props.label} · ${kernel()}` }}
+        trigger={{ title: i18n.t("ui.tool.kernel.stopped"), subtitle: `${props.label} · ${kernel()}` }}
       />
     )
   }
@@ -919,7 +918,7 @@ function KernelTool(props: ToolProps & { language: "python" | "r"; label: "Pytho
         <details data-slot="kernel-tool-source">
           <summary>
             <span data-slot="kernel-tool-prompt">In [{count() ?? " "}]:</span>
-            <span>Code</span>
+            <span>{i18n.t("ui.messagePart.code")}</span>
           </summary>
           <div data-slot="kernel-tool-input-cell">
             <span data-slot="kernel-tool-prompt" aria-hidden="true">
@@ -1297,6 +1296,7 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "generate_image",
   render(props) {
+    const i18n = useI18n()
     const data = useData()
     const dialog = useDialog()
     const route = () =>
@@ -1341,7 +1341,7 @@ ToolRegistry.register({
               fallback={
                 <div data-slot="generated-image-placeholder">
                   <Icon name="photo" size="small" />
-                  <span>The image is saved to the workspace. Open the file to preview it.</span>
+                  <span>{i18n.t("ui.messagePart.image.saved")}</span>
                 </div>
               }
             >
@@ -1581,7 +1581,7 @@ ToolRegistry.register({
 
               <div data-slot="delegation-body">
                 <div data-slot="delegation-toolbar">
-                  <div data-slot="delegation-metrics" aria-label="Delegated research details">
+                  <div data-slot="delegation-metrics" aria-label={i18n.t("ui.messagePart.delegation.details")}>
                     <Show when={model()}>{(value) => <span>{value()}</span>}</Show>
                     <Show when={props.metadata.effort}>
                       <span>{sentenceCaseLabel(String(props.metadata.effort))} effort</span>
@@ -1602,7 +1602,7 @@ ToolRegistry.register({
                   {(item) => (
                     <div data-slot="delegation-current">
                       <Spinner />
-                      <span>Current activity</span>
+                      <span>{i18n.t("ui.messagePart.delegation.currentActivity")}</span>
                       <strong>{item().state.title || getToolInfo(item().tool).title}</strong>
                     </div>
                   )}
@@ -1621,7 +1621,7 @@ ToolRegistry.register({
 
                 <Show when={activity().length > 0}>
                   <div data-slot="delegation-activity">
-                    <span data-slot="delegation-section-label">Activity</span>
+                    <span data-slot="delegation-section-label">{i18n.t("ui.messagePart.delegation.activity")}</span>
                     <For each={activity()}>
                       {(group) => (
                         <div data-slot="delegation-activity-row" data-family={group.family}>
@@ -2000,6 +2000,7 @@ ToolRegistry.register({
 ToolRegistry.register({
   name: "planwrite",
   render(props) {
+    const i18n = useI18n()
     const todos = createMemo(() => {
       const meta = props.metadata?.todos
       if (Array.isArray(meta)) return meta
@@ -2015,7 +2016,7 @@ ToolRegistry.register({
         {...props}
         icon="checklist"
         trigger={{
-          title: "Plan updated",
+          title: i18n.t("ui.messagePart.plan.updated"),
           subtitle: subtitle(),
         }}
       />

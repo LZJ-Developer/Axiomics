@@ -95,7 +95,7 @@ describe("scientific tools settings state", () => {
     expect(capabilityState(hosted)).toMatchObject({ label: "Connected", tone: "neutral", action: undefined })
     expect(
       capabilityState({ ...hosted, current_availability: { local: "unavailable", hosted: "setup_needed" } }),
-    ).toMatchObject({ label: "Setup needed", action: "credentials" })
+    ).toMatchObject({ label: "Setup needed", action: undefined })
   })
 
   test("wires installation and account setup without remote catalog polling", async () => {
@@ -105,7 +105,8 @@ describe("scientific tools settings state", () => {
       Bun.file(new URL("./ScientificToolLogo.tsx", import.meta.url)).text(),
     ])
     expect(component).toContain("setupScientificTool")
-    expect(component).toContain('navigate(target() === "modal" ? "compute" : "credentials")')
+    expect(component).not.toContain('navigate(target() === "modal" ? "compute" : "credentials")')
+    expect(component).not.toContain("useSettingsNav")
     expect(loader).toContain('method: "POST"')
     expect(component).not.toContain("setInterval")
     expect(logos).toContain("https://github.com/scipy/scipy/")

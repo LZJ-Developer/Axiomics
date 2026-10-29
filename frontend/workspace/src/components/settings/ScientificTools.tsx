@@ -1,10 +1,10 @@
 import { Button } from "@axiomics/ui/button"
 import { IconButton } from "@axiomics/ui/icon-button"
 import { For, Show, createMemo, createSignal, onMount } from "solid-js"
+import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import { EmptyState, PanelBody, PanelHeader, PanelScroll, Section } from "./_shared"
-import { useSettingsNav } from "./nav"
 import {
   actionableScientificCapabilities,
   capabilityState,
@@ -17,9 +17,9 @@ import { ScientificToolLogo } from "./ScientificToolLogo"
 import "./scientific-tools.css"
 
 export default function ScientificTools() {
+  const language = useLanguage()
   const server = useServer()
   const platform = usePlatform()
-  const navigate = useSettingsNav()
   const [state, setState] = createSignal<ScientificToolsResponse>()
   const [problem, setProblem] = createSignal("")
   const [notice, setNotice] = createSignal("")
@@ -69,7 +69,10 @@ export default function ScientificTools() {
   return (
     <PanelScroll>
       <div class="scientific-tools-panel">
-        <PanelHeader title="Tools" description="Scientific tools you can run here or connect with your own account." />
+        <PanelHeader
+          title={language.t("settings.panel.scientificTools")}
+          description={language.t("settings.scientificTools.description")}
+        />
         <PanelBody>
           <Show when={problem()}>
             <div class="settings-alert" data-tone="critical" role="alert">
@@ -95,7 +98,11 @@ export default function ScientificTools() {
           </Show>
 
           <Show when={loading() && !state()}>
-            <div class="settings-panel-loading__rows" role="status" aria-label="Loading tools">
+            <div
+              class="settings-panel-loading__rows"
+              role="status"
+              aria-label={language.t("settings.scientificTools.loading")}
+            >
               <span />
               <span />
               <span />
@@ -108,17 +115,17 @@ export default function ScientificTools() {
               fallback={
                 <EmptyState
                   icon="flask"
-                  title="No runnable tools for this device"
-                  hint="Axiomics only lists tools with a real packaged runtime or a supported connection path."
+                  title={language.t("settings.scientificTools.empty.title")}
+                  hint={language.t("settings.scientificTools.empty.hint")}
                 />
               }
             >
               <Show when={local().length > 0}>
                 <Section
                   id="scientific-tools-local"
-                  title="Local science"
+                  title={language.t("settings.scientificTools.local.title")}
                   count={local().length}
-                  description="One exact Python environment powers these tools on this device. Install it once."
+                  description={language.t("settings.scientificTools.local.description")}
                 >
                   <div class="settings-card scientific-tools-list" role="list">
                     <For each={local()}>
@@ -139,33 +146,27 @@ export default function ScientificTools() {
               <Show when={hosted().length > 0}>
                 <Section
                   id="scientific-tools-connected"
-                  title="Connected science"
+                  title={language.t("settings.scientificTools.connected.title")}
                   count={hosted().length}
-                  description="NVIDIA tools share one API key in Credentials. Runs use your NVIDIA account, not your Ace balance."
+                  description={language.t("settings.scientificTools.connected.description")}
                 >
                   <div class="settings-card scientific-tools-list" role="list">
                     <For each={hosted()}>
-                      {(record) => {
-                        const target = () => scientificCapabilityTarget(record)
-                        return (
-                          <CapabilityRow
-                            record={record}
-                            busy={false}
-                            active={false}
-                            onAction={() => navigate(target() === "modal" ? "compute" : "credentials")}
-                            onOpenSource={() => platform.openLink(record.source.reference)}
-                          />
-                        )
-                      }}
+                      {(record) => (
+                        <CapabilityRow
+                          record={record}
+                          busy={false}
+                          active={false}
+                          onOpenSource={() => platform.openLink(record.source.reference)}
+                        />
+                      )}
                     </For>
                   </div>
                 </Section>
               </Show>
             </Show>
 
-            <p class="scientific-tools-footnote">
-              Only executable adapters are listed. Runs use this device or a service you connect directly.
-            </p>
+            <p class="scientific-tools-footnote">{language.t("settings.scientificTools.footnote")}</p>
           </Show>
         </PanelBody>
       </div>
@@ -177,17 +178,16 @@ function CapabilityRow(props: {
   record: ScientificCapabilityRecord
   busy: boolean
   active: boolean
-  onAction: () => void
+  onAction?: () => void
   onOpenSource: () => void
 }) {
+  const language = useLanguage()
   const status = () => capabilityState(props.record)
   const target = () => scientificCapabilityTarget(props.record)
   const actionLabel = () => {
-    if (props.active) return "Installing…"
-    if (status().action === "setup") return status().tone === "warning" ? "Repair" : "Install"
-    if (status().action === "credentials") return status().tone === "warning" ? "Review" : "Connect"
-    if (status().action === "compute") return "Configure"
-    return undefined
+    if (props.active) return language.t("settings.scientificTools.action.installing")
+    if (!props.onAction || status().action !== "setup") return undefined
+    return status().tone === "warning" ? language.t("settings.scientificTools.action.repair") : language.t("settings.scientificTools.action.install")
   }
   return (
     <article class="settings-row scientific-tool-row" data-target={target()} role="listitem">
@@ -213,7 +213,7 @@ function CapabilityRow(props: {
               size="small"
               variant="secondary"
               disabled={props.busy}
-              onClick={props.onAction}
+              onClick={() => props.onAction?.()}
             >
               {label()}
             </Button>
@@ -223,8 +223,8 @@ function CapabilityRow(props: {
           class="scientific-tool-source"
           icon="link"
           variant="ghost"
-          aria-label={`Open ${props.record.name} source`}
-          title={`Open ${props.record.name} source`}
+          aria-label={language.t("settings.scientificTools.openSource", { name: props.record.name })}
+          title={language.t("settings.scientificTools.openSource", { name: props.record.name })}
           onClick={props.onOpenSource}
         />
       </span>

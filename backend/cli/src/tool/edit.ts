@@ -18,6 +18,7 @@ import { Instance } from "../project/instance"
 import { Snapshot } from "@/snapshot"
 import { assertExternalDirectory, sessionToolDirectory } from "./external-directory"
 import { SafeFileIO } from "@/file/safe-io"
+import { PathSpace } from "@/session/path-space"
 import { AuthoritySignal } from "@/project/authority-signal"
 
 const MAX_DIAGNOSTICS_PER_FILE = 20
@@ -27,6 +28,7 @@ function normalizeLineEndings(text: string): string {
 }
 
 export const EditTool = Tool.define("edit", {
+  pathFields: ["filePath"],
   description: DESCRIPTION,
   parameters: z.object({
     filePath: z.string().describe("The absolute path to the file to modify"),
@@ -44,7 +46,8 @@ export const EditTool = Tool.define("edit", {
     }
 
     const directory = await sessionToolDirectory(ctx)
-    const requested = path.isAbsolute(params.filePath) ? params.filePath : path.join(directory, params.filePath)
+    const target = params.filePath
+    const requested = path.isAbsolute(target) ? target : path.join(directory, target)
     using access = await assertExternalDirectory(ctx, requested, { access: "write" })
     const filePath = access?.path ?? requested
     const write = (content: string, approved?: Awaited<ReturnType<typeof SafeFileIO.optional>>) =>

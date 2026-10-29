@@ -4,13 +4,17 @@ import { hostReading, type Capacity } from "@/atlas/host-instruments"
 import { identify } from "@/atlas/poll-identity"
 import { createKernelRouteRequester, kernelAPI } from "@/atlas/kernel-api"
 import { IconCpu } from "@/atlas/shared/Icon"
+import { englishT, type Translate } from "@/i18n/fallback"
 import "@/atlas/HostStrip.css"
 
 type HostStripProps = {
   request?: (path: string) => Promise<Response>
+  /** Translator for the standalone test seam (no LanguageProvider). */
+  t?: Translate
 }
 
 export function HostStrip(props: HostStripProps = {}): JSX.Element {
+  const t = () => props.t ?? englishT
   const request = props.request ?? useSDK().request
   const kernelRequest = createKernelRouteRequester(request)
   const client = identify()
@@ -47,26 +51,31 @@ export function HostStrip(props: HostStripProps = {}): JSX.Element {
   })
 
   return (
-    <section class="host-strip" aria-label="Current local compute" data-testid="host-strip" data-health={health()}>
+    <section
+      class="host-strip"
+      aria-label={t()("compute.host.current")}
+      data-testid="host-strip"
+      data-health={health()}
+    >
       <div class="host-strip__identity">
         <span class="host-strip__glyph" aria-hidden="true">
           <IconCpu size={16} strokeWidth={1.5} />
         </span>
         <div class="host-strip__copy">
-          <strong>This computer</strong>
+          <strong>{t()("compute.host.title")}</strong>
           <span>
             {health() === "loading"
-              ? "Reading compute…"
+              ? t()("compute.host.loading")
               : health() === "unavailable"
-                ? "Usage unavailable"
-                : `${reading().live} active · ${reading().running} running`}
+                ? t()("compute.host.unavailable")
+                : t()("compute.host.active", { live: reading().live, running: reading().running })}
           </span>
         </div>
       </div>
 
-      <div class="host-strip__resources" aria-label="Local compute resources">
+      <div class="host-strip__resources" aria-label={t()("compute.host.resources")}>
         <div class="host-strip__metric" data-host-tile="memory">
-          <span class="host-strip__label">Memory</span>
+          <span class="host-strip__label">{t()("compute.host.memory")}</span>
           <p>
             <strong class="host-strip__headline">{reading().headline}</strong>
             <span class="host-strip__total">{memoryTotal()}</span>
@@ -74,10 +83,10 @@ export function HostStrip(props: HostStripProps = {}): JSX.Element {
           <Meter value={reading().memoryFill} />
         </div>
         <div class="host-strip__metric" data-host-tile="cpu">
-          <span class="host-strip__label">CPU</span>
+          <span class="host-strip__label">{t()("compute.host.cpu")}</span>
           <p>
             <strong class="host-strip__cores-value">{reading().cores}</strong>
-            <span class="host-strip__total">cores</span>
+            <span class="host-strip__total">{t()("compute.host.cores")}</span>
           </p>
           <Meter value={reading().cpuFill} />
         </div>

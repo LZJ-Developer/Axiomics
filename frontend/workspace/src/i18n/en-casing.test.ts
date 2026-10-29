@@ -4,6 +4,26 @@ import { dict } from "./en"
 const deliberateFragments = new Set([
   "provider.connect.oauth.code.visit.suffix",
   "provider.connect.oauth.auto.visit.suffix",
+  // State fragments are composed into aria labels ("Protein screen, working"),
+  // so they must stay lowercase.
+  "session.tabs.working",
+  "session.tabs.unread",
+  "session.tabs.draftSaved",
+  "compute.host.cores",
+  // Units and trailing clauses that only ever follow a count ("12 results",
+  // "3 frames", "2 real cases available for complete replay").
+  "cases.available",
+  "cases.frames",
+  "files.resultOne",
+  "files.resultMany",
+  "files.versionOne",
+  "files.versionMany",
+  // Composed after an action ("Active just now")
+  "home.workbench.activity.justNow",
+  // Suffix inside "Page 3 of 9"
+  "pdf.page.total",
+  // Spinner status line, matching the lowercase monospace wordmark style.
+  "common.loadingEllipsis",
 ])
 
 describe("English interface copy", () => {

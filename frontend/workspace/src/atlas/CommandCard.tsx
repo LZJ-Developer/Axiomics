@@ -1,6 +1,7 @@
 import { createSignal, onCleanup, type JSX } from "solid-js"
 import { Icon } from "@axiomics/ui/icon"
 import { kernelMemoryLabel, type CommandStatus } from "@/atlas/kernel-runtime"
+import { englishT, type Translate } from "@/i18n/fallback"
 
 const memory = (value?: number) => {
   const label = kernelMemoryLabel(value)
@@ -20,21 +21,22 @@ const elapsed = (started: number, now: number) => {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
 }
 
-export function CommandCard(props: { command: CommandStatus; sample?: number }): JSX.Element {
+export function CommandCard(props: { command: CommandStatus; sample?: number; t?: Translate }): JSX.Element {
+  const t = () => props.t ?? englishT
   const [now, setNow] = createSignal(Date.now())
   const timer = setInterval(() => setNow(Date.now()), 1_000)
   onCleanup(() => clearInterval(timer))
 
   return (
     <article class="compute-row command-card" data-command-id={props.command.id} data-state="running">
-      <span class="compute-row__kind" aria-label="Shell command">
+      <span class="compute-row__kind" aria-label={t()("compute.command.kind")}>
         <Icon name="console" />
       </span>
       <div class="compute-row__copy">
         <strong title={props.command.description}>{props.command.description}</strong>
         <span>Running · {elapsed(props.command.started_at, now())}</span>
       </div>
-      <div class="compute-row__telemetry" aria-label="Current command resources">
+      <div class="compute-row__telemetry" aria-label={t()("compute.command.resources")}>
         <span data-metric="memory">{memory(props.command.resources?.memory_bytes)}</span>
         <span data-metric="cpu">{cores(props.command.resources?.cpu_percent)}</span>
       </div>

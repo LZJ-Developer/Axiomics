@@ -4,7 +4,7 @@ import { ManagedEnvironments } from "@/science/kernel/environment-manager"
 import { pythonEnvironment } from "@/science/kernel/interpreter"
 import type { KernelStartOptions } from "@/science/kernel/types"
 import { createHash } from "node:crypto"
-import { constants, existsSync, mkdirSync } from "node:fs"
+import { constants, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { access, readdir, realpath } from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
@@ -300,12 +300,50 @@ export namespace KernelEnvironmentMutation {
         ...(managed.env ?? {}),
         PIP_TARGET: packages,
         PYTHONPATH: [packages, managed.env?.PYTHONPATH, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+        ...(pythonIndexUrl() ? { PIP_INDEX_URL: pythonIndexUrl() } : {}),
+        ...(pythonTrustedHost() ? { PIP_TRUSTED_HOST: pythonTrustedHost() } : {}),
       },
       ...(allowMutation ? { extraWritable: [packages], sandboxNetwork: "allow" as const } : {}),
     }
   }
 
   /** Complete R start contract shared by all canonical entry points. */
+  /** A site's package sources. Long-tail installs are the one place a
+   * deployment's network position (an internal mirror, an air gap, a proxy)
+   * surfaces as a URL, so it is configuration rather than model knowledge: set
+   * it once for every session instead of letting each run rediscover a mirror
+   * or hardcode one. Unset keeps the tool's own default behaviour. */
+  export function pythonIndexUrl() {
+    return process.env.AXIOMICS_PIP_INDEX_URL?.trim() || undefined
+  }
+
+  export function cranMirror() {
+    return process.env.AXIOMICS_CRAN_MIRROR?.trim() || undefined
+  }
+
+  /** Internal mirrors are frequently plain HTTP, which pip refuses as an
+   * untrusted host. The allowlist is site configuration for the same reason as
+   * the index URL itself. */
+  export function pythonTrustedHost() {
+    return process.env.AXIOMICS_PIP_TRUSTED_HOST?.trim() || undefined
+  }
+
+  /** R has no environment variable for the repository list, and a
+   * non-interactive `install.packages()` against the default `@CRAN@` blocks on
+   * a mirror prompt no one is there to answer. Write the mirror to a profile R
+   * loads before the command runs, and return its path so callers can pass it
+   * as R_PROFILE_USER. Rewritten only when the mirror changed, so a site edit
+   * lands without touching an unchanged file. */
+  export function rProfile(environment: string) {
+    const mirror = cranMirror()
+    if (!mirror) return
+    const file = path.join(managedRoot("r", environment), "Rprofile")
+    const text = `options(repos = c(CRAN = ${JSON.stringify(mirror)}))\n`
+    mkdirSync(path.dirname(file), { recursive: true })
+    if (!existsSync(file) || readFileSync(file, "utf8") !== text) writeFileSync(file, text)
+    return file
+  }
+
   export async function rRuntime(allowMutation = false): Promise<KernelStartOptions> {
     // Same reasoning as pythonRuntime: the R starter needs conda-forge plus
     // bioconda, so on an isolated network it can never build. R has no project
@@ -316,10 +354,15 @@ export namespace KernelEnvironmentMutation {
     // the empty app-managed library for every default start and recover it
     // after cache cleanup; mutation authority is still required to write it.
     mkdirSync(packages, { recursive: true })
+    const profile = rProfile("r")
     return {
       ...managed,
       environmentName: "r",
-      env: { ...(managed.env ?? {}), R_LIBS_USER: packages },
+      env: {
+        ...(managed.env ?? {}),
+        R_LIBS_USER: packages,
+        ...(profile ? { R_PROFILE_USER: profile } : {}),
+      },
       ...(allowMutation ? { extraWritable: [packages], sandboxNetwork: "allow" as const } : {}),
     }
   }

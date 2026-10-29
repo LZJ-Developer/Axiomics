@@ -223,7 +223,8 @@ describe("frontier model canonicalization", () => {
       "Opus 5",
       "Kimi K3",
       "GLM 5.3",
-      "DeepSeek V4 Flash",
+      "DeepSeek V4 Pro",
+      "DeepSeek V4.1 Flash",
       "Fable 5",
       "Grok 4.6",
     ])

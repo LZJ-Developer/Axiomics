@@ -1,5 +1,6 @@
 import { lazy, type Component } from "solid-js"
 import type { IconProps } from "@axiomics/ui/icon"
+import type { dict as en } from "@/i18n/en"
 
 // ── Panel contract ──────────────────────────────────────────────────────────
 //
@@ -23,19 +24,14 @@ import type { IconProps } from "@axiomics/ui/icon"
 // HARD RULE: no dead buttons. A panel either wires to a real backend or omits
 // the control. Placeholder panels below ship with zero interactive controls.
 
-export type SettingsSection = "inference" | "capabilities" | "runtime" | "app"
+export type SettingsSection = "capabilities" | "runtime" | "app"
 
 // Source contract for every reachable Settings destination. Keep this list in
 // rail order; the registry contract test verifies that no panel can be added,
 // removed, or left without the shared layout audit silently.
 export const SETTINGS_PANEL_IDS = [
-  "models",
-  "local-models",
   "skills",
   "scientific-tools",
-  "connectors",
-  "credentials",
-  "compute",
   "permissions",
   "network",
   "sandbox",
@@ -50,6 +46,8 @@ export interface SettingsPanel {
   id: SettingsPanelId
   /** Title shown in the shell header + rail label. */
   title: string
+  /** Translation key for {@link title}. */
+  titleKey: keyof typeof en
   /** Icon name from `@axiomics/ui/icon`. */
   icon: IconProps["name"]
   /** Which rail group the row lives under. */
@@ -60,24 +58,11 @@ export interface SettingsPanel {
 
 // Order here is the render order in the rail (top→bottom within each section).
 export const SETTINGS_PANELS: SettingsPanel[] = [
-  // ── Inference ──
-  {
-    id: "models",
-    title: "Models",
-    icon: "models",
-    section: "inference",
-    component: lazy(() => import("./Models")),
-  },
-  {
-    id: "local-models",
-    title: "Local models",
-    icon: "brain",
-    section: "inference",
-    component: lazy(() => import("./LocalModels")),
-  },
+  // ── Capabilities ──
   {
     id: "skills",
     title: "Skills",
+    titleKey: "settings.panel.skills",
     icon: "flask",
     section: "capabilities",
     component: lazy(() => import("./Skills")),
@@ -85,35 +70,16 @@ export const SETTINGS_PANELS: SettingsPanel[] = [
   {
     id: "scientific-tools",
     title: "Tools",
+    titleKey: "settings.panel.scientificTools",
     icon: "atom",
     section: "capabilities",
     component: lazy(() => import("./ScientificTools")),
   },
-  {
-    id: "connectors",
-    title: "Connectors",
-    icon: "mcp",
-    section: "capabilities",
-    component: lazy(() => import("./Connectors")),
-  },
-  {
-    id: "credentials",
-    title: "Credentials",
-    icon: "providers",
-    section: "capabilities",
-    component: lazy(() => import("./Credentials")),
-  },
   // ── Runtime ──
-  {
-    id: "compute",
-    title: "Compute",
-    icon: "cpu",
-    section: "runtime",
-    component: lazy(() => import("./Compute")),
-  },
   {
     id: "permissions",
     title: "Permissions",
+    titleKey: "settings.panel.permissions",
     icon: "shield",
     section: "runtime",
     component: lazy(() => import("./Permissions")),
@@ -121,6 +87,7 @@ export const SETTINGS_PANELS: SettingsPanel[] = [
   {
     id: "network",
     title: "Network",
+    titleKey: "settings.panel.network",
     icon: "server",
     section: "runtime",
     component: lazy(() => import("./Network")),
@@ -128,26 +95,34 @@ export const SETTINGS_PANELS: SettingsPanel[] = [
   {
     id: "sandbox",
     title: "Sandbox",
+    titleKey: "settings.panel.sandbox",
     icon: "code",
     section: "runtime",
     component: lazy(() => import("./Sandbox")),
   },
   // ── App ──
-  { id: "storage", title: "Storage", icon: "folder", section: "app", component: lazy(() => import("./Storage")) },
+  {
+    id: "storage",
+    title: "Storage",
+    titleKey: "settings.panel.storage",
+    icon: "folder",
+    section: "app",
+    component: lazy(() => import("./Storage")),
+  },
   {
     id: "general",
     title: "General",
+    titleKey: "settings.panel.general",
     icon: "sliders",
     section: "app",
     component: lazy(() => import("./General")),
   },
 ]
 
-export const SETTINGS_SECTIONS: { id: SettingsSection; label: string }[] = [
-  { id: "inference", label: "Inference" },
-  { id: "capabilities", label: "Capabilities" },
-  { id: "runtime", label: "Runtime" },
-  { id: "app", label: "App" },
+export const SETTINGS_SECTIONS: { id: SettingsSection; label: string; labelKey: keyof typeof en }[] = [
+  { id: "capabilities", label: "Capabilities", labelKey: "settings.section.capabilities" },
+  { id: "runtime", label: "Runtime", labelKey: "settings.section.runtime" },
+  { id: "app", label: "App", labelKey: "settings.section.app" },
 ]
 
 export function findPanel(id: SettingsPanelId): SettingsPanel {
@@ -158,4 +133,4 @@ export async function preloadPanel(id: SettingsPanelId): Promise<void> {
   await findPanel(id).component.preload?.()
 }
 
-export const DEFAULT_PANEL: SettingsPanelId = "models"
+export const DEFAULT_PANEL: SettingsPanelId = "general"

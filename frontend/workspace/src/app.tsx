@@ -30,11 +30,14 @@ import "./app.css"
 
 const CasesGallery = lazy(() => import("@/pages/cases-gallery"))
 
-const Loading = () => (
-  <div class="size-full" style={{ display: "flex", "align-items": "center", "justify-content": "center" }}>
-    <AsciiSpinner label="loading…" color="var(--color-text-faint)" />
-  </div>
-)
+const Loading = () => {
+  const language = useLanguage()
+  return (
+    <div class="size-full" style={{ display: "flex", "align-items": "center", "justify-content": "center" }}>
+      <AsciiSpinner label={language.t("common.loadingEllipsis")} color="var(--color-text-faint)" />
+    </div>
+  )
+}
 
 const NotFound = () => (
   <main class="app-not-found" aria-labelledby="not-found-title">

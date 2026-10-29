@@ -4,6 +4,7 @@ import { FONT_MONO, FONT_SANS } from "@/styles/tokens"
 import { IconX } from "@/atlas/shared/Icon"
 import { AgentIcon } from "@/atlas/shared/AgentIcon"
 import { useCommand } from "@/context/command"
+import { useLanguage } from "@/context/language"
 
 interface HelpOverlayProps {
   open: boolean
@@ -35,6 +36,7 @@ const SECTIONS: Array<{ title: string; rows: Array<{ keys: string[]; label: stri
 ]
 
 export function HelpOverlay(props: HelpOverlayProps): JSX.Element {
+  const language = useLanguage()
   const command = useCommand()
   let closeRef: HTMLButtonElement | undefined
   let restoreFocus: HTMLElement | undefined
@@ -98,7 +100,7 @@ export function HelpOverlay(props: HelpOverlayProps): JSX.Element {
             <Kobalte.CloseButton
               ref={closeRef}
               type="button"
-              aria-label="Close keyboard shortcuts"
+              aria-label={language.t("shortcuts.close")}
               style={{
                 all: "unset",
                 "box-sizing": "border-box",

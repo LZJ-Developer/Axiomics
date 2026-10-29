@@ -1,12 +1,12 @@
 import { createSignal } from "solid-js"
 import { SettingsPanelStack } from "./panel-stack"
 
-export function createPanelStackFixture(onReady: (select: (id: "models" | "network") => void) => void) {
-  const [active, setActive] = createSignal<"models" | "network">("models")
-  const mounts = { models: 0, network: 0 }
-  const Models = () => {
-    mounts.models += 1
-    return <input aria-label="Model filter" value="remember me" />
+export function createPanelStackFixture(onReady: (select: (id: "permissions" | "network") => void) => void) {
+  const [active, setActive] = createSignal<"permissions" | "network">("permissions")
+  const mounts = { permissions: 0, network: 0 }
+  const Permissions = () => {
+    mounts.permissions += 1
+    return <input aria-label="Permission filter" value="remember me" />
   }
   const Network = () => {
     mounts.network += 1
@@ -20,7 +20,7 @@ export function createPanelStackFixture(onReady: (select: (id: "models" | "netwo
       <SettingsPanelStack
         active={active}
         panels={() => [
-          { id: "models", component: Models },
+          { id: "permissions", component: Permissions },
           { id: "network", component: Network },
         ]}
       />

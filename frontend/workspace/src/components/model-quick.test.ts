@@ -16,14 +16,14 @@ const model = (
 })
 
 describe("curated composer models", () => {
-  test("interleaves connected choices and placeholders in DOM order before explicit exceptions", () => {
+  test("lists only the models a configured provider serves, in roster order", () => {
     const choice = (key: string) => ({ key })
     const rows = curateQuickModelRows([
       choice("openai/gpt-5-6-sol"),
       choice("openai/gpt-5-6-terra"),
       choice("anthropic/claude-opus-5"),
       choice("moonshotai/kimi-k3"),
-      choice("deepseek/deepseek-v4-flash"),
+      choice("deepseek/deepseek-flash"),
       choice("google/gemini-3-6-flash"),
     ])
 
@@ -32,33 +32,18 @@ describe("curated composer models", () => {
       "openai/gpt-5-6-terra",
       "anthropic/claude-opus-5",
       "moonshotai/kimi-k3",
-      "zai/glm-5-3",
-      "deepseek/deepseek-v4-flash",
-      "anthropic/claude-fable-5",
-      "xai/grok-4-6",
+      "deepseek/deepseek-flash",
       "google/gemini-3-6-flash",
     ])
-    expect(rows.map((row) => row.kind)).toEqual([
-      "choice",
-      "choice",
-      "choice",
-      "choice",
-      "unavailable",
-      "choice",
-      "unavailable",
-      "unavailable",
-      "choice",
-    ])
+    expect(rows.every((row) => row.kind === "choice")).toBe(true)
   })
 
-  test("omits connected models hidden by the user while retaining truly unavailable placeholders", () => {
+  test("never advertises a roster model that no configured provider serves", () => {
     const choice = (key: string) => ({ key })
-    const rows = curateQuickModelRows([choice("openai/gpt-5-6-sol"), choice("anthropic/claude-opus-5")], {
-      hidden: new Set(["openai/gpt-5-6-terra"]),
-    })
+    const rows = curateQuickModelRows([choice("deepseek/deepseek-v4-pro")])
 
-    expect(rows.map((row) => row.key)).not.toContain("openai/gpt-5-6-terra")
-    expect(rows.find((row) => row.key === "zai/glm-5-3")?.kind).toBe("unavailable")
+    expect(rows.map((row) => row.key)).toEqual(["deepseek/deepseek-v4-pro"])
+    expect(rows.some((row) => row.key === "zai/glm-5-3")).toBe(false)
   })
 
   test("moves pinned roster and catalog choices ahead of the default roster", () => {

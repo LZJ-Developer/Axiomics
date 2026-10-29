@@ -3,6 +3,7 @@ import { Dialog } from "@axiomics/ui/dialog"
 import { useDialog } from "@axiomics/ui/context/dialog"
 import { IconRefresh, IconArrowRight } from "@/atlas/shared/Icon"
 import { useGlobalSDK } from "@/context/global-sdk"
+import { useLanguage } from "@/context/language"
 import { resolveServerRoute } from "@/config/server-url"
 import "./FdaBanner.css"
 
@@ -56,6 +57,7 @@ const STEP_BODY: Record<"mac" | "win" | "linux", string> = {
  * compact recovery sheet with a deliberate settings link and recheck.
  */
 export function FdaChip(): JSX.Element {
+  const language = useLanguage()
   const sdk = useGlobalSDK()
   const [dismissed, setDismissed] = createSignal(
     typeof localStorage !== "undefined" && localStorage.getItem(DISMISS_KEY) === "1",
@@ -94,9 +96,14 @@ export function FdaChip(): JSX.Element {
 
   return (
     <Show when={!dismissed() && !probe.loading && probe()?.fda === false}>
-      <button type="button" class="folder-access-chip" onClick={openSheet} title="Project folder access is blocked">
+      <button
+        type="button"
+        class="folder-access-chip"
+        onClick={openSheet}
+        title={language.t("files.access.blockedTitle")}
+      >
         <span class="folder-access-chip__dot" aria-hidden="true" />
-        Folder access
+        {language.t("files.access.folderAccess")}
       </button>
     </Show>
   )
@@ -107,16 +114,17 @@ function FdaSheet(props: {
   onRecheck: () => Promise<void>
   onDismiss: () => void
 }): JSX.Element {
+  const language = useLanguage()
   const url = () => SETTINGS_URL[props.os]
   const [busy, setBusy] = createSignal(false)
   return (
     <Dialog title={STEP_TITLE[props.os]} description={STEP_BODY[props.os]} class="folder-access-dialog" fit transition>
-      <section class="folder-access-sheet" aria-label="Folder access recovery">
+      <section class="folder-access-sheet" aria-label={language.t("files.access.recovery")}>
         <div class="folder-access-status">
           <span class="folder-access-status__dot" aria-hidden="true" />
           <span>
-            <strong>Protected folders are unavailable</strong>
-            <small>You can keep working with folders this process is allowed to read.</small>
+            <strong>{language.t("files.access.protectedUnavailable")}</strong>
+            <small>{language.t("files.access.protectedHint")}</small>
           </span>
         </div>
         <Show when={props.os === "mac"}>
@@ -125,7 +133,7 @@ function FdaSheet(props: {
               <span>Open Privacy &amp; Security → Full Disk Access.</span>
             </li>
             <li>
-              <span>Enable the terminal or desktop app you used to launch Axiomics.</span>
+              <span>{language.t("files.access.enableTerminal")}</span>
             </li>
             <li>
               <span>
@@ -133,7 +141,7 @@ function FdaSheet(props: {
               </span>
             </li>
             <li>
-              <span>Quit and relaunch Axiomics, then recheck access.</span>
+              <span>{language.t("files.access.relaunch")}</span>
             </li>
           </ol>
         </Show>

@@ -11,9 +11,9 @@ test("show-steps expansion survives navigation and reloads", () => {
 })
 
 test("delegated sessions expose parent and sibling navigation", () => {
-  expect(source).toContain("Delegated agent")
-  expect(source).toContain('aria-label="Back to parent session"')
-  expect(source).toContain('aria-label="Previous delegated agent"')
-  expect(source).toContain('aria-label="Next delegated agent"')
+  expect(source).toContain('language.t("session.delegated.label")')
+  expect(source).toContain('language.t("session.delegated.back")')
+  expect(source).toContain('language.t("session.delegated.previous")')
+  expect(source).toContain('language.t("session.delegated.next")')
   expect(source).toContain("childSessions().length")
 })

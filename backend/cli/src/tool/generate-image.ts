@@ -286,6 +286,7 @@ function requestError(status: number, body: OpenRouterImage | undefined, raw: st
 }
 
 export const GenerateImageTool = Tool.define("generate_image", {
+  pathFields: ["output_path", "input_path"],
   description:
     "Generate or edit an image with Gemini 3 Pro Image using the user's connected Gemini or OpenRouter account. Saves the image directly in the connected workspace.",
   parameters: z.object({

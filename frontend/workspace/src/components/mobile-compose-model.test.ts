@@ -73,7 +73,7 @@ describe("mobile compose and model sheets", () => {
     expect(settings).toContain('placement="top-end"')
     expect(settings).toContain("data-mobile-model-settings-overlay")
     expect(settings).toContain('class="model-settings-popover__close"')
-    expect(settings).toContain('props.kind === "model" ? "model selector" : "model options"')
+    expect(settings).toContain('props.kind === "model" ? "model.close.model" : "model.close.options"')
     expect(settings).toContain('target?.scrollIntoView({ block: "nearest" })')
     expect(settings).not.toContain("target?.focus({ preventScroll: true })")
     expect(settings).toContain("local.model.variant.set")

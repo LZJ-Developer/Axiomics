@@ -18,12 +18,23 @@ const server = await createServer({
     resolve: { conditions: ["browser", "production"] },
   },
 })
-const [subject, web] = await Promise.all([
+const [subject, language, platform, web] = await Promise.all([
   server.ssrLoadModule("/src/components/model-settings-popover.tsx") as Promise<
     typeof import("./model-settings-popover")
   >,
+  server.ssrLoadModule("/src/context/language.tsx") as Promise<typeof import("@/context/language")>,
+  server.ssrLoadModule("/src/context/platform.tsx") as Promise<typeof import("@/context/platform")>,
   server.ssrLoadModule("solid-js/web") as Promise<typeof import("solid-js/web")>,
 ])
+
+const platformValue = {
+  platform: "web" as const,
+  openLink() {},
+  back() {},
+  forward() {},
+  restart: async () => {},
+  notify: async () => {},
+}
 const cleanups: Array<() => void> = []
 
 afterAll(() => server.close())
@@ -36,7 +47,22 @@ afterEach(() => {
 const mount = (view: () => JSX.Element) => {
   const host = document.createElement("div")
   document.body.append(host)
-  cleanups.push(web.render(view, host))
+  cleanups.push(
+    web.render(
+      () =>
+        platform.PlatformProvider({
+          value: platformValue,
+          get children() {
+            return language.LanguageProvider({
+              get children() {
+                return view()
+              },
+            })
+          },
+        }),
+      host,
+    ),
+  )
   return host
 }
 

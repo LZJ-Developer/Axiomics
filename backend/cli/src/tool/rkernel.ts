@@ -8,6 +8,7 @@ import { Shell } from "@/shell/shell"
 import { Instance } from "@/project/instance"
 import { Axiomics } from "@/axiomics"
 import { SessionFilesystem } from "@/session/filesystem"
+import { PathSpace } from "@/session/path-space"
 import { Sandbox } from "@/sandbox/sandbox"
 import { KernelQueue } from "@/science/kernel/queue"
 import { KernelProcessIdentity } from "@/science/kernel/process"
@@ -258,20 +259,38 @@ class RKernel implements Kernel {
     await Bun.write(configPath, "{}\n")
     this.scriptPath = scriptPath
     this.configPath = configPath
-    const workspace = opts?.authorizedWritable
-      ? [...opts.authorizedWritable]
-      : opts?.sessionID
-        ? await SessionFilesystem.processWriteRoots(opts.sessionID)
-        : [Instance.directory, Instance.worktree]
-    const readable = opts?.authorizedReadable
-      ? [...opts.authorizedReadable]
-      : opts?.sessionID
-        ? await SessionFilesystem.processReadRoots(opts.sessionID)
-        : [Instance.directory, Instance.worktree]
+    const cwd = opts?.cwd ?? (opts?.sessionID ? await SessionFilesystem.workspace(opts.sessionID) : Instance.directory)
+    const view =
+      policy.enabled === false || Sandbox.backend() !== "bubblewrap"
+        ? undefined
+        : await PathSpace.view(opts?.sessionID ?? "", cwd)
+    const viewRoots = view ? PathSpace.hostRoots(view.roots) : []
+    const outsideView = (value: string) =>
+      !viewRoots.some((root) => value === root || value.startsWith(root + path.sep))
+    const workspace = (
+      opts?.authorizedWritable
+        ? [...opts.authorizedWritable]
+        : opts?.sessionID
+          ? await SessionFilesystem.processWriteRoots(opts.sessionID)
+          : [Instance.directory, Instance.worktree]
+    ).filter(outsideView)
+    const readable = (
+      opts?.authorizedReadable
+        ? [...opts.authorizedReadable]
+        : opts?.sessionID
+          ? await SessionFilesystem.processReadRoots(opts.sessionID)
+          : [Instance.directory, Instance.worktree]
+    ).filter(outsideView)
 
     // Confine the kernel to the workspace when the execution sandbox is on: the R
     // kernel runs arbitrary agent-authored code — the same threat model as the
     // bash tool — so it must respect the same boundary.
+    const env = Axiomics.kernelEnv(process.env, {
+      ...(opts?.env ?? {}),
+      ATLAS_CLI_CONFIG_PATH: configPath,
+    })
+    if (view) view.env = PathSpace.payloadEnv(view, env)
+    const envOverlay = Sandbox.envOverlay(Instance.project.id)
     const sandboxed = Sandbox.wrapArgv({
       file: interpreter.binary,
       args: ["--vanilla", scriptPath],
@@ -279,6 +298,9 @@ class RKernel implements Kernel {
       readable,
       extraWritable: [scriptPath, configPath, ...(opts?.extraWritable ?? [])],
       unreadable: Axiomics.kernelSensitivePaths(),
+      view,
+      envOverlay,
+      path: view ? PathSpace.translateValue(view.roots, view.relocate, process.env.PATH ?? "") : undefined,
       options: {
         enabled: policy.enabled,
         network: opts?.sandboxNetwork ?? policy.network,
@@ -286,7 +308,6 @@ class RKernel implements Kernel {
         onUnavailable: policy.onUnavailable,
       },
     })
-    const cwd = opts?.cwd ?? (opts?.sessionID ? await SessionFilesystem.workspace(opts.sessionID) : Instance.directory)
     this.environment = {
       cwd,
       interpreter: {
@@ -313,10 +334,7 @@ class RKernel implements Kernel {
     try {
       proc = spawn(wrapped.file, wrapped.args, {
         cwd,
-        env: Axiomics.kernelEnv(process.env, {
-          ...(opts?.env ?? {}),
-          ATLAS_CLI_CONFIG_PATH: configPath,
-        }),
+        env,
         stdio: ["pipe", "pipe", "pipe"],
         // Own process group so killing the kernel reaps its worker children (#102).
         detached: process.platform !== "win32",

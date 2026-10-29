@@ -20,6 +20,7 @@ import { useSync } from "@/context/sync"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import { useLanguage } from "@/context/language"
+import { englishT, type Translate } from "@/i18n/fallback"
 import { SourceMenu } from "@/atlas/files/SourceMenu"
 import { ArtifactGrid } from "@/atlas/files/ArtifactGrid"
 import { FileTable, type FileRow } from "@/atlas/files/FileTable"
@@ -232,7 +233,10 @@ function RenameArtifact(props: {
   artifact: StoredArtifact
   onSubmit: (title: string) => Promise<unknown>
   onClose: () => void
+  /** Translator for the standalone test seam (no LanguageProvider). */
+  t?: Translate
 }): JSX.Element {
+  const t = () => props.t ?? englishT
   const [title, setTitle] = createSignal(props.artifact.title)
 
   return (
@@ -245,13 +249,13 @@ function RenameArtifact(props: {
       }}
     >
       <label class="files-connect__field">
-        <span>Result name</span>
+        <span>{t()("files.connect.resultName")}</span>
         <input
           data-rename-input
           value={title()}
           autofocus
           maxlength={200}
-          aria-label="Result name"
+          aria-label={t()("files.connect.resultName")}
           onInput={(event) => setTitle(event.currentTarget.value)}
         />
       </label>
@@ -883,7 +887,9 @@ export function FilesPane(
       )
     }
     if (props.onRenameArtifact) return props.onRenameArtifact(artifact, submit)
-    dialog?.show(() => <RenameArtifact artifact={artifact} onSubmit={submit} onClose={() => dialog.close()} />)
+    dialog?.show(() => (
+      <RenameArtifact artifact={artifact} t={language?.t} onSubmit={submit} onClose={() => dialog.close()} />
+    ))
   }
 
   /**
@@ -1068,7 +1074,8 @@ export function FilesPane(
     dialog?.show(() => (
       <FolderPicker
         kind="folder"
-        title="Connect a folder"
+        t={language?.t}
+        title={language?.t("files.access.connectFolder") ?? "Connect a folder"}
         onSelect={(result) => {
           if (!owns(ticket)) return
           const picked = Array.isArray(result) ? result[0] : result
@@ -1336,16 +1343,20 @@ export function FilesPane(
       </header>
 
       <Show when={connect.open}>
-        <form class="files-connect" aria-label="Connect a folder" onSubmit={submit}>
+        <form
+          class="files-connect"
+          aria-label={language?.t("files.access.connectFolder") ?? "Connect a folder"}
+          onSubmit={submit}
+        >
           <div class="files-connect__heading">
             <span>
-              <strong>Connect a folder</strong>
-              <small>Add another location to this session.</small>
+              <strong>{language?.t("files.access.connectFolder") ?? "Connect a folder"}</strong>
+              <small>{language?.t("files.connect.detail") ?? "Add another location to this session."}</small>
             </span>
             <button
               type="button"
               class="files-connect__dismiss"
-              aria-label="Close folder connection form"
+              aria-label={language?.t("files.connect.close") ?? "Close folder connection form"}
               onClick={() => setConnect("open", false)}
             >
               <IconX size={13} strokeWidth={1.6} />
@@ -1355,7 +1366,7 @@ export function FilesPane(
             <input
               class="files-connect__path"
               value={connect.path}
-              aria-label="Folder path"
+              aria-label={language?.t("files.connect.path") ?? "Folder path"}
               placeholder="/home/example-user-bb0347/data"
               spellcheck={false}
               onInput={(event) => setConnect("path", event.currentTarget.value)}
@@ -1369,9 +1380,9 @@ export function FilesPane(
 
           <div class="files-connect__row">
             <label class="files-connect__field">
-              <span>Access</span>
+              <span>{language?.t("files.connect.access") ?? "Access"}</span>
               <select
-                aria-label="Folder access"
+                aria-label={language?.t("files.access.folderAccess") ?? "Folder access"}
                 data-connect-access
                 value={connect.access}
                 onChange={(event) => setConnect("access", event.currentTarget.value as FilesystemAccess)}
@@ -1477,6 +1488,7 @@ export function FilesPane(
 
         <Match when={current().kind === "artifacts"}>
           <ArtifactGrid
+            t={language?.t}
             artifacts={stored()}
             titles={titles()}
             currentSession={sessionID()}
@@ -1600,6 +1612,7 @@ export function FilesPane(
         {(file) => (
           <RemoteFileView
             file={file}
+            t={language?.t}
             read={remoteBytes}
             onDownload={(remote) =>
               void downloadRemote({ name: remote.name, type: "file", path: remote.path }, remote.volume)

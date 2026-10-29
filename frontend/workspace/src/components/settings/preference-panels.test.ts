@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url"
 const panelNames = ["Network", "Permissions", "Storage", "Sandbox", "General"] as const
 const source = (name: (typeof panelNames)[number]) =>
   readFileSync(fileURLToPath(new URL(`./${name}.tsx`, import.meta.url)), "utf8")
-const compute = readFileSync(fileURLToPath(new URL("./Compute.tsx", import.meta.url)), "utf8")
 const appearance = readFileSync(fileURLToPath(new URL("../settings-general.tsx", import.meta.url)), "utf8")
 const styles = readFileSync(fileURLToPath(new URL("./preference-panels.css", import.meta.url)), "utf8")
 
@@ -27,7 +26,7 @@ describe("minimal grouped settings panels", () => {
   })
 
   test("uses progressive disclosure and aligned numeric metrics", () => {
-    expect(source("Permissions")).toContain("Show all tool defaults")
+    expect(source("Permissions")).toContain('"settings.permissions.defaults.showAll"')
     expect(source("Permissions")).toContain("aria-expanded={showAllDefaults()}")
     expect(source("General")).toContain("<AppearanceSections />")
     expect(appearance).toContain("settings.general.section.sounds")
@@ -44,7 +43,7 @@ describe("minimal grouped settings panels", () => {
     expect(source("Storage")).toContain('role="progressbar"')
     expect(source("Sandbox")).toContain('call<SelfTest>("/test", { method: "POST" })')
     expect(source("Sandbox")).toContain('aria-live="polite"')
-    expect(source("General")).toContain('"/account/logout", { method: "POST" }')
+    expect(source("General")).not.toContain('"/account/logout", { method: "POST" }')
     expect(source("General")).not.toContain('settingsApi<Preferences>(base(), fetchFn(), "/settings/preferences"')
     expect(source("General")).not.toContain('title="Gateway"')
     expect(source("General")).not.toContain('title="Trace"')
@@ -56,11 +55,9 @@ describe("minimal grouped settings panels", () => {
     expect(styles).not.toContain("settings-row:not(:last-child)::after")
   })
 
-  test("keeps Network and Compute on the same flat responsive surface language", () => {
+  test("keeps Network on the flat responsive surface language", () => {
     expect(source("Network")).toContain("settings-network-disclosure")
-    expect(compute).toContain("settings-preferences-panel--compute")
     expect(styles).toMatch(/\.settings-preferences-panel \.settings-card\s*\{[^}]*border: 0;/s)
-    expect(styles).toContain(".settings-compute-host-actions")
     expect(styles).toContain("@container settings-main (max-width: 680px)")
     expect(styles).not.toContain("border: 1px solid var(--settings-border);")
   })

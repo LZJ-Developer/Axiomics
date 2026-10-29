@@ -35,7 +35,8 @@ test("keeps the research rail readable with one stylesheet owner", () => {
 })
 
 test("keeps sidebar actions identifiable and gives top session tabs the tab semantics", () => {
-  expect(source).toContain('aria-label={`Session actions for ${props.session.title || "Session"}`}')
+  expect(source).toContain('aria-label={language.t("workspace.sidebar.actionsFor", {')
+  expect(source).toContain('name: props.session.title || language.t("workspace.sidebar.session"),')
   expect(source).toContain("if (restoreFocus) queueMicrotask(() => tab?.focus())")
   expect(source).toContain("commit(true)")
   expect(source).toContain("cancel(true)")

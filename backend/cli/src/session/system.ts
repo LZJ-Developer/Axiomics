@@ -2,6 +2,7 @@ import { Ripgrep } from "../file/ripgrep"
 
 import { Instance } from "../project/instance"
 import { SessionFilesystem } from "./filesystem"
+import { PathSpace } from "./path-space"
 
 import PROMPT_CORE from "./prompt/core.txt"
 import PROMPT_DIRECT from "./prompt/direct.txt"
@@ -205,10 +206,12 @@ Keep only one item in_progress at a time.
       SessionFilesystem.workspace(sessionID),
       SessionFilesystem.state(sessionID),
       ProjectAccess.status(project),
+      PathSpace.roots(sessionID),
     ])
     const workspace = context[0]
     const filesystem = context[1]
     const projectAccess = context[2]
+    const pathSpace = context[3]
     const sources = filesystem.grants.filter(
       (grant) =>
         !grant.time.consumed && !grant.time.revoked && (grant.source === "api" || grant.source === "permission"),
@@ -228,15 +231,15 @@ Keep only one item in_progress at a time.
         `  Project: ${projectName}`,
         `  Project ID: ${project.id}`,
         `  Session ID: ${sessionID}`,
-        `  Project files: ${Instance.directory} (durable and shared across this project)`,
-        `  Session scratch: ${workspace} (temporary and isolated to this conversation)`,
+        `  Project files: ${pathSpace.project.model} (durable and shared across this project)`,
+        `  Session scratch: ${pathSpace.scratch.model} (temporary and isolated to this conversation)`,
         `  Results: immutable project-wide deliverables saved with the artifact tool`,
         `  Access mode: ${access}`,
         `  Connected project folders:`,
         ...(sources.length
           ? sources.map(
               (grant) =>
-                `    - ${grant.path} (${grant.access === "write" ? "read and write" : "read only"}, ${grant.scope} scope)`,
+                `    - ${PathSpace.toModel(pathSpace, grant.path)} (${grant.access === "write" ? "read and write" : "read only"}, ${grant.scope} scope)`,
             )
           : [`    - none`]),
         `  Is directory a git repo: ${project.vcs === "git" ? "yes" : "no"}`,
@@ -245,7 +248,7 @@ Keep only one item in_progress at a time.
         `</env>`,
         `An Axiomics project is a durable research context that may aggregate multiple connected folders and files. Session scratch belongs only to this conversation. Results are immutable deliverables shared project-wide; a normal workspace file is not a Result until artifact save_file returns its Result ID and version.`,
         `Use Session scratch by default for one-off downloads, analyses, scripts, tables, and plots. Work in Project files only when the user points to existing durable material or asks to keep reusable outputs. Do not create a new project subfolder for an ordinary answer. Promote a file to Results only when the user requests a durable deliverable or a Result-only contract requires it.`,
-        `The physical paths above are routing information. Use the human project name in conversation, not UUID directory components. Do not expose scratch, managed-project, or connected-folder paths in a generic greeting. Mention a path only when the user asks about location or when it is needed to complete their request.`,
+        `These paths are the workspace as this machine presents it. Use them verbatim in shell commands and file tools. Use the human project name in conversation, not UUID directory components. Do not expose scratch, project, or connected-folder paths in a generic greeting. Mention a path only when the user asks about location or when it is needed to complete their request.`,
         `<files>`,
         `  ${
           project.vcs === "git" && false

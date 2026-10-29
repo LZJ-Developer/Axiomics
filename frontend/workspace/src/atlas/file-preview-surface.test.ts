@@ -46,7 +46,7 @@ describe("file preview surface", () => {
     expect(textView).toContain('import "../FilePreview.css"')
     expect(textView).toContain('import { MarkdownDocument } from "../MarkdownDocument"')
     expect(textView).toContain('class="atlas-file-document atlas-file-notebook"')
-    expect(textView).toContain("<MarkdownDocument name={props.name} text={props.text}")
+    expect(textView).toContain("<MarkdownDocument t={language.t} name={props.name} text={props.text}")
     expect(textView).toContain('<Markdown class="atlas-md" text={cell.source}')
     expect(textView).not.toContain('class="markdown-body"')
   })

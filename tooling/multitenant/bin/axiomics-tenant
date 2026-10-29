@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 租户生命周期管理：add / retire / list / reclaim
+# 租户生命周期管理：add / retire / list / reclaim / gc
 #
 # 设计约束（每条都有实测依据）：
 #   - 容器标志集缺一不可（见 docs/多租户运维手册.md 2.3）
@@ -91,7 +91,9 @@ next_id() {
   while read -r id; do
     [ -n "$id" ] || continue
     n=${id#u}
-    [[ "$n" =~ ^[0-9]+$ ]] && [ "$n" -gt "$max" ] && max=$n
+    # 10# 不可省：ID 带前导零（u0008），bash 算术按八进制解析，
+    # 碰到 8 或 9 就报 "value too great for base" —— 到第 8 个租户才炸。
+    [[ "$n" =~ ^[0-9]+$ ]] && [ "$((10#$n))" -gt "$max" ] && max=$((10#$n))
   done <<<"$from_map
 $from_retired"
   printf 'u%04d' $((max + 1))
@@ -137,8 +139,26 @@ run_tenant() {
   local CORS_ARGS=()
   for o in $CORS_ORIGINS_RAW; do [ -n "$o" ] && CORS_ARGS+=(--cors "$o"); done
 
+  # 站点镜像源：设了就传给租户，没设则保持工具默认（官方源）。内网站点通常
+  # 两者都指向本单位的镜像；pip 走 PIP_INDEX_URL，R 没有对应环境变量，
+  # 平台会把它写成项目级 Rprofile 并用 R_PROFILE_USER 指过去。
+  local MIRROR_ARGS=()
+  [ -n "${AXIOMICS_PIP_INDEX_URL:-}" ] && MIRROR_ARGS+=(-e AXIOMICS_PIP_INDEX_URL="$AXIOMICS_PIP_INDEX_URL")
+  # 内网镜像多为 http，pip 需要显式信任该主机，否则报 not a trusted host。
+  [ -n "${AXIOMICS_PIP_TRUSTED_HOST:-}" ] && MIRROR_ARGS+=(-e AXIOMICS_PIP_TRUSTED_HOST="$AXIOMICS_PIP_TRUSTED_HOST")
+  [ -n "${AXIOMICS_CRAN_MIRROR:-}" ] && MIRROR_ARGS+=(-e AXIOMICS_CRAN_MIRROR="$AXIOMICS_CRAN_MIRROR")
+
+  # 面向研究者的 Web 产品默认不开终端：后端 /pty 直接 403，前端不渲染入口。
+  # 需要排障的站点用 AX_TERMINAL_DISABLED=0 重新建租户即可恢复。
+  # --hostname：容器内无法自建 UTS 命名空间（rootless 下 sethostname 必 EPERM），
+  # 沙箱会把 --unshare-uts/--hostname 去掉；主机名由容器本身给出，
+  # 否则模型在 `hostname` 里读到的是容器 id。
+  # 内网 TLS 有两类用户：Node 系（bun 本体）只认 NODE_EXTRA_CA_CERTS；conda 环境
+  # 自带 certifi/ssl.cert.pem，必须用 SSL_CERT_FILE/REQUESTS_CA_BUNDLE 指向整包 CA
+  # 才能访问内网 HTTPS。整包 ca-bundle.crt 里已含内部 CA，覆盖公网 CA 不受影响。
   podman run -d --name "ax-$tid" \
     --init \
+    --hostname axiomics \
     --userns=keep-id \
     --security-opt unmask=ALL \
     --security-opt mask=/sys/bus/pci \
@@ -153,9 +173,21 @@ run_tenant() {
     -e PIP_CACHE_DIR=/cache/pip -e UV_CACHE_DIR=/cache/uv \
     -e AXIOMICS_SHARED_PYTHON="$SHARED_PYTHON" \
     -e AXIOMICS_SHARED_R="$SHARED_R" \
+    -e AXIOMICS_SHARED_ENVS="$SHARED_ENVS" \
+    -e AXIOMICS_ENV_OVERLAY_ROOT=/data/kernel-overlay \
+    -e AXIOMICS_DISABLE_TERMINAL="${AX_TERMINAL_DISABLED:-1}" \
+    -e AXIOMICS_SANDBOX_UNATTENDED=1 \
+    -e AXIOMICS_UI_LOCALE=zh \
+    "${MIRROR_ARGS[@]}" \
     -e http_proxy= -e https_proxy= -e HTTP_PROXY= -e HTTPS_PROXY= \
     -e all_proxy= -e ALL_PROXY= -e no_proxy= -e NO_PROXY= \
     -e NODE_EXTRA_CA_CERTS=/etc/pki/ca-trust/source/anchors/axiomics-internal-ca.crt \
+    -e SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt \
+    -e SSL_CERT_DIR=/etc/pki/tls/certs \
+    -e REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt \
+    -e CURL_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt \
+    -e PIP_CERT=/etc/pki/tls/certs/ca-bundle.crt \
+    -e GIT_SSL_CAINFO=/etc/pki/tls/certs/ca-bundle.crt \
     -v "$ENTRYPOINT:/entrypoint.sh:ro" \
     -v "$SHARED_ENVS:$SHARED_ENVS:ro" \
     -v "$TENANTS/$tid/data:/data" -v "$TENANTS/$tid/config:/config" \
@@ -209,19 +241,18 @@ cmd_add() {
     "baseURL": "https://host.containers.internal:43001/model/v1",
     "apiKey": "tenant-$tid"
   }}},
-  "sandbox": { "enabled": false }
+  "sandbox": { "enabled": true, "network": "allow" }
 }
 JSON
-  # 这一个值同时决定两件事，没有中间档（实测）：
-  #   true  → mode=approve → bwrap 沙箱开 + 每个动作都要用户点确认
+  # 这一个值决定项目默认档位（实测）：
+  #   true  → mode=approve → bwrap 沙箱开；bash 允许执行，风险命令仍弹一次确认
   #   false → mode=full    → 无沙箱 + 不询问
-  # 本部署选 false：agent 跑在云端，容器本身就是租户间的隔离边界
-  # （一人一容器、独立 PID/net/fs），权限放开不打断长流程。
-  #
-  # 代价要记住：ScientificCapability 派发本地作业前要求「已验证的 OS 沙箱」，
-  # 关掉这一档后该要求是否仍被满足，取决于 ExecutionAuthority 的判定式
-  # （unavailable = enabled && !available && onUnavailable==="error"，enabled=false 时恒假）。
-  # 这条在真机上验证过再改这个默认值，别凭印象。
+  # 本部署选 true + network=allow：模型端要有 /home/example-user-d4f0bc 视图与
+  # .runtime/envs 覆盖层，前提是沙箱真的在执行（PathSpace.exposed() 读的就是
+  # 这里的 enabled，改文件必须重启容器才生效，Config 有进程内缓存）。
+  # network=allow 让 pip/下载照常走，牺牲的是沙箱的网络隔离，租户间仍由容器边界隔离。
+  # 逐条确认在 run_tenant 里用 AXIOMICS_SANDBOX_UNATTENDED=1 关掉：风险命令、
+  # 外部路径读、联网检索直接放行；写外部路径/compute/环境变更仍会询问。
 
   run_tenant "$tid" "$port" "$gpu"
 
@@ -281,6 +312,41 @@ seed_cases() {
   if [ -d "$slice/projects" ]; then
     mkdir -p "$root/projects"
     cp -a --reflink=auto "$slice/projects/." "$root/projects/" || die "案例项目骨架写入失败：$slice/projects"
+  fi
+
+  # 产物库：storage 里只有会话记录和 Results 卡片的引用，真正的字节在
+  # artifact-store（artifacts.db + blobs/）。只并 storage 的后果实测过：
+  # 卡片正常显示，点开报 404（GET /file/artifact-store/art_…）。
+  # 库要按行合并而不是覆盖 —— 租户自己产生的产物可能已经写进去了。
+  if [ -d "$slice/artifact-store" ]; then
+    mkdir -p "$root/artifact-store/blobs"
+    [ -d "$slice/artifact-store/blobs" ] && cp -a --reflink=auto "$slice/artifact-store/blobs/." "$root/artifact-store/blobs/"
+    python3 - "$root/artifact-store/artifacts.db" "$slice/artifact-store/artifacts.db" <<'PY' || die "案例产物库合并失败：$slice/artifact-store"
+import os, shutil, sqlite3, sys
+target, source = sys.argv[1], sys.argv[2]
+if not os.path.exists(source):
+    sys.exit(0)
+os.makedirs(os.path.dirname(target), exist_ok=True)
+# 租户还没写过产物时，整库复制比空库再合并简单，也不会漏掉表结构
+if not os.path.exists(target):
+    shutil.copy2(source, target)
+    print("  产物库：直接复制", sqlite3.connect(target).execute("select count(*) from artifacts").fetchone()[0], "条")
+    sys.exit(0)
+db = sqlite3.connect(target)
+db.execute("ATTACH DATABASE ? AS src", (source,))
+added = {}
+for table in ("store_meta", "blobs", "artifacts", "versions", "executions"):
+    cols = [row[1] for row in db.execute(f"PRAGMA src.table_info({table})")]
+    if not cols:
+        continue
+    names = ", ".join(cols)
+    before = db.total_changes
+    db.execute(f"INSERT OR IGNORE INTO main.{table} ({names}) SELECT {names} FROM src.{table}")
+    added[table] = db.total_changes - before
+db.commit()
+db.execute("DETACH DATABASE src")
+print("  产物库：合并", ", ".join(f"{k}+{v}" for k, v in added.items() if v) or "无新增")
+PY
   fi
 
   # 记录里带着装配时的宿主路径（worktree 指向磁盘上的案例目录、scratchRoot 指向
@@ -349,6 +415,9 @@ cmd_retire() {
   [ -n "$tid" ] || die "未找到用户 $name"
 
   podman stop -t 10 "ax-$tid" >/dev/null 2>&1 || true
+  # overlayfs 把自己的 work 目录建成 0000；不先放松权限，tar 读不到，
+  # 归档里就少了整个项目的环境覆盖层，而错误被 `|| true` 吞掉。
+  chmod -R u+rwX "$TENANTS/$tid/data/kernel-overlay" 2>/dev/null || true
   mkdir -p "$AX_ROOT/archive"
   tar -czf "$AX_ROOT/archive/$tid-$(date +%F).tar.gz" -C "$TENANTS" "$tid" 2>/dev/null || true
   grep -v "^$name " "$MAP" > "$MAP.new"; mv "$MAP.new" "$MAP"
@@ -414,6 +483,28 @@ cmd_list() {
     st=$(podman ps -a --filter "name=^ax-$t$" --format "{{.Status}}" 2>/dev/null | head -1 || true)
     printf '%-10s %-8s %-7s %-5s %s\n' "$n" "$t" "$p" "$g" "${st:-未运行}"
   done < "$MAP"
+}
+
+# ── gc：回收已删除项目的环境覆盖层 ──────────────────────────────────
+# 共享环境只读、每项目一层可写覆盖。项目目录删掉后，覆盖层没有别的主人，
+# 留着只是占盘；这里按「项目目录是否还在」判断，只读不猜活跃度。
+cmd_gc() {
+  local dry=0
+  [ "${1:-}" = "--dry-run" ] && dry=1
+  local d tid prj removed=0
+  for d in "$TENANTS"/*/data/kernel-overlay/*; do
+    [ -d "$d" ] || continue
+    tid=$(basename "$(dirname "$(dirname "$(dirname "$d")")")")
+    prj=$(basename "$d")
+    [ -d "$TENANTS/$tid/data/projects/$prj" ] && continue
+    if [ "$dry" = 1 ]; then
+      echo "would remove $d"
+      continue
+    fi
+    chmod -R u+rwX "$d" 2>/dev/null || true
+    rm -rf "$d" && removed=$((removed + 1))
+  done
+  [ "$dry" = 1 ] || echo "已回收 $removed 个项目环境覆盖层"
 }
 
 # ── reclaim：两个精确信号 ────────────────────────────────────────────
@@ -577,6 +668,7 @@ case "${1:-}" in
   start)   shift; cmd_start "$@" ;;
   recreate) shift; cmd_recreate "$@" ;;
   list)    cmd_list ;;
+  gc)      shift; cmd_gc "$@" ;;
   reclaim) shift; cmd_reclaim "$@" ;;
   sweep)   cmd_sweep ;;
   seed-cases) shift; seed_cases "${1:?用法: axiomics-tenant seed-cases <租户ID>|--all [optional]}" "${2:-required}" ;;

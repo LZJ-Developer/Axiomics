@@ -40,36 +40,36 @@ const mount = (view: () => JSX.Element) => {
 
 describe("SettingsPanelStack", () => {
   test("keeps visited panels mounted while exposing only the active panel", async () => {
-    let select!: (id: "models" | "network") => void
+    let select!: (id: "permissions" | "network") => void
     const harness = fixture.createPanelStackFixture((next) => (select = next))
     const host = mount(harness.view)
 
-    const models = host.querySelector<HTMLElement>('[data-settings-panel="models"]')!
+    const permissions = host.querySelector<HTMLElement>('[data-settings-panel="permissions"]')!
     const network = host.querySelector<HTMLElement>('[data-settings-panel="network"]')!
-    expect(models.hidden).toBe(false)
-    expect(models.hasAttribute("inert")).toBe(false)
-    expect(models.getAttribute("aria-hidden")).toBeNull()
+    expect(permissions.hidden).toBe(false)
+    expect(permissions.hasAttribute("inert")).toBe(false)
+    expect(permissions.getAttribute("aria-hidden")).toBeNull()
     expect(network.hidden).toBe(true)
     expect(network.hasAttribute("inert")).toBe(true)
     expect(network.getAttribute("aria-hidden")).toBe("true")
 
-    const modelFilter = host.querySelector<HTMLInputElement>('[aria-label="Model filter"]')!
-    modelFilter.focus()
-    expect(document.activeElement).toBe(modelFilter)
+    const permissionFilter = host.querySelector<HTMLInputElement>('[aria-label="Permission filter"]')!
+    permissionFilter.focus()
+    expect(document.activeElement).toBe(permissionFilter)
 
     select("network")
     await Promise.resolve()
-    expect(models.hidden).toBe(true)
-    expect(models.hasAttribute("inert")).toBe(true)
-    expect(models.getAttribute("aria-hidden")).toBe("true")
+    expect(permissions.hidden).toBe(true)
+    expect(permissions.hasAttribute("inert")).toBe(true)
+    expect(permissions.getAttribute("aria-hidden")).toBe("true")
     expect(network.hidden).toBe(false)
     expect(network.hasAttribute("inert")).toBe(false)
     expect(network.getAttribute("aria-hidden")).toBeNull()
     expect(document.activeElement).toBe(network)
-    select("models")
+    select("permissions")
 
-    expect(harness.mounts).toEqual({ models: 1, network: 1 })
-    expect(modelFilter.value).toBe("remember me")
+    expect(harness.mounts).toEqual({ permissions: 1, network: 1 })
+    expect(permissionFilter.value).toBe("remember me")
     expect(host.querySelector(".settings-panel-loading")).toBeNull()
   })
 })

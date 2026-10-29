@@ -26,6 +26,7 @@ const ROOT = (() => {
     : "/srv/axiomics"
 })()
 const LEDGER = process.env.AX_LEDGER ?? `${ROOT}/logs/usage.jsonl`
+const MAP = process.env.AX_MAP ?? `${ROOT}/tenants.map`
 const KEY_FILE = process.env.AX_KEY_FILE ?? "/dev/null"
 const KEY_ENV = process.env.DEEPSEEK_KEY ?? ""
 
@@ -49,6 +50,20 @@ function tenantOf(auth: string | null): string | null {
   // 租户容器发的占位符形如 Bearer tenant-u0001
   const m = /^Bearer\s+tenant-(u\d+)$/i.exec(auth ?? "")
   return m ? m[1] : null
+}
+
+/**
+ * 占位符只是「形如 tenant-u0001」，并不代表这个租户存在。真清单在 tenants.map。
+ *
+ * 少这一步的后果实测过：随便编一个 `Bearer tenant-u9999` 也能换到真密钥并记账，
+ * 任何能连到本端口的主机都能消耗主办方的模型额度。
+ * 每次请求读一次（几十字节）而不是缓存：开通/注销后立即生效，不用重启代理。
+ */
+async function knownTenant(tid: string) {
+  const text = await Bun.file(MAP)
+    .text()
+    .catch(() => "")
+  return text.split("\n").some((line) => line.trim().split(/\s+/)[1] === tid)
 }
 
 function price(model: string) {
@@ -81,6 +96,7 @@ Bun.serve({
 
     const tenant = tenantOf(req.headers.get("authorization"))
     if (!tenant) return Response.json({ error: "unrecognized tenant placeholder" }, { status: 401 })
+    if (!(await knownTenant(tenant))) return Response.json({ error: "unknown tenant" }, { status: 401 })
 
     const target = UPSTREAM.replace(/\/+$/, "") + url.pathname.replace(/^\/model/, "")
     let body = req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer()

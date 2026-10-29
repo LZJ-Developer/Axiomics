@@ -1,5 +1,6 @@
 import { Dynamic } from "solid-js/web"
 import { For, Suspense, createEffect, onCleanup, type Accessor, type Component } from "solid-js"
+import { englishT, type Translate } from "@/i18n/fallback"
 
 export interface SettingsPanelStackItem<Id extends string = string> {
   id: Id
@@ -17,7 +18,10 @@ export interface SettingsPanelStackItem<Id extends string = string> {
 export function SettingsPanelStack<Id extends string>(props: {
   active: Accessor<Id>
   panels: Accessor<SettingsPanelStackItem<Id>[]>
+  /** Translator for fixtures that render without the LanguageProvider. */
+  t?: Translate
 }) {
+  const t = () => props.t ?? englishT
   const slots = new Map<Id, HTMLElement>()
 
   createEffect(() => {
@@ -51,7 +55,7 @@ export function SettingsPanelStack<Id extends string>(props: {
         >
           <Suspense
             fallback={
-              <div class="settings-panel-loading" role="status" aria-label="Loading settings">
+              <div class="settings-panel-loading" role="status" aria-label={t()("settings.panel.loading")}>
                 <div class="settings-panel-loading__header">
                   <span class="settings-panel-loading__line" data-size="title" />
                   <span class="settings-panel-loading__line" data-size="copy" />

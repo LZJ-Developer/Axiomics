@@ -4,8 +4,10 @@ import { EditTool } from "./edit"
 import DESCRIPTION from "./multiedit.txt"
 import path from "path"
 import { Instance } from "../project/instance"
+import { PathSpace } from "@/session/path-space"
 
 export const MultiEditTool = Tool.define("multiedit", {
+  pathFields: ["filePath"],
   description: DESCRIPTION,
   parameters: z.object({
     filePath: z.string().describe("The absolute path to the file to modify"),
@@ -22,11 +24,12 @@ export const MultiEditTool = Tool.define("multiedit", {
   }),
   async execute(params, ctx) {
     const tool = await EditTool.init()
+    const filePath = params.filePath
     const results = []
     for (const [, edit] of params.edits.entries()) {
       const result = await tool.execute(
         {
-          filePath: params.filePath,
+          filePath,
           oldString: edit.oldString,
           newString: edit.newString,
           replaceAll: edit.replaceAll,
@@ -36,7 +39,7 @@ export const MultiEditTool = Tool.define("multiedit", {
       results.push(result)
     }
     return {
-      title: path.relative(Instance.worktree, params.filePath),
+      title: path.relative(Instance.worktree, filePath),
       metadata: {
         results: results.map((r) => r.metadata),
       },

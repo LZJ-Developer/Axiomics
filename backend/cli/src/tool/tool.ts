@@ -38,6 +38,15 @@ export namespace Tool {
     init: (ctx?: InitContext) => Promise<{
       description: string
       parameters: Parameters
+      /** Argument fields that may name a workspace path in the model's
+       * vocabulary. The session boundary translates them to host spellings
+       * before execute(), so a tool never has to remember to. */
+      pathFields?: string[]
+      /** Whether this tool's output describes locations rather than carrying
+       * content. Only then is the host→model rewrite applied to `output`; file
+       * contents must never be rewritten. Titles and errors are always
+       * translated. */
+      localizeOutput?: boolean
       execute(
         args: z.infer<Parameters>,
         ctx: Context,

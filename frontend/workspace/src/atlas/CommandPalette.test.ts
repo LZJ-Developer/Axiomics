@@ -102,7 +102,9 @@ test("registers route-owned actions and removes the dead file.open palette path"
   expect(session).toContain('id: "project.files"')
   expect(session).toContain('id: "project.compute"')
   expect(session).toContain('id: "settings.open"')
-  expect(session).toContain('id: "documentation.open"')
+  // The documentation command was retired with the standalone docs route; the
+  // palette must not keep advertising an id no route registers.
+  expect(session).not.toContain('id: "documentation.open"')
   expect(commands).not.toContain('run("file.open", "palette")')
   expect(commands).not.toContain("showPalette")
 })
@@ -183,12 +185,12 @@ test("labels the palette as local search without overpromising", () => {
 })
 
 test("shows a searching row in flight and no-matches only after completion", () => {
-  expect(source).toContain("Searching…")
-  expect(source).toContain("No matches")
+  expect(source).toContain('language.t("palette.search.searching")')
+  expect(source).toContain('language.t("palette.search.noMatches")')
   expect(source).toContain("!searching() && !searchError() && !short() && filtered().length === 0")
-  expect(source).toContain("Type one more character")
-  expect(source).toContain("Search unavailable")
-  expect(source).toContain("Project content could not be searched")
+  expect(source).toContain('language.t("palette.search.typeMore")')
+  expect(source).toContain('language.t("palette.search.unavailable")')
+  expect(source).toContain('language.t("palette.search.unavailableHint")')
   expect(source).toContain("Retry")
   expect(source).toContain('aria-live="polite"')
 })

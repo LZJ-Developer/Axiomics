@@ -18,8 +18,10 @@ import { createStore } from "solid-js/store"
 import { Icon } from "@axiomics/ui/icon"
 import { showToast } from "@axiomics/ui/toast"
 import { useGlobalSDK } from "@/context/global-sdk"
+import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useGlobalSync } from "@/context/global-sync"
+import { englishT, type Translate } from "@/i18n/fallback"
 import type { Config } from "@axiomics/sdk/v2/client"
 import { installFromGit } from "./skills-settings"
 import {
@@ -113,12 +115,12 @@ function displayLabel(value: string) {
   return label ? label[0]!.toUpperCase() + label.slice(1) : value
 }
 
-const SOURCE_LABEL: Record<Source, string> = {
-  default: "Default",
-  installed: "Installed",
-  user: "Personal",
-  project: "Project",
-}
+const SOURCE_LABEL = {
+  default: "skills.source.default",
+  installed: "skills.source.installed",
+  user: "skills.source.personal",
+  project: "skills.source.project",
+} as const satisfies Record<Source, string>
 
 export type SkillsPageServices = {
   server: string
@@ -132,6 +134,10 @@ export type SkillsPageServices = {
 }
 
 export default function SkillsPage(props: { embedded?: boolean; services?: SkillsPageServices }): JSX.Element {
+  // The `services` prop is the standalone test seam (see SkillsPage.test.tsx);
+  // production always renders this page inside the language provider.
+  const language = props.services ? undefined : useLanguage()
+  const t = () => language?.t ?? englishT
   const service =
     props.services ??
     (() => {
@@ -155,7 +161,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
             !saved?.skills?.disabled ||
             JSON.stringify([...saved.skills.disabled].sort()) !== JSON.stringify([...disabled].sort())
           ) {
-            throw new Error("This server did not confirm the selection. Update the Axiomics server and try again.")
+            throw new Error(t()("skills.page.serverConfirm"))
           }
           sync.set("config", "skills", { ...sync.data.config.skills, disabled } as SelectionConfig["skills"])
           return disabled
@@ -244,7 +250,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
       markPermissionPending(name, 1)
       return [name, version] as const
     })
-    setPreferences("feedback", "Saving selection…")
+    setPreferences("feedback", t()("skills.toast.saving"))
 
     const persist = async () => {
       try {
@@ -263,11 +269,20 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
         )
         setPreferences(
           "feedback",
-          `${names.length === 1 ? "Skill" : `${names.length} skills`} ${next ? "activated" : "turned off"}.`,
+          t()(
+              next
+                ? names.length === 1
+                  ? "skills.toast.enabledOne"
+                  : "skills.toast.enabledMany"
+                : names.length === 1
+                  ? "skills.toast.disabledOne"
+                  : "skills.toast.disabledMany",
+              { count: names.length },
+            ),
         )
       } catch (error) {
-        setPreferences("feedback", "Selection could not be saved. Your previous settings are unchanged.")
-        showToast({ variant: "error", title: "Could not save skill selection", description: message(error) })
+        setPreferences("feedback", t()("skills.toast.saveFailed"))
+        showToast({ variant: "error", title: t()("skills.toast.saveFailedTitle"), description: message(error) })
       } finally {
         for (const [name, version] of versions) {
           if (permissionVersions.get(name) === version) setPreferences("changes", name, undefined!)
@@ -290,7 +305,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
       counts.set(cat, (counts.get(cat) ?? 0) + 1)
     }
     return [
-      { id: "all", label: "All categories", count: all().length },
+      { id: "all", label: t()("skills.source.allCategories"), count: all().length },
       ...[...counts.entries()]
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([id, count]) => ({ id, label: displayLabel(id), count })),
@@ -300,11 +315,11 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
   const sources = createMemo(() => {
     const count = (value: Source) => all().filter((skill) => sourceOf(skill) === value).length
     return [
-      { id: "all", label: "All sources", count: all().length },
-      { id: "default", label: "Default", count: count("default") },
-      { id: "installed", label: "Installed", count: count("installed") },
-      { id: "user", label: "Personal", count: count("user") },
-      { id: "project", label: "Project", count: count("project") },
+      { id: "all", label: t()("skills.source.all"), count: all().length },
+      { id: "default", label: t()("skills.source.default"), count: count("default") },
+      { id: "installed", label: t()("skills.source.installed"), count: count("installed") },
+      { id: "user", label: t()("skills.source.personal"), count: count("user") },
+      { id: "project", label: t()("skills.source.project"), count: count("project") },
     ]
   })
 
@@ -426,38 +441,38 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
               when={!props.embedded}
               fallback={
                 <>
-                  <h2>Skills</h2>
-                  <p>Your research toolkit. Choose what agents can load when it is useful.</p>
+                  <h2>{t()("settings.panel.skills")}</h2>
+                  <p>{t()("skills.page.tagline")}</p>
                 </>
               }
             >
               <>
-                <h1>Skills</h1>
-                <p>Your research toolkit. Choose what agents can load when it is useful.</p>
+                <h1>{t()("settings.panel.skills")}</h1>
+                <p>{t()("skills.page.tagline")}</p>
               </>
             </Show>
           </div>
           <div class="skills-workspace__summary" aria-live="polite">
-            <span>{enabledCount()} active</span>
+            <span>{t()("skills.page.summaryActive", { count: enabledCount() })}</span>
             <span aria-hidden="true">/</span>
-            <span>{all().length} in library</span>
+            <span>{t()("skills.page.summaryLibrary", { count: all().length })}</span>
           </div>
         </div>
 
         <Show when={view() === "list"}>
           <div class="skills-workspace__toolbar">
-            <div class="skills-workspace__views" role="group" aria-label="Skill library views">
+            <div class="skills-workspace__views" role="group" aria-label={t()("skills.page.views")}>
               <For
                 each={
                   [
-                    { id: "all", label: "All skills", count: all().length },
-                    { id: "active", label: "Active", count: enabledCount() },
+                    { id: "all", label: "skills.page.view.all", count: all().length },
+                    { id: "active", label: "skills.page.view.active", count: enabledCount() },
                     {
                       id: "pinned",
-                      label: "Pinned",
+                      label: "skills.page.view.pinned",
                       count: all().filter((skill) => pinnedNames().has(skill.name)).length,
                     },
-                    { id: "off", label: "Off", count: all().length - enabledCount() },
+                    { id: "off", label: "skills.page.view.off", count: all().length - enabledCount() },
                   ] as const
                 }
               >
@@ -470,7 +485,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                       setVisibleRows(INITIAL_SKILL_ROWS)
                     }}
                   >
-                    {tab.label}
+                    {t()(tab.label)}
                     <span>{tab.count}</span>
                   </button>
                 )}
@@ -483,8 +498,9 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                   setSearch(value)
                   setVisibleRows(INITIAL_SKILL_ROWS)
                 }}
-                placeholder="Search skills"
-                ariaLabel="Search skills"
+                placeholder={t()("skills.page.search")}
+                ariaLabel={t()("skills.page.search")}
+                t={t()}
               />
               <button
                 type="button"
@@ -492,27 +508,27 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                 aria-expanded={preferences.customize}
                 onClick={() => setPreferences("customize", !preferences.customize)}
               >
-                <Icon name="settings-gear" size="small" /> Filters & view
+                <Icon name="settings-gear" size="small" /> {t()("skills.page.customize")}
               </button>
               <AddMenu
-                label="Add skill"
+                label={t()("skills.page.add")}
                 items={[
                   {
                     icon: "pencil-line",
-                    label: "Write from scratch",
-                    description: "Author a new SKILL.md in the editor",
+                    label: t()("skills.page.add.scratch"),
+                    description: t()("skills.page.add.scratchDesc"),
                     onSelect: () => setView("scratch"),
                   },
                   {
                     icon: "cloud-upload",
-                    label: "Upload a skill",
-                    description: "Import a SKILL.md file from disk",
+                    label: t()("skills.page.add.upload"),
+                    description: t()("skills.page.add.uploadDesc"),
                     onSelect: () => fileInput?.click(),
                   },
                   {
                     icon: "github",
-                    label: "Import from GitHub",
-                    description: "Install from a public git repo URL",
+                    label: t()("skills.page.add.github"),
+                    description: t()("skills.page.add.githubDesc"),
                     onSelect: () => setView("github"),
                   },
                 ]}
@@ -527,7 +543,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                     setSource(value as SourceView)
                     setVisibleRows(INITIAL_SKILL_ROWS)
                   }}
-                  ariaLabel="Filter skills by source"
+                  ariaLabel={t()("skills.page.filter.source")}
                 />
                 <FilterMenu
                   options={categories()}
@@ -536,12 +552,12 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                     setCategory(value)
                     setVisibleRows(INITIAL_SKILL_ROWS)
                   }}
-                  ariaLabel="Filter skills by category"
+                  ariaLabel={t()("skills.page.filter.category")}
                 />
                 <label class="skills-workspace__density">
-                  Rows
+                  {t()("skills.page.rows")}
                   <select
-                    aria-label="Skill row density"
+                    aria-label={t()("skills.page.density")}
                     value={preferences.density}
                     onChange={(event) => {
                       const density = event.currentTarget.value === "compact" ? "compact" : "comfortable"
@@ -553,8 +569,8 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                       }
                     }}
                   >
-                    <option value="comfortable">Comfortable</option>
-                    <option value="compact">Compact</option>
+                    <option value="comfortable">{t()("skills.page.density.comfortable")}</option>
+                    <option value="compact">{t()("skills.page.density.compact")}</option>
                   </select>
                 </label>
                 <div class="skills-workspace__bulk">
@@ -608,6 +624,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
         <div class="skills-workspace__content">
           <Show when={view() === "scratch"}>
             <ScratchForm
+              t={t()}
               busy={busy()}
               onCancel={() => setView("list")}
               onCreate={async (name, description, body) => {
@@ -616,10 +633,10 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                   const content = `---\nname: ${name}\ndescription: ${description}\n---\n\n${body}\n`
                   await service.create(name, content)
                   await skillsCtl.refetch()
-                  showToast({ variant: "success", title: `Skill "${name}" created` })
+                  showToast({ variant: "success", title: t()("skills.toast.created", { name }) })
                   setView("list")
                 } catch (err) {
-                  showToast({ variant: "error", title: "Could not create skill", description: message(err) })
+                  showToast({ variant: "error", title: t()("skills.toast.createFailed"), description: message(err) })
                 } finally {
                   setBusy(false)
                 }
@@ -629,6 +646,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
 
           <Show when={view() === "github"}>
             <GithubForm
+              t={t()}
               busy={busy()}
               onCancel={() => setView("list")}
               onInstall={async (url) => {
@@ -640,12 +658,15 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                   const r = res.rejected.length
                   showToast({
                     variant: n > 0 ? "success" : "error",
-                    title: n > 0 ? `Installed ${n} skill${n === 1 ? "" : "s"}` : "No skills installed",
-                    description: r > 0 ? `${r} rejected by security review` : undefined,
+                    title:
+                      n > 0
+                        ? t()(n === 1 ? "skills.toast.installedOne" : "skills.toast.installedMany", { count: n })
+                        : t()("skills.toast.none"),
+                    description: r > 0 ? t()("skills.toast.rejected", { count: r }) : undefined,
                   })
                   if (n > 0) setView("list")
                 } catch (err) {
-                  showToast({ variant: "error", title: "Install failed", description: message(err) })
+                  showToast({ variant: "error", title: t()("skills.toast.installFailed"), description: message(err) })
                 } finally {
                   setBusy(false)
                 }
@@ -656,24 +677,24 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
           <Show when={view() === "list"}>
             <Show when={skills.error && all().length > 0}>
               <div class="skills-workspace__catalog-warning" role="alert">
-                <span>The saved catalog is shown. Reconnect before changing active skills.</span>
+                <span>{t()("skills.page.catalogWarning")}</span>
                 <button type="button" onClick={() => void skillsCtl.refetch()}>
-                  Retry
+                  {t()("skills.page.retry")}
                 </button>
               </div>
             </Show>
             <Show
               when={!skills.loading || all().length > 0}
-              fallback={<CatalogState icon="refresh" title="Loading skills" hint="Fetching the latest catalog…" />}
+              fallback={<CatalogState icon="refresh" title={t()("skills.page.loadingTitle")} hint={t()("skills.page.loadingHint")} />}
             >
               <Show
                 when={!skills.error || all().length > 0}
                 fallback={
                   <CatalogState
                     icon="alert-circle"
-                    title="Skills could not be loaded"
+                    title={t()("skills.page.loadFailed")}
                     hint={message(skills.error)}
-                    action="Try again"
+                    action={t()("skills.page.tryAgain")}
                     onAction={() => void skillsCtl.refetch()}
                   />
                 }
@@ -686,16 +707,16 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                       fallback={
                         <EmptyState
                           icon="brain"
-                          title="No skills yet"
-                          hint="Write one from scratch, upload a SKILL.md, or import from a public GitHub repository."
+                          title={t()("skills.page.emptyTitle")}
+                          hint={t()("skills.page.emptyHint")}
                         />
                       }
                     >
                       <CatalogState
                         icon="magnifying-glass"
-                        title="No matching skills"
-                        hint="Try a different search, source, or category."
-                        action="Clear filters"
+                        title={t()("skills.page.noMatchTitle")}
+                        hint={t()("skills.page.noMatchHint")}
+                        action={t()("skills.page.clearFilters")}
                         onAction={clearFilters}
                       />
                     </Show>
@@ -713,6 +734,7 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
                             <For each={items}>
                               {(skill) => (
                                 <SkillRow
+                                  t={t()}
                                   skill={skill}
                                   on={enabled(skill.name)}
                                   pinned={pinnedNames().has(skill.name)}
@@ -753,13 +775,13 @@ export default function SkillsPage(props: { embedded?: boolean; services?: Skill
       const content = await file.text()
       const name = frontmatterName(content) ?? file.name.replace(/\.md$/i, "")
       if (!frontmatterName(content)) {
-        throw new Error("The SKILL.md must start with a frontmatter block containing `name:` and `description:`.")
+        throw new Error(t()("skills.page.frontmatter"))
       }
       await service.create(name, content)
       await skillsCtl.refetch()
       showToast({ variant: "success", title: `Skill "${name}" uploaded` })
     } catch (err) {
-      showToast({ variant: "error", title: "Upload failed", description: message(err) })
+      showToast({ variant: "error", title: t()("skills.toast.uploadFailed"), description: message(err) })
     } finally {
       setBusy(false)
     }
@@ -775,48 +797,50 @@ export function SkillStateBadges(props: {
   action?: "allow" | "ask" | "deny"
   blocked?: boolean
   projectDisabled?: boolean
+  t?: Translate
 }): JSX.Element {
+  const t = () => props.t ?? englishT
   return (
-    <div class="skills-workspace__tags" aria-label="Skill states">
+    <div class="skills-workspace__tags" aria-label={t()("skills.state.badges")}>
       <span
         class="settings-chip"
         data-state={props.allowed ? "allowed" : "library"}
         title={
           props.action === "ask"
-            ? "The agent requests permission before loading this skill."
+            ? t()("skills.badge.askTitle")
             : props.action === "deny"
-              ? "Disabled by a permission rule. Selection does not override policy."
+              ? t()("skills.badge.denyTitle")
               : undefined
         }
       >
         {props.projectDisabled
-          ? "Off in this project"
+          ? t()("skills.badge.offProject")
           : props.blocked || props.action === "deny"
-            ? "Blocked by policy"
+            ? t()("skills.badge.blocked")
             : props.allowed
               ? props.action === "ask"
-                ? "Ask first"
-                : "Active"
-              : "Off"}
+                ? t()("skills.badge.askFirst")
+                : t()("skills.badge.active")
+              : t()("skills.badge.off")}
       </span>
       <Show when={props.loaded}>
         <span class="settings-chip" data-state="loaded">
-          Loaded this turn
+          {t()("skills.badge.loaded")}
         </span>
       </Show>
       <Show when={props.pinned}>
         <span class="settings-chip" data-state="pinned">
-          Pinned
+          {t()("skills.badge.pinned")}
         </span>
       </Show>
       <Show when={!props.pinned && props.recent}>
         <span class="settings-chip" data-state="recent">
-          Recent
+          {t()("skills.badge.recent")}
         </span>
       </Show>
       <Show when={!props.pinned && !props.recent && props.recommended}>
         <span class="settings-chip" data-state="recommended">
-          Recommended
+          {t()("skills.badge.recommended")}
         </span>
       </Show>
     </div>
@@ -833,7 +857,9 @@ function SkillRow(props: {
   disabled: boolean
   onToggle: (v: boolean) => void
   onPin: (v: boolean) => void
+  t: Translate
 }): JSX.Element {
+  const t = () => props.t
   const source = () => sourceOf(props.skill)
   return (
     <li
@@ -852,7 +878,7 @@ function SkillRow(props: {
           <span>
             <code>/{props.skill.name}</code>
             <span aria-hidden="true">·</span>
-            {SOURCE_LABEL[source()]}
+            {t()(SOURCE_LABEL[source()])}
           </span>
         </div>
       </div>
@@ -863,6 +889,7 @@ function SkillRow(props: {
         </p>
         <div class="skills-workspace__badges">
           <SkillStateBadges
+            t={t()}
             allowed={props.on}
             pinned={props.pinned}
             recent={props.recent}
@@ -872,7 +899,7 @@ function SkillRow(props: {
             projectDisabled={props.skill.disabled_by === "project"}
           />
           <Show when={(props.skill.tags ?? []).length > 0}>
-            <div class="skills-workspace__tags" aria-label="Skill tags">
+            <div class="skills-workspace__tags" aria-label={t()("skills.state.tags")}>
               <For each={(props.skill.tags ?? []).slice(0, 2)}>
                 {(tag) => <span class="settings-chip">{displayLabel(tag)}</span>}
               </For>
@@ -915,7 +942,9 @@ function ScratchForm(props: {
   busy: boolean
   onCancel: () => void
   onCreate: (name: string, description: string, body: string) => void
+  t: Translate
 }): JSX.Element {
+  const t = () => props.t
   const [name, setName] = createSignal("")
   const [description, setDescription] = createSignal("")
   const [body, setBody] = createSignal("")
@@ -927,8 +956,8 @@ function ScratchForm(props: {
           <Icon name="pencil-line" size="small" />
         </div>
         <div>
-          <h3>Write a new skill</h3>
-          <p>Create a focused playbook that agents can load when it is relevant.</p>
+          <h3>{t()("skills.page.writeTitle")}</h3>
+          <p>{t()("skills.page.writeHint")}</p>
         </div>
       </div>
       <div class="skills-workspace__form-fields">
@@ -937,7 +966,7 @@ function ScratchForm(props: {
           label="Description"
           value={description()}
           onInput={setDescription}
-          placeholder="When should an agent load this skill?"
+          placeholder={t()("skills.form.descriptionPlaceholder")}
         />
         <FormField
           label="Instructions (Markdown)"
@@ -945,7 +974,7 @@ function ScratchForm(props: {
           onInput={setBody}
           multiline
           mono
-          placeholder="Step-by-step guidance, code examples, pitfalls…"
+          placeholder={t()("skills.form.bodyPlaceholder")}
         />
         <div class="skills-workspace__form-actions">
           <FormButton
@@ -953,14 +982,20 @@ function ScratchForm(props: {
             disabled={props.busy || !valid()}
             onClick={() => props.onCreate(name().trim(), description().trim(), body())}
           />
-          <FormButton label="Cancel" variant="ghost" onClick={props.onCancel} disabled={props.busy} />
+          <FormButton label={t()("common.cancel")} variant="ghost" onClick={props.onCancel} disabled={props.busy} />
         </div>
       </div>
     </div>
   )
 }
 
-function GithubForm(props: { busy: boolean; onCancel: () => void; onInstall: (url: string) => void }): JSX.Element {
+function GithubForm(props: {
+  busy: boolean
+  onCancel: () => void
+  onInstall: (url: string) => void
+  t: Translate
+}): JSX.Element {
+  const t = () => props.t
   const [url, setUrl] = createSignal("")
   return (
     <div class="skills-workspace__form">
@@ -969,8 +1004,8 @@ function GithubForm(props: { busy: boolean; onCancel: () => void; onInstall: (ur
           <Icon name="github" size="small" />
         </div>
         <div>
-          <h3>Import from GitHub</h3>
-          <p>Install one or more skills from a public repository.</p>
+          <h3>{t()("skills.page.importTitle")}</h3>
+          <p>{t()("skills.page.importHint")}</p>
         </div>
       </div>
       <div class="skills-workspace__form-fields">
@@ -985,7 +1020,7 @@ function GithubForm(props: { busy: boolean; onCancel: () => void; onInstall: (ur
             disabled={props.busy || !url().trim()}
             onClick={() => props.onInstall(url().trim())}
           />
-          <FormButton label="Cancel" variant="ghost" onClick={props.onCancel} disabled={props.busy} />
+          <FormButton label={t()("common.cancel")} variant="ghost" onClick={props.onCancel} disabled={props.busy} />
         </div>
       </div>
     </div>
