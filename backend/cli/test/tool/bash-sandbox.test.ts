@@ -125,6 +125,69 @@ describe("tool.bash sandbox integration", () => {
     })
   }, 15_000)
 
+  test("exposes the shared environment tree under the synthetic home", async () => {
+    if (!Sandbox.available()) return
+
+    await using _sandbox = await sandboxedExecution()
+    await using tmp = await tmpdir({ git: true })
+    const shared = fs.mkdtempSync(path.join(os.tmpdir(), "axiomics-shared-"))
+    const overlayRoot = fs.mkdtempSync(path.join(os.tmpdir(), "axiomics-overlay-"))
+    fs.mkdirSync(path.join(shared, "omics-test", "bin"), { recursive: true })
+    fs.writeFileSync(path.join(shared, "omics-test", "bin", "python3"), "shared-python\n")
+    const previous = {
+      shared: process.env.AXIOMICS_SHARED_ENVS,
+      overlay: process.env.AXIOMICS_ENV_OVERLAY_ROOT,
+    }
+    process.env.AXIOMICS_SHARED_ENVS = shared
+    process.env.AXIOMICS_ENV_OVERLAY_ROOT = overlayRoot
+    let projectID = ""
+
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          projectID = Instance.project.id
+          const ctx = await context()
+          const bash = await BashTool.init()
+          const result = await bash.execute(
+            {
+              command: [
+                `echo "ENVS=$(ls /home/example-user-d4f0bc/.runtime/envs)"`,
+                `echo "READ=$(cat /home/example-user-d4f0bc/.runtime/envs/omics-test/bin/python3)"`,
+                `echo upgraded > /home/example-user-d4f0bc/.runtime/envs/omics-test/bin/python3`,
+                `echo "WRITE=$(cat /home/example-user-d4f0bc/.runtime/envs/omics-test/bin/python3)"`,
+              ].join("; "),
+              description: "install into the project environment view",
+            },
+            ctx,
+          )
+          expect(result.metadata.exit, result.output).toBe(0)
+          expect(result.output).toContain("ENVS=omics-test")
+          expect(result.output).toContain("READ=shared-python")
+          expect(result.output).toContain("WRITE=upgraded")
+
+          // The install lives in this project's layer, and the shared copy
+          // every project starts from is untouched.
+          const upper = path.join(overlayRoot, projectID, "upper", "omics-test", "bin", "python3")
+          expect(fs.readFileSync(upper, "utf8")).toBe("upgraded\n")
+          expect(fs.readFileSync(path.join(shared, "omics-test", "bin", "python3"), "utf8")).toBe("shared-python\n")
+        },
+      })
+    } finally {
+      if (previous.shared === undefined) delete process.env.AXIOMICS_SHARED_ENVS
+      else process.env.AXIOMICS_SHARED_ENVS = previous.shared
+      if (previous.overlay === undefined) delete process.env.AXIOMICS_ENV_OVERLAY_ROOT
+      else process.env.AXIOMICS_ENV_OVERLAY_ROOT = previous.overlay
+      // overlayfs marks its work directory mode 0000; loosen it before a
+      // non-root recursive removal can descend.
+      try {
+        fs.chmodSync(path.join(overlayRoot, projectID, "work", "work"), 0o700)
+      } catch {}
+      fs.rmSync(shared, { recursive: true, force: true })
+      fs.rmSync(overlayRoot, { recursive: true, force: true })
+    }
+  }, 20_000)
+
   test("runs Git normally from a linked worktree", async () => {
     if (!Sandbox.available()) return
 

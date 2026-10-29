@@ -290,6 +290,7 @@ class RKernel implements Kernel {
       ATLAS_CLI_CONFIG_PATH: configPath,
     })
     if (view) view.env = PathSpace.payloadEnv(view, env)
+    const envOverlay = Sandbox.envOverlay(Instance.project.id)
     const sandboxed = Sandbox.wrapArgv({
       file: interpreter.binary,
       args: ["--vanilla", scriptPath],
@@ -298,7 +299,8 @@ class RKernel implements Kernel {
       extraWritable: [scriptPath, configPath, ...(opts?.extraWritable ?? [])],
       unreadable: Axiomics.kernelSensitivePaths(),
       view,
-      path: view ? PathSpace.remapHome(view.relocate, process.env.PATH ?? "") : undefined,
+      envOverlay,
+      path: view ? PathSpace.translateValue(view.roots, view.relocate, process.env.PATH ?? "") : undefined,
       options: {
         enabled: policy.enabled,
         network: opts?.sandboxNetwork ?? policy.network,

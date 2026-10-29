@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 租户生命周期管理：add / retire / list / reclaim
+# 租户生命周期管理：add / retire / list / reclaim / gc
 #
 # 设计约束（每条都有实测依据）：
 #   - 容器标志集缺一不可（见 docs/多租户运维手册.md 2.3）
@@ -166,6 +166,8 @@ run_tenant() {
     -e PIP_CACHE_DIR=/cache/pip -e UV_CACHE_DIR=/cache/uv \
     -e AXIOMICS_SHARED_PYTHON="$SHARED_PYTHON" \
     -e AXIOMICS_SHARED_R="$SHARED_R" \
+    -e AXIOMICS_SHARED_ENVS="$SHARED_ENVS" \
+    -e AXIOMICS_ENV_OVERLAY_ROOT=/data/kernel-overlay \
     -e AXIOMICS_DISABLE_TERMINAL="${AX_TERMINAL_DISABLED:-1}" \
     "${MIRROR_ARGS[@]}" \
     -e http_proxy= -e https_proxy= -e HTTP_PROXY= -e HTTPS_PROXY= \
@@ -399,6 +401,9 @@ cmd_retire() {
   [ -n "$tid" ] || die "未找到用户 $name"
 
   podman stop -t 10 "ax-$tid" >/dev/null 2>&1 || true
+  # overlayfs 把自己的 work 目录建成 0000；不先放松权限，tar 读不到，
+  # 归档里就少了整个项目的环境覆盖层，而错误被 `|| true` 吞掉。
+  chmod -R u+rwX "$TENANTS/$tid/data/kernel-overlay" 2>/dev/null || true
   mkdir -p "$AX_ROOT/archive"
   tar -czf "$AX_ROOT/archive/$tid-$(date +%F).tar.gz" -C "$TENANTS" "$tid" 2>/dev/null || true
   grep -v "^$name " "$MAP" > "$MAP.new"; mv "$MAP.new" "$MAP"
@@ -464,6 +469,28 @@ cmd_list() {
     st=$(podman ps -a --filter "name=^ax-$t$" --format "{{.Status}}" 2>/dev/null | head -1 || true)
     printf '%-10s %-8s %-7s %-5s %s\n' "$n" "$t" "$p" "$g" "${st:-未运行}"
   done < "$MAP"
+}
+
+# ── gc：回收已删除项目的环境覆盖层 ──────────────────────────────────
+# 共享环境只读、每项目一层可写覆盖。项目目录删掉后，覆盖层没有别的主人，
+# 留着只是占盘；这里按「项目目录是否还在」判断，只读不猜活跃度。
+cmd_gc() {
+  local dry=0
+  [ "${1:-}" = "--dry-run" ] && dry=1
+  local d tid prj removed=0
+  for d in "$TENANTS"/*/data/kernel-overlay/*; do
+    [ -d "$d" ] || continue
+    tid=$(basename "$(dirname "$(dirname "$(dirname "$d")")")")
+    prj=$(basename "$d")
+    [ -d "$TENANTS/$tid/data/projects/$prj" ] && continue
+    if [ "$dry" = 1 ]; then
+      echo "would remove $d"
+      continue
+    fi
+    chmod -R u+rwX "$d" 2>/dev/null || true
+    rm -rf "$d" && removed=$((removed + 1))
+  done
+  [ "$dry" = 1 ] || echo "已回收 $removed 个项目环境覆盖层"
 }
 
 # ── reclaim：两个精确信号 ────────────────────────────────────────────
@@ -627,6 +654,7 @@ case "${1:-}" in
   start)   shift; cmd_start "$@" ;;
   recreate) shift; cmd_recreate "$@" ;;
   list)    cmd_list ;;
+  gc)      shift; cmd_gc "$@" ;;
   reclaim) shift; cmd_reclaim "$@" ;;
   sweep)   cmd_sweep ;;
   seed-cases) shift; seed_cases "${1:?用法: axiomics-tenant seed-cases <租户ID>|--all [optional]}" "${2:-required}" ;;

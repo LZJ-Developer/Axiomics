@@ -5,7 +5,7 @@ import { spawn, spawnSync } from "child_process"
 import { lazy } from "@/util/lazy"
 import { Log } from "@/util/log"
 import { Shell } from "@/shell/shell"
-import { VIEW_TMP, relocate as relocatePrefix } from "./view"
+import { ENV_OVERLAY_MOUNT, VIEW_TMP, overlayScript, relocate as relocatePrefix } from "./view"
 
 const log = Log.create({ service: "sandbox" })
 
@@ -81,6 +81,10 @@ export namespace Sandbox {
      * meant to learn. Masks are relocated too: a secret left at its host
      * spelling would stay readable under the relocated mount. */
     relocate?: { from: string; to: string }
+    /** Host roots that appear under a different spelling inside the namespace
+     * even though they are not the relocated home (the shared environment
+     * tree). Applied to argv and to path-like environment values. */
+    remap?: { from: string; to: string }[]
     /** Variables the payload sees inside the namespace. They are applied with
      * bwrap `--setenv`, never on the spawn environment: the host-side launch
      * gate boots this binary before bwrap exists and must keep host spellings
@@ -99,6 +103,17 @@ export namespace Sandbox {
   export interface Spec {
     file: string
     args: string[]
+  }
+
+  /** Per-project copy-on-write view of the shared environment tree. The
+   * overlay is mounted one level outside bwrap and bound over `target`, so
+   * installs land in `upper` while every project still shares one read-only
+   * lower. */
+  export interface EnvOverlay {
+    lower: string
+    upper: string
+    work: string
+    target: string
   }
 
   /** User-facing config knobs (mirrors Config.Sandbox, kept dependency-free). */
@@ -773,7 +788,7 @@ export namespace Sandbox {
     return args
   }
 
-  export function bubblewrapArgs(policy: Policy, view?: View): string[] {
+  export function bubblewrapArgs(policy: Policy, view?: View, overlay?: EnvOverlay): string[] {
     // Bubblewrap creates an empty tmpfs root. Populate only runtime and policy
     // grants; never bind the host root, even read-only, because doing so exposes
     // every same-user secret to arbitrary project code.
@@ -864,6 +879,11 @@ export namespace Sandbox {
       if (fs.statSync(source).isDirectory()) args.push("--tmpfs", destination)
       else args.push("--ro-bind-try", "/dev/null", destination)
     }
+    // The per-project overlay replaces the read-only shared tree: the wrapper
+    // one level outside has already mounted the merged view at a fixed path,
+    // and binding it read-write is what lets an install land in the project's
+    // upper layer instead of the shared lower.
+    if (overlay) args.push("--bind", ENV_OVERLAY_MOUNT, overlay.target)
     // Bubblewrap creates missing destination ancestors in the empty root while
     // assembling nested mounts. Those directories are scaffolding, not policy
     // grants: for example, mounting /home/user/.bun read-only must not leave
@@ -908,12 +928,34 @@ export namespace Sandbox {
   }
 
   /** Wrap an arbitrary argv under the active backend, or null when unavailable. */
-  function specForArgv(argv: string[], policy: Policy, view?: View): Spec | null {
+  function specForArgv(argv: string[], policy: Policy, view?: View, overlay?: EnvOverlay): Spec | null {
     switch (backend()) {
       case "seatbelt":
         return { file: "sandbox-exec", args: ["-p", seatbeltProfile(policy), ...argv] }
-      case "bubblewrap":
-        return { file: "bwrap", args: [...bubblewrapArgs(policy, view), "--", ...argv] }
+      case "bubblewrap": {
+        const bwrap = ["bwrap", ...bubblewrapArgs(policy, view, overlay), "--", ...argv]
+        if (!overlay) return { file: "bwrap", args: bwrap.slice(1) }
+        // Assemble the overlay in a private user+mount namespace, then exec
+        // bwrap inside it. bwrap creates its own namespace on top and binds
+        // the merged tree in; the host kernel allows nested user namespaces,
+        // so this needs no extra container capability.
+        return {
+          file: "unshare",
+          args: [
+            "-Urm",
+            "--map-root-user",
+            "/bin/sh",
+            "-c",
+            overlayScript(),
+            "sh",
+            ENV_OVERLAY_MOUNT,
+            overlay.lower,
+            overlay.upper,
+            overlay.work,
+            ...bwrap,
+          ],
+        }
+      }
       default:
         return null
     }
@@ -949,6 +991,21 @@ export namespace Sandbox {
   }
 
   /**
+   * Per-project copy-on-write view of the shared environment tree, or
+   * undefined when the deployment did not configure one. `upper` and `work`
+   * live under the project's data root, so installs persist across the
+   * project's sessions and disappear when the project is reclaimed.
+   */
+  export function envOverlay(projectID: string): EnvOverlay | undefined {
+    const lower = process.env.AXIOMICS_SHARED_ENVS
+    const root = process.env.AXIOMICS_ENV_OVERLAY_ROOT
+    if (!lower || !root) return
+    if (!/^[A-Za-z0-9_-]+$/.test(projectID)) return
+    const base = path.join(root, projectID)
+    return { lower, target: lower, upper: path.join(base, "upper"), work: path.join(base, "work") }
+  }
+
+  /**
    * Decide how to run a shell command given the sandbox config and the
    * workspace. Never throws unless `onUnavailable: "error"` and no backend
    * exists. The `cwd` is *not* granted write access unless it lies within the
@@ -972,6 +1029,8 @@ export namespace Sandbox {
     /** Model-facing home and mounted roots. Linux bubblewrap only; ignored by
      * backends without mount namespaces. */
     view?: View
+    /** Per-project copy-on-write view of the shared environment tree. */
+    envOverlay?: EnvOverlay
     options?: Options
   }): Plan {
     const { backend: b, warning } = decide(input.options)
@@ -1008,6 +1067,7 @@ export namespace Sandbox {
         ),
         policy,
         view,
+        input.envOverlay,
       )!
       log.info("sandboxing command", { backend: b, network: policy.network, writable: policy.writable.length })
       return { file: s.file, args: s.args, useShell: false, sandboxed: true, backend: b, temporary, warning }
@@ -1044,6 +1104,8 @@ export namespace Sandbox {
     /** PATH the payload should receive. Callers pass the already-remapped
      * value when a view is active. */
     path?: string
+    /** Per-project copy-on-write view of the shared environment tree. */
+    envOverlay?: EnvOverlay
     options?: Options
   }): Wrapped {
     const { backend: b, warning } = decide(input.options)
@@ -1075,7 +1137,6 @@ export namespace Sandbox {
       // above; only the argv the payload executes is rewritten.
       const relocate = view?.relocate
       const remap = (value: string) => {
-        if (!relocate || relocate.from === "/") return value
         // Resolve first: the interpreter often sits behind an absolute symlink
         // (a managed data-root link). The payload derives its install prefix
         // from the path it was executed as, so it must name the canonical
@@ -1085,6 +1146,15 @@ export namespace Sandbox {
         try {
           resolved = fs.realpathSync.native(value)
         } catch {}
+        // The shared environment tree is mounted under its model spelling but
+        // is not part of the relocated home; its alias is applied first.
+        for (const alias of view?.remap ?? []) {
+          const moved = relocatePrefix(alias, resolved)
+          if (moved !== resolved) return moved
+          const lexical = relocatePrefix(alias, value)
+          if (lexical !== value) return lexical
+        }
+        if (!relocate) return value
         return relocatePrefix(relocate, resolved)
       }
       const s = specForArgv(
@@ -1096,6 +1166,7 @@ export namespace Sandbox {
         ),
         { ...policy, gpu: input.gpu },
         view,
+        input.envOverlay,
       )!
       log.info("sandboxing process", { backend: b, network: policy.network, writable: policy.writable.length })
       return { file: s.file, args: s.args, sandboxed: true, backend: b, temporary, warning }

@@ -489,6 +489,9 @@ export const BashTool = Tool.define("bash", async () => {
           options.enabled === false || Sandbox.backend() !== "bubblewrap"
             ? undefined
             : await PathSpace.view(ctx.sessionID, cwd)
+        // Per-project copy-on-write view of the shared environment tree:
+        // installs persist for the project instead of touching the shared base.
+        const envOverlay = Sandbox.envOverlay(Instance.project.id)
         // When the view is active the project roots appear only under the
         // synthetic home; leaving them in the policy would mount the same
         // directories at their host spelling and defeat the whole point.
@@ -517,7 +520,12 @@ export const BashTool = Tool.define("bash", async () => {
         // canonical, view-visible interpreter: a lexical host path behind the
         // managed data-root link would dangle inside the namespace.
         const pythonHost = runtime.binary ?? Bun.which("python3") ?? Bun.which("python") ?? undefined
-        const pythonBinary = pythonHost && view ? PathSpace.remapHome(view.relocate, pythonHost) : pythonHost
+        const pythonBinary =
+          pythonHost && view
+            ? PathSpace.toModel(view.roots, pythonHost) !== pythonHost
+              ? PathSpace.toModel(view.roots, pythonHost)
+              : PathSpace.remapHome(view.relocate, pythonHost)
+            : pythonHost
         const sandbox = Sandbox.plan({
           command: Shell.pipefail(shell, params.command),
           shell,
@@ -537,9 +545,12 @@ export const BashTool = Tool.define("bash", async () => {
             pythonVisible: pythonBinary,
             // `withTempEnvironment` writes PATH itself, so the view has to be
             // applied here as well as on the spawn env.
-            path: view ? PathSpace.remapHome(view.relocate, runtimeEnv.PATH ?? process.env.PATH ?? "") : runtimeEnv.PATH,
+            path: view
+              ? PathSpace.translateValue(view.roots, view.relocate, runtimeEnv.PATH ?? process.env.PATH ?? "")
+              : runtimeEnv.PATH,
           },
           view,
+          envOverlay,
           options,
         })
         return Axiomics.withSubprocessEnv(process.env, async (env, overlay) => {

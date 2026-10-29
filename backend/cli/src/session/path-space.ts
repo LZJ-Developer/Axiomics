@@ -5,7 +5,7 @@ import { Instance } from "@/project/instance"
 import { SessionFilesystem } from "@/session/filesystem"
 import { Config } from "@/config/config"
 import { Sandbox } from "@/sandbox/sandbox"
-import { VIEW_HOME, VIEW_TMP, relocate as relocatePrefix } from "@/sandbox/view"
+import { ENV_OVERLAY_MOUNT, VIEW_ENVS, VIEW_HOME, relocate as relocatePrefix } from "@/sandbox/view"
 import { Log } from "@/util/log"
 
 const log = Log.create({ service: "path-space" })
@@ -44,6 +44,10 @@ export namespace PathSpace {
      * worktree so git and build tools work, while the model is told it is
      * working in the subdirectory it actually opened. */
     repository?: Root
+    /** The deployment's shared environment tree. It is one read-only copy for
+     * every project; with the per-project overlay it appears writable and
+     * installs land in the project's upper layer. */
+    envs?: Root
     connected?: Connected[]
     /** Home-prefix relocation applied to policy mounts. Text that names a
      * path under the host home is rewritten with the same rule. */
@@ -198,7 +202,9 @@ export namespace PathSpace {
     const connected = sessionID.startsWith("ses_")
       ? connectedRoots((await SessionFilesystem.state(sessionID).catch(() => undefined))?.grants ?? [])
       : []
+    const shared = process.env.AXIOMICS_SHARED_ENVS
     return {
+      ...(shared ? { envs: { host: shared, model: VIEW_ENVS } } : {}),
       project: { host: directory, model: projectModel },
       // Legacy sessions keep scratch inside the project directory. One host
       // directory must not appear under two names, so it reports the project
@@ -218,6 +224,7 @@ export namespace PathSpace {
       current.project,
       current.scratch,
       ...(current.repository ? [current.repository] : []),
+      ...(current.envs ? [current.envs] : []),
       ...(current.connected ?? []),
     ]
   }
@@ -295,9 +302,18 @@ export namespace PathSpace {
     if (current.scratch.host !== mountRoot.host && !contains(mountRoot.host, current.scratch.host)) {
       mounts.push({ source: current.scratch.host, destination: current.scratch.model })
     }
+    // The shared environment tree follows the same rule as the roots: it is
+    // reachable only under its model spelling. With the per-project overlay
+    // the source is the wrapper's merged mount, and the mount is writable —
+    // that is what makes an install land in the project instead of the base.
+    const overlay = !!process.env.AXIOMICS_ENV_OVERLAY_ROOT
+    if (current.envs) {
+      if (overlay) mounts.push({ source: ENV_OVERLAY_MOUNT, destination: current.envs.model })
+    }
     const readOnlyMounts = (current.connected ?? [])
       .filter((root) => root.access !== "write")
       .map((root) => ({ source: root.host, destination: root.model }))
+    if (current.envs && !overlay) readOnlyMounts.push({ source: current.envs.host, destination: current.envs.model })
     for (const root of current.connected ?? []) {
       if (root.access === "write") mounts.push({ source: root.host, destination: root.model })
     }
@@ -308,6 +324,7 @@ export namespace PathSpace {
       cwd: targetCwd,
       mounts,
       ...(readOnlyMounts.length ? { readOnlyMounts } : {}),
+      ...(current.envs ? { remap: [{ from: current.envs.host, to: current.envs.model }] } : {}),
       relocate: current.relocate,
       env: { USER: "agent", LOGNAME: "agent" },
       roots: current,
