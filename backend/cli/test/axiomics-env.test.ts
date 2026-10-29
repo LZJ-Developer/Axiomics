@@ -147,6 +147,7 @@ test("kernel env filtering keeps runtime configuration but drops credentials", (
     VIRTUAL_ENV: "/work/.venv",
     PYTHONPATH: "/work/python",
     R_LIBS: "/work/R",
+    PIP_TARGET: "/work/python/site-packages",
     ATLAS_API_KEY: "thk_atlas",
     OPENROUTER_API_KEY: "sk-or-user-owned",
     AWS_SECRET_ACCESS_KEY: "aws-secret",
@@ -160,6 +161,7 @@ test("kernel env filtering keeps runtime configuration but drops credentials", (
     VIRTUAL_ENV: "/work/.venv",
     PYTHONPATH: "/work/python",
     R_LIBS: "/work/R",
+    PIP_TARGET: "/work/python/site-packages",
   })
 })
 

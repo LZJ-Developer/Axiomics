@@ -124,6 +124,10 @@ const KERNEL_RUNTIME_KEYS = new Set([
   "TEMP",
   "PYTHONPATH",
   "PYTHONHOME",
+  // Project-scoped install target the platform sets on every kernel and Bash
+  // launch; without it here the subprocess filter would drop it and a pip
+  // install would land somewhere no later command can import from.
+  "PIP_TARGET",
   "VIRTUAL_ENV",
   "CONDA_PREFIX",
   "CONDA_DEFAULT_ENV",

@@ -351,6 +351,18 @@ export const BashTool = Tool.define("bash", async () => {
         },
       })
 
+      // A shell command is how a long-tail dependency actually gets installed,
+      // so recognize the mutation here the way the Python tool does. Detection
+      // is conservative (pip/uv/conda/install.packages and friends) and the
+      // caller approves it; the approval is what lets this one launch write
+      // the project package root and reach a repository. Every later launch
+      // imports the result through the exported PIP_TARGET/PYTHONPATH or
+      // R_LIBS_USER, so the model never has to repeat a path.
+      const mutation =
+        KernelEnvironmentMutation.detect({ language: "python", environment: "python", code: params.command }) ??
+        KernelEnvironmentMutation.detect({ language: "r", environment: "r", code: params.command })
+      if (mutation) await ctx.ask(KernelEnvironmentMutation.permission(mutation))
+
       // Seed the BYOK secret cache so redact() below masks the user's own
       // provider keys (auth.json + shell env), not just synced managed ones.
       await Axiomics.refreshByokSecrets(process.env).catch(() => {})
@@ -369,8 +381,14 @@ export const BashTool = Tool.define("bash", async () => {
       // the generation check below still rejects any authority change before
       // the subprocess is created. This keeps independent shell launches from
       // timing out behind environment maintenance.
-      const runtime = await KernelEnvironmentMutation.pythonRuntime("python")
+      const runtime = await KernelEnvironmentMutation.pythonRuntime("python", mutation?.language === "python")
       if (runtime.env?.PIP_TARGET) readable.add(runtime.env.PIP_TARGET)
+      // R installs also arrive through the shell. Materialize the same library
+      // rRuntime exports rather than starting a second kernel runtime: one
+      // directory, created on demand, granted to this launch only.
+      const rLibrary =
+        mutation?.language === "r" ? path.join(KernelEnvironmentMutation.managedRoot("r", "r"), "library") : undefined
+      if (rLibrary) await import("node:fs/promises").then((fs) => fs.mkdir(rLibrary, { recursive: true }))
 
       const started = Date.now()
       const streams = { stdout: "", stderr: "" }
@@ -426,14 +444,14 @@ export const BashTool = Tool.define("bash", async () => {
           command: Shell.pipefail(shell, params.command),
           shell,
           cwd,
-          workspace: current.writable,
+          workspace: [...current.writable, ...(runtime.extraWritable ?? []), ...(rLibrary ? [rLibrary] : [])],
           readable: [...readable],
           unreadable: Axiomics.kernelSensitivePaths(),
           runtime: {
             python: runtime.binary ?? Bun.which("python3") ?? Bun.which("python") ?? undefined,
             path: runtime.env?.PATH,
           },
-          options: current.sandbox,
+          options: mutation ? { ...current.sandbox, network: "allow" as const } : current.sandbox,
         })
         return Axiomics.withSubprocessEnv(process.env, async (env, overlay) => {
           const cache = sandbox.sandboxed ? Sandbox.cacheEnvironment(current.workspace) : {}
@@ -452,6 +470,14 @@ export const BashTool = Tool.define("bash", async () => {
               // user's key with the Ace managed proxy after subprocessEnv ran.
               env: {
                 ...Axiomics.filterEnvForSubprocess({ ...env, ...(runtime.env ?? {}), ...cache }),
+                // The subprocess filter rebuilds by allowlist, so the runtime
+                // overlay's own keys (PYTHONPATH, PIP_TARGET, R_LIBS_USER, …)
+                // are dropped even though pythonRuntime just computed them.
+                // Re-admit them through the kernel allowlist, which admits no
+                // provider or service credential key: an install made with the
+                // exported PIP_TARGET stays importable by the next command
+                // without the caller having to re-state PYTHONPATH.
+                ...Axiomics.filterEnvForKernel({ ...(runtime.env ?? {}), ...(rLibrary ? { R_LIBS_USER: rLibrary } : {}) }),
                 // The final overlay pass re-sanitizes runtime/cache values and
                 // therefore drops control variables. Restore only the fixed
                 // Git policy from subprocessEnv so Git never falls back to a
