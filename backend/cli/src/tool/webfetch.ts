@@ -13,6 +13,7 @@ import os from "node:os"
 import path from "node:path"
 import { ToolRetryGuard } from "@/session/tool-retry-guard"
 import { AuthoritySignal } from "@/project/authority-signal"
+import { Provider } from "@/provider/provider"
 
 export const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5 MiB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
@@ -23,6 +24,68 @@ export const DOWNLOAD_DISK_RESERVE_BYTES = 512 * 1024 * 1024 // preserve 512 MiB
 const DEFAULT_RATE_LIMIT_DELAY = 1_000
 const MAX_RATE_LIMIT_DELAY = 120_000
 const HOST_PACING_LIMIT = 256
+
+/** Platform bot challenges (Vercel, Cloudflare) arrive as 403/429 plus a
+ * mitigation header. A plain HTTP client cannot pass the JavaScript check. */
+export function botChallenge(response: Response) {
+  const flag = response.headers.get("x-vercel-mitigated") ?? response.headers.get("cf-mitigated")
+  return flag?.toLowerCase() === "challenge"
+}
+
+/** One page through the model provider's own tools API. DeepSeek exposes
+ * `POST <baseURL>/tools/fetch`, which renders the page from their crawler and
+ * is not subject to the challenge that blocks us. Returns undefined when the
+ * provider has no such endpoint or nothing usable — the original challenge
+ * error then stands. */
+export async function providerFetchedPage(input: {
+  baseURL: string
+  key?: string
+  url: string
+  signal: AbortSignal
+  fetch?: typeof fetch
+}): Promise<{ title: string; content: string } | undefined> {
+  const endpoint = `${input.baseURL.replace(/\/+$/, "")}/tools/fetch`
+  const request = input.fetch ?? fetch
+  const response = await request(endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(input.key ? { authorization: `Bearer ${input.key}` } : {}),
+    },
+    body: JSON.stringify({ url: input.url }),
+    signal: input.signal,
+  })
+  if (!response.ok) return undefined
+  const page = (await response.json().catch(() => undefined)) as { title?: unknown; content?: unknown } | undefined
+  const content = typeof page?.content === "string" ? page.content : ""
+  if (!content.trim()) return undefined
+  return { title: typeof page?.title === "string" ? page.title : "", content }
+}
+
+function sessionModel(messages: Tool.Context["messages"]) {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const info = messages[index]?.info
+    if (info?.role === "user" && info.model) return info.model
+  }
+  return undefined
+}
+
+/** Where the active model's provider exposes its tools API, when it does. */
+async function providerToolsEndpoint(ctx: Tool.Context) {
+  const selected = sessionModel(ctx.messages) ?? (await Provider.defaultModel().catch(() => undefined))
+  if (!selected) return undefined
+  const provider = await Provider.getProvider(selected.providerID).catch(() => undefined)
+  if (!provider) return undefined
+  const baseURL = typeof provider.options?.baseURL === "string" ? provider.options.baseURL.trim() : ""
+  if (!baseURL) return undefined
+  const key =
+    typeof provider.options?.apiKey === "string" && provider.options.apiKey
+      ? provider.options.apiKey
+      : typeof provider.key === "string" && provider.key
+        ? provider.key
+        : undefined
+  return { providerID: selected.providerID, baseURL, key }
+}
 
 type HostPacingState = {
   tail: Promise<void>
@@ -322,6 +385,36 @@ export const WebFetchTool = Tool.define("webfetch", {
 
       if (!response.ok) {
         await response.body?.cancel().catch(() => {})
+        // A challenge is not a rate limit: our plain request cannot pass the
+        // JavaScript check, but the provider's crawler may already have the
+        // page. Try its tools API once, then keep the original error if that
+        // is unavailable (older gateways, other providers) — a fallback must
+        // never turn a working error into a confusing one.
+        if (botChallenge(response) && !download && params.format !== "html") {
+          const endpoint = await providerToolsEndpoint(ctx).catch(() => undefined)
+          const page = endpoint
+            ? await providerFetchedPage({
+                baseURL: endpoint.baseURL,
+                key: endpoint.key,
+                url: params.url,
+                signal,
+              }).catch(() => undefined)
+            : undefined
+          if (endpoint && page) {
+            return {
+              title: `${params.url} (${endpoint.providerID} tools/fetch)`,
+              output: [
+                `Fetched through the ${endpoint.providerID} tools API: the site answers direct HTTP with an automated-client challenge. Content may lag the live page.`,
+                `Reported title: ${page.title || "(none)"}`,
+                "",
+                page.content,
+              ].join("\n"),
+              metadata: {
+                response: { url: params.url, provider: endpoint.providerID, via: "provider_tools_fetch" },
+              } as Record<string, unknown>,
+            }
+          }
+        }
         if (response.status === 404) {
           throw new Error(
             "Request failed with status code: 404. This endpoint or identifier does not exist. " +
@@ -336,6 +429,18 @@ export const WebFetchTool = Tool.define("webfetch", {
           )
         }
         if (response.status === 429) {
+          // Vercel (like Cloudflare) answers automated clients with a platform
+          // challenge served as 429. That is not a rate limit: no back-off or
+          // rewording gets past the JavaScript check, so the generic advice to
+          // "continue sequentially" only sends the agent in circles.
+          if (botChallenge(response)) {
+            throw new Error(
+              "Request failed with status code: 429. The host answered with an automated-client challenge " +
+                "(a JavaScript check that a plain HTTP fetch cannot pass), not a rate limit. Retrying Web fetch — " +
+                "even with a reworded call or another URL on the same host — cannot succeed. " +
+                "Use another authoritative source: a documented API endpoint, a mirror, or a host that serves plain HTML.",
+            )
+          }
           const retryAfter = webFetchRetryAfterMs(response.headers.get("retry-after"))
           throw new Error(
             `Request failed with status code: 429. This host is rate limiting requests; queued WebFetch calls to the same host are now paced for ${Math.ceil(retryAfter / 1_000)} seconds. Do not fan out more requests to this service; continue sequentially or use a different authoritative source.`,

@@ -5,7 +5,9 @@ import {
   MAX_RESPONSE_SIZE,
   WebFetchTool,
   automaticDownloadName,
+  botChallenge,
   normalizeDownloadOutputPath,
+  providerFetchedPage,
   webFetchRetryAfterMs,
 } from "../../src/tool/webfetch"
 import type { Tool } from "../../src/tool/tool"
@@ -130,6 +132,62 @@ test("webfetch serializes same-host requests and honors Retry-After after a 429"
   expect(calls).toBe(2)
   expect(maxActive).toBe(1)
   expect(webFetchRetryAfterMs("2")).toBe(2_000)
+})
+
+test("reports a platform bot challenge as such instead of advising a paced retry", async () => {
+  await Network.set({ allowlistEnabled: false, enabled: [], custom: [] })
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls++
+    // What www.10xgenomics.com returns to curl, requests, and Web fetch alike.
+    return new Response("<!DOCTYPE html><title>Vercel Security Checkpoint</title>", {
+      status: 429,
+      headers: { "x-vercel-mitigated": "challenge" },
+    })
+  }) as unknown as typeof fetch
+
+  const webfetch = await WebFetchTool.init()
+  const error = await captureError(
+    webfetch.execute({ url: "https://example.com/platforms/visium", format: "markdown" }, context(async () => {})),
+  )
+
+  expect(error.message).toContain("automated-client challenge")
+  expect(error.message).not.toContain("paced")
+  expect(calls).toBe(1)
+})
+
+test("provider tools fetch turns a challenge into page content, and declines quietly otherwise", async () => {
+  const seen: Array<{ url: string; headers: Headers; body: string }> = []
+  const stub = (status: number, payload: unknown) =>
+    (async (url: string, init: RequestInit) => {
+      seen.push({ url: String(url), headers: new Headers(init.headers), body: String(init.body) })
+      return new Response(JSON.stringify(payload), { status })
+    }) as unknown as typeof fetch
+  const signal = new AbortController().signal
+
+  const page = await providerFetchedPage({
+    baseURL: "https://gateway.example/model/v1/",
+    key: "tenant-key",
+    url: "https://www.10xgenomics.com/platforms/visium",
+    signal,
+    fetch: stub(200, { title: "Visium", content: "# Visium\n\nspots" }),
+  })
+  expect(page).toEqual({ title: "Visium", content: "# Visium\n\nspots" })
+  expect(seen[0]?.url).toBe("https://gateway.example/model/v1/tools/fetch")
+  expect(seen[0]?.headers.get("authorization")).toBe("Bearer tenant-key")
+  expect(JSON.parse(seen[0]!.body)).toEqual({ url: "https://www.10xgenomics.com/platforms/visium" })
+
+  // No content, no endpoint, or an error: the caller keeps its own diagnosis.
+  expect(
+    await providerFetchedPage({ baseURL: "https://gw/v1", url: "https://x", signal, fetch: stub(200, { content: " " }) }),
+  ).toBeUndefined()
+  expect(
+    await providerFetchedPage({ baseURL: "https://gw/v1", url: "https://x", signal, fetch: stub(404, {}) }),
+  ).toBeUndefined()
+
+  expect(botChallenge(new Response("", { status: 429, headers: { "x-vercel-mitigated": "challenge" } }))).toBe(true)
+  expect(botChallenge(new Response("", { status: 403, headers: { "cf-mitigated": "challenge" } }))).toBe(true)
+  expect(botChallenge(new Response("", { status: 429 }))).toBe(false)
 })
 
 test("webfetch reduces absolute, temp-directory, and nested destinations to safe root filenames", () => {
