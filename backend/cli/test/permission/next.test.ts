@@ -1295,9 +1295,17 @@ test("unattended deployments keep the sandbox but stop asking for routine work",
         metadata: write,
       }),
     ).toBe("ask")
+    // A network read is routine too: it brings data in and changes nothing on
+    // the host. Egress that becomes a side effect keeps asking.
     expect(
       PermissionNext.modeAction({ mode: "approve", permission: "network", configured: "ask", granted: "ask" }),
+    ).toBe("allow")
+    expect(
+      PermissionNext.modeAction({ mode: "approve", permission: "generate_image", configured: "ask", granted: "ask" }),
     ).toBe("ask")
+    expect(
+      PermissionNext.modeAction({ mode: "approve", permission: "network", configured: "deny", granted: "allow" }),
+    ).toBe("deny")
     expect(PermissionNext.modeAction({ mode: "ask", permission: "edit", configured: "allow", granted: "allow" })).toBe(
       "ask",
     )
@@ -1312,6 +1320,10 @@ test("unattended deployments keep the sandbox but stop asking for routine work",
       granted: "ask",
       metadata: { shell: { command: "rm -rf build" } },
     }),
+  ).toBe("ask")
+  // Outside an unattended deployment the network still needs a human.
+  expect(
+    PermissionNext.modeAction({ mode: "approve", permission: "network", configured: "ask", granted: "ask" }),
   ).toBe("ask")
 })
 

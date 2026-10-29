@@ -98,8 +98,12 @@ export namespace PermissionNext {
    * behavior, while unknown permission kinds remain fail-closed.
    */
   /** Permissions that only read: with the sandbox boundary in force they add
-   * no durable power, so an unattended deployment lets them through. */
-  const UNATTENDED_READ = new Set(["webfetch", "websearch", "codesearch"])
+   * no durable power, so an unattended deployment lets them through. A network
+   * read belongs here: a page fetched or a search run brings data in without
+   * touching the host, and anything that would turn egress into a side effect
+   * (a download onto disk, an image render, a compute job) asks its own
+   * permission. */
+  const UNATTENDED_READ = new Set(["webfetch", "websearch", "codesearch", "network"])
 
   function externalRead(metadata: Record<string, unknown> | undefined) {
     const filesystem = metadata?.filesystem
@@ -121,10 +125,11 @@ export namespace PermissionNext {
     if (input.mode === "ask" && level !== "passive") return "ask"
     // Unattended deployments (one tenant, one container, an enforced OS
     // sandbox) keep the sandbox but stop interrupting routine work: a shell
-    // command whose reach the sandbox already bounds, and read access to paths
-    // outside the workspace, proceed without a human. Grants that widen the
-    // boundary (write to an external path, compute, environment mutation,
-    // network or MCP endpoints) still ask their own permission.
+    // command whose reach the sandbox already bounds, read access to paths
+    // outside the workspace, and network reads proceed without a human. Grants
+    // that widen the boundary (write to an external path, compute, environment
+    // mutation, provider spend or MCP endpoints) still ask their own
+    // permission.
     if (input.mode === "approve" && input.permission === "bash" && level === "risky") {
       return Flag.AXIOMICS_SANDBOX_UNATTENDED ? "allow" : "ask"
     }
