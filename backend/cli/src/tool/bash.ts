@@ -383,12 +383,33 @@ export const BashTool = Tool.define("bash", async () => {
       // timing out behind environment maintenance.
       const runtime = await KernelEnvironmentMutation.pythonRuntime("python", mutation?.language === "python")
       if (runtime.env?.PIP_TARGET) readable.add(runtime.env.PIP_TARGET)
-      // R installs also arrive through the shell. Materialize the same library
-      // rRuntime exports rather than starting a second kernel runtime: one
-      // directory, created on demand, granted to this launch only.
-      const rLibrary =
-        mutation?.language === "r" ? path.join(KernelEnvironmentMutation.managedRoot("r", "r"), "library") : undefined
-      if (rLibrary) await import("node:fs/promises").then((fs) => fs.mkdir(rLibrary, { recursive: true }))
+      // R reaches a shell the same way Python does, and its project library has
+      // to be exported on every launch, not only on the install — otherwise the
+      // package one command installed is invisible to the next. rRuntime would
+      // start a kernel we do not need here, so assemble the same overlay: the
+      // shared R bin on PATH, R_HOME, and the project library on R_LIBS_USER.
+      // Writing that library (and reaching a repository) still requires the
+      // mutation grant below.
+      const rBase = KernelEnvironmentMutation.sharedBase("r")
+      const rLibrary = rBase ? path.join(KernelEnvironmentMutation.managedRoot("r", "r"), "library") : undefined
+      const runtimeEnv = { ...(runtime.env ?? {}) }
+      if (rBase && rLibrary) {
+        // R warns or fails when R_LIBS_USER names a missing directory, so create
+        // it on the same terms rRuntime does.
+        await import("node:fs/promises").then((fs) => fs.mkdir(rLibrary, { recursive: true }))
+        runtimeEnv.PATH = [rBase.binary && path.dirname(rBase.binary), runtimeEnv.PATH]
+          .filter(Boolean)
+          .join(path.delimiter)
+        // R_HOME is deliberately not exported: Rscript resolves its own home
+        // from its installation and answers a mismatched exported value with
+        // "WARNING: ignoring environment value of R_HOME" on every command.
+        runtimeEnv.R_LIBS_USER = rLibrary
+        readable.add(rLibrary)
+        // The interpreter itself lives in the read-only shared root, which is
+        // outside the project grant; without it `Rscript` is not launchable
+        // inside the sandbox even though it is on PATH.
+        if (rBase.env?.R_HOME) readable.add(rBase.env.R_HOME)
+      }
 
       const started = Date.now()
       const streams = { stdout: "", stderr: "" }
@@ -444,12 +465,16 @@ export const BashTool = Tool.define("bash", async () => {
           command: Shell.pipefail(shell, params.command),
           shell,
           cwd,
-          workspace: [...current.writable, ...(runtime.extraWritable ?? []), ...(rLibrary ? [rLibrary] : [])],
+          workspace: [
+            ...current.writable,
+            ...(runtime.extraWritable ?? []),
+            ...(mutation?.language === "r" && rLibrary ? [rLibrary] : []),
+          ],
           readable: [...readable],
           unreadable: Axiomics.kernelSensitivePaths(),
           runtime: {
             python: runtime.binary ?? Bun.which("python3") ?? Bun.which("python") ?? undefined,
-            path: runtime.env?.PATH,
+            path: runtimeEnv.PATH,
           },
           options: mutation ? { ...current.sandbox, network: "allow" as const } : current.sandbox,
         })
@@ -469,7 +494,7 @@ export const BashTool = Tool.define("bash", async () => {
               // overlays must never restore a managed token or re-pair a
               // user's key with the Ace managed proxy after subprocessEnv ran.
               env: {
-                ...Axiomics.filterEnvForSubprocess({ ...env, ...(runtime.env ?? {}), ...cache }),
+                ...Axiomics.filterEnvForSubprocess({ ...env, ...runtimeEnv, ...cache }),
                 // The subprocess filter rebuilds by allowlist, so the runtime
                 // overlay's own keys (PYTHONPATH, PIP_TARGET, R_LIBS_USER, …)
                 // are dropped even though pythonRuntime just computed them.
@@ -477,7 +502,7 @@ export const BashTool = Tool.define("bash", async () => {
                 // provider or service credential key: an install made with the
                 // exported PIP_TARGET stays importable by the next command
                 // without the caller having to re-state PYTHONPATH.
-                ...Axiomics.filterEnvForKernel({ ...(runtime.env ?? {}), ...(rLibrary ? { R_LIBS_USER: rLibrary } : {}) }),
+                ...Axiomics.filterEnvForKernel(runtimeEnv),
                 // The final overlay pass re-sanitizes runtime/cache values and
                 // therefore drops control variables. Restore only the fixed
                 // Git policy from subprocessEnv so Git never falls back to a
