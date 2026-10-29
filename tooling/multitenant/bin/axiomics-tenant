@@ -148,6 +148,8 @@ run_tenant() {
   [ -n "${AXIOMICS_PIP_TRUSTED_HOST:-}" ] && MIRROR_ARGS+=(-e AXIOMICS_PIP_TRUSTED_HOST="$AXIOMICS_PIP_TRUSTED_HOST")
   [ -n "${AXIOMICS_CRAN_MIRROR:-}" ] && MIRROR_ARGS+=(-e AXIOMICS_CRAN_MIRROR="$AXIOMICS_CRAN_MIRROR")
 
+  # 面向研究者的 Web 产品默认不开终端：后端 /pty 直接 403，前端不渲染入口。
+  # 需要排障的站点用 AX_TERMINAL_DISABLED=0 重新建租户即可恢复。
   podman run -d --name "ax-$tid" \
     --init \
     --userns=keep-id \
@@ -164,6 +166,7 @@ run_tenant() {
     -e PIP_CACHE_DIR=/cache/pip -e UV_CACHE_DIR=/cache/uv \
     -e AXIOMICS_SHARED_PYTHON="$SHARED_PYTHON" \
     -e AXIOMICS_SHARED_R="$SHARED_R" \
+    -e AXIOMICS_DISABLE_TERMINAL="${AX_TERMINAL_DISABLED:-1}" \
     "${MIRROR_ARGS[@]}" \
     -e http_proxy= -e https_proxy= -e HTTP_PROXY= -e HTTPS_PROXY= \
     -e all_proxy= -e ALL_PROXY= -e no_proxy= -e NO_PROXY= \

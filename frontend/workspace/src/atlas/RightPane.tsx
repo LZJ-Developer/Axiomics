@@ -28,6 +28,7 @@ import { StoredArtifactView } from "@/artifacts/StoredArtifactView"
 import { confirmDialog } from "@/atlas/dialogs"
 import { discardFileDraft } from "@/atlas/file-drafts"
 import { AsciiSpinner } from "@/atlas/shared/AsciiSpinner"
+import { deploymentCapabilities } from "@/context/capabilities"
 import { PaneResizer } from "@/atlas/PaneResizer"
 import {
   IconArchive,
@@ -225,6 +226,12 @@ export function RightPane(
   const language = useLanguage()
   const paneID = createUniqueId()
   const context = uiStore.context
+  // A persisted tab from before the policy changed (or a session opened on a
+  // server that has since disabled the terminal) must not leave the inspector
+  // stuck on a surface the deployment does not offer.
+  createEffect(() => {
+    if (!deploymentCapabilities.terminal() && uiStore.context() === "terminal") uiStore.openContext("files")
+  })
   const labels = createMemo(
     (): Record<ContextTab, string> => ({
       artifact: language.t("workspace.inspector.files"),
@@ -272,7 +279,9 @@ export function RightPane(
   const fileTabs = createMemo(() =>
     uiStore.workTabs().filter((tab): tab is Extract<WorkTab, { kind: "file" }> => tab.kind === "file"),
   )
-  const terminal = () => uiStore.workTabs().some((tab) => tab.kind === "view" && tab.context === "terminal")
+  const terminal = () =>
+    deploymentCapabilities.terminal() &&
+    uiStore.workTabs().some((tab) => tab.kind === "view" && tab.context === "terminal")
   const [terminalSeen, setTerminalSeen] = createSignal(terminal())
   createEffect(() => {
     if (terminal()) setTerminalSeen(true)

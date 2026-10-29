@@ -21,6 +21,10 @@ export namespace Flag {
   export const AXIOMICS_DISABLE_AUTOUPDATE = truthy("AXIOMICS_DISABLE_AUTOUPDATE")
   export const AXIOMICS_DISABLE_PRUNE = truthy("AXIOMICS_DISABLE_PRUNE")
   export const AXIOMICS_DISABLE_TERMINAL_TITLE = truthy("AXIOMICS_DISABLE_TERMINAL_TITLE")
+  /** Deployment policy for products used through the web UI only: no shell
+   * surface at all, so the PTY routes refuse and the client hides its entries.
+   * Unset keeps today's behaviour. */
+  export const AXIOMICS_DISABLE_TERMINAL = truthy("AXIOMICS_DISABLE_TERMINAL")
   export const AXIOMICS_PERMISSION = process.env["AXIOMICS_PERMISSION"]
   export const AXIOMICS_DISABLE_DEFAULT_PLUGINS = truthy("AXIOMICS_DISABLE_DEFAULT_PLUGINS")
   export const AXIOMICS_DISABLE_LSP_DOWNLOAD = truthy("AXIOMICS_DISABLE_LSP_DOWNLOAD")

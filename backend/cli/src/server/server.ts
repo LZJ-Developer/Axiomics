@@ -23,6 +23,7 @@ import { Agent } from "../agent/agent"
 import { Skill } from "../skill/skill"
 import { PermissionNext } from "../permission/next"
 import { Config } from "../config/config"
+import { Flag } from "../flag/flag"
 import { Auth } from "../auth"
 import { Command } from "../command"
 import { Global } from "../global"
@@ -395,6 +396,28 @@ export namespace Server {
           }),
         )
         .use(validator("query", z.object({ directory: z.string().optional() })))
+        // Deployment capabilities the client must honour before it renders a
+        // surface. Today only the terminal; a policy flag rather than a user
+        // preference, so a site sets it once for every session.
+        .get(
+          "/capabilities",
+          describeRoute({
+            summary: "Deployment capabilities",
+            description: "Server-wide switches a client must apply to its UI, such as whether a terminal is available.",
+            operationId: "app.capabilities",
+            responses: {
+              200: {
+                description: "Enabled deployment capabilities",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ terminal: z.boolean() })),
+                  },
+                },
+              },
+            },
+          }),
+          async (c) => c.json({ terminal: !Flag.AXIOMICS_DISABLE_TERMINAL }),
+        )
         .route("/project", ProjectRoutes())
         .route("/pty", PtyRoutes())
         .route("/config", ConfigRoutes())

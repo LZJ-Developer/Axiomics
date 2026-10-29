@@ -3,12 +3,21 @@ import { describeRoute, validator, resolver } from "hono-openapi"
 import { upgradeWebSocket } from "hono/bun"
 import z from "zod"
 import { Pty } from "@/pty"
+import { Flag } from "@/flag/flag"
 import { Storage } from "../../storage/storage"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 
 export const PtyRoutes = lazy(() =>
   new Hono()
+    // A deployment that ships this product through the web UI alone turns the
+    // terminal off as policy. Refuse every PTY call here rather than relying on
+    // the client to hide its entries: an old cached bundle, a script, or a
+    // hand-written request must not reach a shell.
+    .use(async (c, next) => {
+      if (!Flag.AXIOMICS_DISABLE_TERMINAL) return next()
+      return c.json({ error: "The terminal is disabled on this server" }, 403)
+    })
     .get(
       "/",
       describeRoute({

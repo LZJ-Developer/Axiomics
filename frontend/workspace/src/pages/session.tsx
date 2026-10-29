@@ -65,6 +65,7 @@ import { toast } from "@/atlas/Toast"
 import { createSessionTabs } from "@/atlas/store/sessionTabs"
 import { terminalEndpointAvailable } from "@/atlas/terminal-endpoint"
 import { productPreferences, type ProductPreferences } from "@/context/product-preferences"
+import { deploymentCapabilities } from "@/context/capabilities"
 import { SIDEBAR_WIDTH, clampSidebarWidth } from "@/pages/session-sidebar-size"
 import { SessionTabStrip, sessionTabID, type SessionTabItem } from "@/pages/session-tabs"
 import { sessionUnavailable } from "@/pages/session-availability"
@@ -267,6 +268,10 @@ export default function Page(): JSX.Element {
 
   const openContext = (context: SessionContext) => {
     if (!publicContextAvailable(context)) return
+    // Deployment policy: a site that ships this product through the web UI
+    // alone turns the terminal off. Every entry point funnels through here, so
+    // the guard also covers persisted contexts and programmatic opens.
+    if (context === "terminal" && !deploymentCapabilities.terminal()) return
     uiStore.openContext(context)
     if (context !== "terminal") return
     void ensureSession()
@@ -831,7 +836,9 @@ export default function Page(): JSX.Element {
       action("handoff", "Write handoff & compact", "Save a resumable handoff, then compact"),
       action("checkpoint", "Save checkpoint", "Capture a local recovery packet from current session state"),
     )
-    return list
+    return deploymentCapabilities.terminal()
+      ? list
+      : list.filter((item) => item.id !== "terminal.toggle" && item.id !== "terminal.new")
   })
 
   const [stepsExpanded, setStepsExpanded] = createSignal<Record<string, boolean>>(readTraceExpansion())

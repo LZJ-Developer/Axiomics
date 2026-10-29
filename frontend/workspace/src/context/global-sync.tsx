@@ -97,6 +97,7 @@ import {
 import { showToast } from "@axiomics/ui/toast"
 import { getFilename } from "@axiomics/util/path"
 import { usePlatform } from "./platform"
+import { fetchDeploymentCapabilities } from "./capabilities"
 import { useLanguage } from "@/context/language"
 import { Persist, persisted } from "@/utils/persist"
 import { projectScope } from "@/utils/project-route"
@@ -1450,6 +1451,9 @@ function createGlobalSync() {
           setGlobalStore("provider_auth", x.data ?? {})
         }),
       ),
+      // Deployment policy decides which surfaces exist at all; load it with the
+      // blocking requests so the first paint never offers a disabled one.
+      retry(() => fetchDeploymentCapabilities(globalSDK.url)),
     ]
 
     const results = await Promise.allSettled(tasks)
