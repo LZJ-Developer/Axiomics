@@ -19,18 +19,17 @@ type QuickModelInput<T extends QuickModel> = {
 
 type QuickModelRowOptions = {
   pinned?: readonly string[]
-  hidden?: ReadonlySet<string>
 }
 
-export type QuickModelRow<T extends { key: string }> =
-  | { kind: "choice"; key: string; choice: T }
-  | { kind: "unavailable"; key: string; model: (typeof COMPOSER_MODEL_ROSTER)[number] }
+export type QuickModelRow<T extends { key: string }> = { kind: "choice"; key: string; choice: T }
 
 /**
  * Produces the root picker's source order. Pinned choices lead, followed by
- * visible roster entries and passive placeholders for genuinely disconnected
- * roster models. Hidden connected entries are omitted. The rendered DOM can
- * use this list directly instead of relying on CSS `order`, which would
+ * connected roster entries and then any other connected choice. Only models a
+ * provider actually serves are listed: a roster entry that no configured
+ * provider offers is skipped rather than rendered as a placeholder, so the
+ * menu never advertises a model the deployment cannot call. The rendered DOM
+ * can use this list directly instead of relying on CSS `order`, which would
  * disagree with keyboard and accessibility traversal.
  */
 export function curateQuickModelRows<T extends { key: string }>(
@@ -52,15 +51,7 @@ export function curateQuickModelRows<T extends { key: string }>(
 
   for (const model of COMPOSER_MODEL_ROSTER) {
     if (added.has(model.key)) continue
-    const choice = byKey.get(model.key)
-    if (choice) {
-      rows.push({ kind: "choice", key: model.key, choice })
-      added.add(model.key)
-      continue
-    }
-    if (options.hidden?.has(model.key)) continue
-    rows.push({ kind: "unavailable", key: model.key, model })
-    added.add(model.key)
+    addChoice(model.key)
   }
 
   for (const choice of choices) {

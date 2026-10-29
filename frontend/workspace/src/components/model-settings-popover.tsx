@@ -86,15 +86,6 @@ const providerIcon = (id: string) => {
   return iconNames.includes(alias as IconName) ? (alias as IconName) : undefined
 }
 
-const providerLabels: Record<string, string> = {
-  anthropic: "Anthropic",
-  deepseek: "DeepSeek",
-  moonshotai: "Moonshot AI",
-  openai: "OpenAI",
-  xai: "xAI",
-  zai: "Z.AI",
-}
-
 const ModelMark: Component<{ id: string; name: string }> = (props) => (
   <span class="model-settings-logo" aria-hidden="true">
     <Show when={providerIcon(props.id)} fallback={<span>{props.name.charAt(0).toUpperCase()}</span>}>
@@ -448,25 +439,13 @@ export const ModelSettingsPopover: Component<{ trigger?: "label" | "icon" }> = (
     })
     return models.flatMap((model) => choiceFor(model) ?? [])
   })
-  const hiddenChoiceKeys = createMemo(
-    () =>
-      new Set(
-        allChoices()
-          .filter((choice) =>
-            choice.routes.every((model) => !local.model.visible({ providerID: model.provider.id, modelID: model.id })),
-          )
-          .map((choice) => choice.key),
-      ),
-  )
   const pinnedChoiceKeys = createMemo(() =>
     local.model
       .pinned()
       .filter((model): model is NonNullable<typeof model> => Boolean(model))
       .flatMap((model) => choiceFor(model)?.key ?? []),
   )
-  const quickRows = createMemo(() =>
-    curateQuickModelRows(quick(), { pinned: pinnedChoiceKeys(), hidden: hiddenChoiceKeys() }),
-  )
+  const quickRows = createMemo(() => curateQuickModelRows(quick(), { pinned: pinnedChoiceKeys() }))
   const catalog = createMemo(() => {
     const value = catalogQuery().trim().toLowerCase()
     return choices()
@@ -750,28 +729,6 @@ export const ModelSettingsPopover: Component<{ trigger?: "label" | "icon" }> = (
                 >
                   <For each={quickRows()}>
                     {(entry) => {
-                      if (entry.kind === "unavailable") {
-                        const model = entry.model
-                        const provider = () => ({
-                          id: model.provider,
-                          name: providerLabels[model.provider] ?? model.provider,
-                        })
-                        return (
-                          <div
-                            data-model-quick
-                            data-model-unavailable
-                            class={`${row} model-settings-unavailable`}
-                            aria-label={`${model.label}, unavailable`}
-                          >
-                            <ModelMark id={provider().id} name={provider().name} />
-                            <span class="model-settings-model">
-                              <strong>{model.label}</strong>
-                              <small>{`${provider().name} · Unavailable`}</small>
-                            </span>
-                          </div>
-                        )
-                      }
-
                       const choice = entry.choice
                       const model = choice.model
                       const provider = () => displayProviderForModel(model.provider, model.id)
