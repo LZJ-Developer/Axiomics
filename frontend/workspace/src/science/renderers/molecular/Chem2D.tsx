@@ -1,6 +1,7 @@
 import { Show, createEffect, createSignal, onCleanup } from "solid-js"
 import type { JSX } from "solid-js"
 import type { ArtifactRenderProps } from "../registry"
+import { useLanguage } from "@/context/language"
 
 /**
  * 2D chemical structure renderer backed by RDKit.js (`@rdkit/rdkit`) for the
@@ -112,6 +113,7 @@ function responsive(svg: string): string {
 }
 
 export function Chem2D(props: ArtifactRenderProps): JSX.Element {
+  const language = useLanguage()
   const [svg, setSvg] = createSignal<string>("")
   const [status, setStatus] = createSignal<Status>("idle")
   const [error, setError] = createSignal<string>("")
@@ -183,12 +185,14 @@ export function Chem2D(props: ArtifactRenderProps): JSX.Element {
             font: "13px/1.5 ui-sans-serif, system-ui, sans-serif",
           }}
         >
-          <Show when={status() === "loading"}>Rendering molecule…</Show>
+          <Show when={status() === "loading"}>{language.t("chem.loading")}</Show>
           <Show when={status() === "empty"}>
-            <span>No molecule to display. Provide a SMILES string or Mol block.</span>
+            <span>{language.t("chem.empty")}</span>
           </Show>
           <Show when={status() === "error"}>
-            <span style={{ color: "#c0392b" }}>Could not render molecule: {error()}</span>
+            <span style={{ color: "#c0392b" }}>
+              {language.t("chem.error", { message: error() })}
+            </span>
           </Show>
         </div>
       </Show>

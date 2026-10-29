@@ -15,10 +15,12 @@ test("chat and composer controls retain the shared visible keyboard focus ring",
   )
 })
 
-test("the browser shell uses the neutral dark palette as its pre-script fallback", () => {
+// The shell paints before any script runs, so index.html must name one explicit
+// theme colour (the light default) instead of delegating to a media query.
+test("the browser shell declares one explicit pre-script theme colour", () => {
   const html = shell()
 
-  expect(html).toContain('<meta name="theme-color" content="#17191c" />')
+  expect(html).toContain('<meta name="theme-color" content="#f5f6f7" />')
   expect(html).not.toContain('media="(prefers-color-scheme: dark)"')
   expect(html).not.toContain('content="#26241f"')
 })

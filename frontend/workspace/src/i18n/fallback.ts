@@ -18,3 +18,17 @@ function resolve(text: string, params?: Record<string, string | number>) {
 /** English translator used when a component renders outside the provider. */
 export const englishT = ((key: string, params?: Record<string, string | number>) =>
   resolve((en as Record<string, string>)[key] ?? key, params)) as unknown as Translate
+
+/**
+ * Translator for plain functions that run outside a component (confirmation
+ * dialogs, toast helpers). The provider installs the active locale here so a
+ * dialog opened from anywhere still speaks the user's language.
+ */
+let current: Translate = englishT
+
+export function setTranslator(next: Translate) {
+  current = next
+}
+
+export const translate = ((key: string, params?: Record<string, string | number>) =>
+  (current as unknown as (k: string, p?: Record<string, string | number>) => string)(key, params)) as Translate

@@ -21,13 +21,13 @@ describe("contextual project terminal", () => {
       read("../pages/session-sidebar-action.tsx"),
     ])
 
-    expect(pane).toContain('terminal: "Terminal"')
+    expect(pane).toContain('terminal: language.t("workspace.inspector.terminal")')
     expect(pane).toContain('context() === "terminal"')
     expect(pane).toContain("<Show when={terminalSeen()}>")
     expect(pane).toContain("const terminalVisible = () =>")
     expect(pane).toContain("<TerminalSurface active={terminalVisible()} />")
     expect(pane).not.toContain('<Match when={context() === "terminal"}>')
-    expect(action).toContain('ariaLabel="Open project terminal"')
+    expect(action).toContain("ariaLabel={copy().openTerminal}")
     expect(action).toContain('props.onContext("terminal")')
     expect(action).toContain("onWarm={preloadTerminal}")
     expect(surface).toContain('aria-label={language.t("terminal.surface")}')

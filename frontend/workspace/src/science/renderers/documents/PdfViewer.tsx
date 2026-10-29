@@ -1,6 +1,7 @@
-import { For, Show, onCleanup, onMount } from "solid-js"
+import { Show, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { ArtifactRenderProps } from "../registry"
+import { useLanguage } from "@/context/language"
 import { withPdfResources } from "./pdfjs-resources"
 import { ensurePdfWorker } from "./pdfjs-worker"
 import "./PdfViewer.css"
@@ -25,7 +26,7 @@ type Zoom = "fit" | number
 
 interface PdfViewState {
   error?: string
-  status: string
+  loading: boolean
   pages?: { total: number; shown: number; rendered: number }
   zoom: Zoom
   currentPage: number
@@ -90,6 +91,7 @@ interface PdfLib {
 }
 
 export function PdfViewer(props: ArtifactRenderProps) {
+  const language = useLanguage()
   let shell!: HTMLElement
   let viewport!: HTMLDivElement
   let host!: HTMLDivElement
@@ -97,7 +99,7 @@ export function PdfViewer(props: ArtifactRenderProps) {
   const cfg = normalize(props.data)
   const hasSource = Boolean(cfg.url || cfg.bytes || cfg.base64)
   const [view, setView] = createStore<PdfViewState>({
-    status: hasSource ? "Loading PDF…" : "",
+    loading: hasSource,
     zoom: "fit",
     currentPage: 1,
     rendering: false,
@@ -109,7 +111,8 @@ export function PdfViewer(props: ArtifactRenderProps) {
   let requestRender = () => {}
   let goToPage = (_page: number) => {}
 
-  const zoomLabel = () => (view.zoom === "fit" ? "Fit" : `${Math.round((view.zoom as number) * 100)}%`)
+  const zoomLabel = () =>
+    view.zoom === "fit" ? language.t("pdf.zoom.fit") : `${Math.round((view.zoom as number) * 100)}%`
   const changeZoom = (direction: -1 | 1) => {
     const value = view.zoom
     const base = value === "fit" ? view.fitScale : value
@@ -188,14 +191,14 @@ export function PdfViewer(props: ArtifactRenderProps) {
         frame.className = "pdf-viewer-page"
         frame.dataset.page = String(n)
         frame.setAttribute("role", "group")
-        frame.setAttribute("aria-label", `Page ${n} of ${total}`)
+        frame.setAttribute("aria-label", language.t("pdf.page.frame", { page: n, total }))
 
         const canvas = document.createElement("canvas")
         canvas.width = Math.max(1, Math.floor(size.width * dpr))
         canvas.height = Math.max(1, Math.floor(size.height * dpr))
         canvas.style.width = `${Math.floor(size.width)}px`
         canvas.style.height = `${Math.floor(size.height)}px`
-        canvas.setAttribute("aria-label", `Rendered PDF page ${n}`)
+        canvas.setAttribute("aria-label", language.t("pdf.page.canvas", { page: n }))
 
         const label = document.createElement("span")
         label.className = "pdf-viewer-page-number"
@@ -212,7 +215,7 @@ export function PdfViewer(props: ArtifactRenderProps) {
           thumb.type = "button"
           thumb.className = "pdf-viewer-thumbnail"
           thumb.dataset.page = String(n)
-          thumb.setAttribute("aria-label", `Go to page ${n}`)
+          thumb.setAttribute("aria-label", language.t("pdf.thumb.page", { page: n }))
           thumb.addEventListener("click", () => goToPage(n))
 
           const thumbScale = Math.min(0.28, 88 / Math.max(1, natural.width))
@@ -327,14 +330,14 @@ export function PdfViewer(props: ArtifactRenderProps) {
           }
           doc = loaded
           setView({
-            status: "",
+            loading: false,
             pages: { total: loaded.numPages, shown: Math.min(loaded.numPages, cfg.maxPages), rendered: 0 },
           })
           requestRender()
         } catch (cause) {
           if (disposed) return
           setView({
-            status: "",
+            loading: false,
             rendering: false,
             error: cause instanceof Error ? cause.message : String(cause),
           })
@@ -371,23 +374,23 @@ export function PdfViewer(props: ArtifactRenderProps) {
 
         <Show when={view.pages}>
           {(count) => (
-            <div class="pdf-viewer-page-controls" aria-label="Page navigation">
+            <div class="pdf-viewer-page-controls" aria-label={language.t("pdf.pages.nav")}>
               <button
                 type="button"
-                aria-label="Previous page"
+                aria-label={language.t("pdf.nav.previous")}
                 disabled={view.currentPage <= 1}
                 onClick={() => goToPage(view.currentPage - 1)}
               >
                 <span aria-hidden="true">‹</span>
               </button>
               <span class="pdf-viewer-page-status">
-                <span class="pdf-viewer-page-label">Page </span>
+                <span class="pdf-viewer-page-label">{language.t("pdf.page.label")}</span>
                 <strong>{view.currentPage}</strong>
-                <span> of {count().shown}</span>
+                <span>{language.t("pdf.page.total", { total: count().shown })}</span>
               </span>
               <button
                 type="button"
-                aria-label="Next page"
+                aria-label={language.t("pdf.nav.next")}
                 disabled={view.currentPage >= count().shown}
                 onClick={() => goToPage(view.currentPage + 1)}
               >
@@ -397,14 +400,16 @@ export function PdfViewer(props: ArtifactRenderProps) {
           )}
         </Show>
 
-        <div class="pdf-viewer-zoom" aria-label="PDF zoom">
-          <button type="button" aria-label="Zoom out" onClick={() => changeZoom(-1)}>
+        <div class="pdf-viewer-zoom" aria-label={language.t("pdf.zoom.title")}>
+          <button type="button" aria-label={language.t("pdf.zoom.out")} onClick={() => changeZoom(-1)}>
             <span aria-hidden="true">−</span>
           </button>
           <button
             type="button"
             classList={{ "is-active": view.zoom === "fit" }}
-            aria-label={view.zoom === "fit" ? "Fit page width selected" : "Fit page width"}
+            aria-label={
+              view.zoom === "fit" ? language.t("pdf.zoom.fitWidthSelected") : language.t("pdf.zoom.fitWidth")
+            }
             aria-pressed={view.zoom === "fit"}
             onClick={() => {
               setView("zoom", "fit")
@@ -413,7 +418,7 @@ export function PdfViewer(props: ArtifactRenderProps) {
           >
             {zoomLabel()}
           </button>
-          <button type="button" aria-label="Zoom in" onClick={() => changeZoom(1)}>
+          <button type="button" aria-label={language.t("pdf.zoom.in")} onClick={() => changeZoom(1)}>
             <span aria-hidden="true">+</span>
           </button>
         </div>
@@ -424,30 +429,32 @@ export function PdfViewer(props: ArtifactRenderProps) {
           ref={thumbHost}
           class="pdf-viewer-thumbnails"
           classList={{ "is-visible": view.thumbnails }}
-          aria-label="PDF page thumbnails"
+          aria-label={language.t("pdf.thumbnails")}
           aria-hidden={!view.thumbnails}
         />
         <div ref={viewport} class="atlas-scroll pdf-viewer-body" data-slot="pdf-body">
           <Show when={!hasSource}>
             <div class="pdf-viewer-message" data-slot="pdf-empty">
-              No PDF source. Provide <code>{`{ url }`}</code>, <code>{`{ bytes }`}</code>, or{" "}
-              <code>{`{ base64 }`}</code>.
+              {language.t("pdf.empty")}
             </div>
           </Show>
-          <Show when={view.status}>
+          <Show when={view.loading}>
             <div class="pdf-viewer-message" role="status" aria-live="polite">
-              {view.status}
+              {language.t("pdf.loading")}
             </div>
           </Show>
-          <Show when={view.rendering && !view.status}>
+          <Show when={view.rendering && !view.loading}>
             <div class="pdf-viewer-rendering" role="status" aria-live="polite">
-              Rendering {view.pages?.rendered ?? 0} of {view.pages?.shown ?? 0}
+              {language.t("pdf.rendering", {
+                rendered: view.pages?.rendered ?? 0,
+                shown: view.pages?.shown ?? 0,
+              })}
             </div>
           </Show>
           <Show when={view.error}>
             {(message) => (
               <div class="pdf-viewer-error" data-slot="pdf-error" role="alert">
-                <strong>Couldn’t render this PDF</strong>
+                <strong>{language.t("pdf.error.title")}</strong>
                 <span>{message()}</span>
               </div>
             )}
@@ -455,11 +462,9 @@ export function PdfViewer(props: ArtifactRenderProps) {
           <div ref={host} class="pdf-viewer-pages" data-slot="pdf-pages" />
           <Show when={view.pages && view.pages.shown < view.pages.total}>
             <div class="pdf-viewer-cap-note">
-              <For each={[view.pages!]}>
-                {(count) =>
-                  `${count.total - count.shown} more page${count.total - count.shown === 1 ? "" : "s"} not rendered`
-                }
-              </For>
+              {language.t((view.pages!.total - view.pages!.shown) === 1 ? "pdf.capped.one" : "pdf.capped.many", {
+                count: view.pages!.total - view.pages!.shown,
+              })}
             </div>
           </Show>
         </div>

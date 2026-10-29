@@ -74,9 +74,14 @@ export function ProjectsWorkbench(props: {
   }
 
   const activityLabel = (project: HomeProject) => {
+    // A server clock ahead of this browser would make Luxon phrase the age as
+    // "in 3 seconds"; under a minute (or in the future) is simply "just now".
+    const elapsed = clock.now - project.updatedAt
     const relative =
-      DateTime.fromMillis(project.updatedAt).toRelative({ base: DateTime.fromMillis(clock.now) }) ??
-      language.t("home.workbench.activity.recently")
+      elapsed < 60_000
+        ? language.t("home.workbench.activity.justNow")
+        : (DateTime.fromMillis(project.updatedAt).toRelative({ base: DateTime.fromMillis(clock.now) }) ??
+          language.t("home.workbench.activity.recently"))
     const action = language.t(
       (project.time.activity ?? 0) > project.time.created
         ? "home.workbench.activity.active"

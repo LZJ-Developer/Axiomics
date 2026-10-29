@@ -280,9 +280,9 @@ export default function Page(): JSX.Element {
 
   async function deleteSession(sessionID: string) {
     const ok = await confirmDialog(dialog, {
-      title: "Delete this session?",
-      message: "This removes the conversation and its session workspace. Saved Results stay available.",
-      confirmLabel: "Delete session",
+      title: language.t("session.deleteDialog.title"),
+      message: language.t("session.deleteDialog.message"),
+      confirmLabel: language.t("session.deleteDialog.action"),
       danger: true,
     })
     if (!ok) return

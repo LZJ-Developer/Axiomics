@@ -45,7 +45,9 @@ test("lives in a project-owned sibling frame instead of the session route", () =
 test("keeps artifact details and provenance out of the right pane", () => {
   const source = read("./RightPane.tsx")
 
-  expect(source).toContain('aria-label={narrow() ? "Back to conversation" : "Close context"}')
+  expect(source).toContain(
+    'aria-label={narrow() ? language.t("workspace.inspector.back") : language.t("workspace.inspector.close")}',
+  )
   expect(source).not.toContain("ArtifactInspector")
   expect(source).not.toContain("Artifact details")
   expect(source).not.toContain("onDirtyChange={(dirty) => markDirty(tab.id, dirty)}\n                      onClose=")
@@ -94,7 +96,7 @@ test("resize separator exposes keyboard and range semantics", () => {
   expect(source).toContain("onReset={splitEvenly}")
   expect(source).toContain("preferredWidth={width()}")
   expect(source).not.toContain('class="research-inspector__resize-grip"')
-  expect(source).toContain('aria-label="Workspace layout"')
+  expect(source).toContain('aria-label={language.t("workspace.inspector.layout")}')
   expect(source).toContain("new ResizeObserver(measure)")
   expect(source).toContain('element.closest<HTMLElement>(".project-workspace-frame")')
   expect(source).toContain('querySelector<HTMLElement>(".project-workspace-frame__route .session-sidebar")')
@@ -144,9 +146,9 @@ test("keeps the Compute tab while mounting the unified execution inventory", () 
   const source = read("./RightPane.tsx")
 
   expect(source).toContain('import { ComputeSurface } from "@/atlas/ComputeSurface"')
-  expect(source).toContain('kernels: "Compute"')
+  expect(source).toContain('kernels: language.t("workspace.inspector.compute")')
   expect(source).toContain('when={context() === "kernels"}')
-  expect(source).toContain("<ComputeSurface />")
+  expect(source).toContain("<ComputeSurface t={language.t} />")
   expect(source).not.toContain("<KernelPanel />")
 })
 

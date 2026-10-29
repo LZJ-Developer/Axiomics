@@ -326,7 +326,6 @@
   font-size: 10px;
   font-weight: var(--font-weight-medium);
   letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .workspace-replay-actions {

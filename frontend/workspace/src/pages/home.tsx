@@ -87,9 +87,9 @@ export default function Home(): JSX.Element {
   async function archiveProject(project: ProjectRecord) {
     const name = projectName(project)
     const ok = await confirmDialog(dialog, {
-      title: `Archive ${name}?`,
-      message: "This hides the project from Home until you restore it. Its files and sessions stay on disk.",
-      confirmLabel: "Archive",
+      title: language.t("home.archive.title", { name }),
+      message: language.t("home.archive.message"),
+      confirmLabel: language.t("home.archive.confirm"),
     })
     if (!ok) return
     try {
@@ -99,11 +99,11 @@ export default function Home(): JSX.Element {
       })
       projectPrefs.hide(project.id, project.worktree)
       layout.projects.close(project.worktree)
-      showToast({ variant: "success", title: "Project archived" })
+      showToast({ variant: "success", title: language.t("home.archive.done") })
     } catch (error) {
       showToast({
         variant: "error",
-        title: "Could not archive project",
+        title: language.t("home.archive.failed"),
         description: error instanceof Error ? error.message : String(error),
       })
     }
@@ -116,11 +116,11 @@ export default function Home(): JSX.Element {
         body: JSON.stringify({ archived: false }),
       })
       projectPrefs.unhide(project.id, project.worktree)
-      showToast({ variant: "success", title: `${projectName(project)} restored` })
+      showToast({ variant: "success", title: language.t("home.restore.done", { name: projectName(project) }) })
     } catch (error) {
       showToast({
         variant: "error",
-        title: "Could not restore project",
+        title: language.t("home.restore.failed"),
         description: error instanceof Error ? error.message : String(error),
       })
     }

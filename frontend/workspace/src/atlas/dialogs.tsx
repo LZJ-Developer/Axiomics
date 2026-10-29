@@ -3,6 +3,7 @@ import { Button } from "@axiomics/ui/button"
 import { Dialog as ModalDialog } from "@axiomics/ui/dialog"
 import { TextField } from "@axiomics/ui/text-field"
 import { useDialog } from "@axiomics/ui/context/dialog"
+import { translate } from "@/i18n/fallback"
 
 type DialogController = ReturnType<typeof useDialog>
 
@@ -38,7 +39,7 @@ export function confirmDialog(
         >
           <div style={actions}>
             <Button autofocus size="normal" variant="secondary" onClick={() => done(false)}>
-              {opts.cancelLabel ?? "Cancel"}
+              {opts.cancelLabel ?? translate("common.cancel")}
             </Button>
             <Button
               size="normal"
@@ -46,7 +47,7 @@ export function confirmDialog(
               classList={{ "atlas-dialog__danger": opts.danger === true }}
               onClick={() => done(true)}
             >
-              {opts.confirmLabel ?? "Confirm"}
+              {opts.confirmLabel ?? translate("common.confirm")}
             </Button>
           </div>
         </ModalDialog>
@@ -90,10 +91,10 @@ export function promptDialog(
           </div>
           <div style={actions}>
             <Button size="normal" variant="secondary" onClick={() => done(null)}>
-              Cancel
+              {translate("common.cancel")}
             </Button>
             <Button size="normal" variant="primary" onClick={() => done(value())}>
-              {opts.confirmLabel ?? "OK"}
+              {opts.confirmLabel ?? translate("common.confirm")}
             </Button>
           </div>
         </ModalDialog>
@@ -127,7 +128,7 @@ export function alertDialog(
         >
           <div style={actions}>
             <Button autofocus size="normal" variant="primary" onClick={done}>
-              OK
+              {translate("common.ok")}
             </Button>
           </div>
         </ModalDialog>

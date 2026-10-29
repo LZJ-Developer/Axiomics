@@ -193,8 +193,8 @@ test("settings search and filter controls expose contextual accessible names", (
 
   expect(shared).toContain('aria-label={props.ariaLabel ?? props.placeholder ?? t()("settings.search.default")}')
   expect(shared).toContain("aria-label={props.ariaLabel}")
-  expect(skills).toContain('ariaLabel="Filter skills by source"')
-  expect(skills).toContain('ariaLabel="Filter skills by category"')
+  expect(skills).toContain('ariaLabel={t()("skills.page.filter.source")}')
+  expect(skills).toContain('ariaLabel={t()("skills.page.filter.category")}')
 })
 
 test("settings reuse workspace surfaces and adaptive boundaries without a parallel palette", () => {

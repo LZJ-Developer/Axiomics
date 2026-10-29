@@ -1,6 +1,7 @@
 // Storage — real on-disk footprint of the Axiomics data directory.
 // Backed by /settings/storage (routes/settings/storage.ts).
 import { type Component, For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import { DateTime } from "luxon"
 import { Button } from "@axiomics/ui/button"
 import { Icon } from "@axiomics/ui/icon"
 import { useGlobalSDK } from "@/context/global-sdk"
@@ -35,6 +36,7 @@ type Usage = {
   scanning?: boolean
   updated_at?: string | null
   scan_error?: string | null
+  skipped_entries?: number
   relocation?: Relocation | null
 }
 
@@ -280,12 +282,18 @@ export const Storage: Component = () => {
   }
 
   const maxBytes = createMemo(() => Math.max(1, ...(usage()?.entries.map((e) => e.bytes) ?? [1])))
+  // `updated_at` is set only by a scan that finished. Without one the server
+  // has no size, so "0 B" and "nothing stored" would assert something it never
+  // measured — report the figure as unavailable instead.
+  const unavailable = () => Boolean(usage()?.scan_error) && !usage()?.updated_at
   const updatedLabel = createMemo(() => {
     const value = usage()?.updated_at
     if (!value) return undefined
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return undefined
-    return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+    // Format through Luxon so the timestamp follows the app language, not the
+    // browser's own locale (a Chinese UI otherwise printed "Oct 29, 2026, 5:05 PM").
+    const date = DateTime.fromISO(value)
+    if (!date.isValid) return undefined
+    return date.toLocaleString(DateTime.DATETIME_MED)
   })
 
   return (
@@ -336,13 +344,19 @@ export const Storage: Component = () => {
             )}
           </Show>
           <Show when={usage()?.scan_error}>
-            {(message) => (
-              <div class="settings-alert" data-tone="warning" role="status">
+            <div class="settings-alert" data-tone="warning" role="status">
+              <Icon name="alert-circle" size="small" class="shrink-0 text-icon-weak-base" />
+              <span>{language.t("settings.storage.scanError")}</span>
+              <Button size="small" variant="secondary" class="settings-panel-action" onClick={() => void retry()}>
+                {language.t("settings.storage.retry")}
+              </Button>
+            </div>
+          </Show>
+          <Show when={usage()?.skipped_entries}>
+            {(count) => (
+              <div class="settings-alert" data-tone="neutral" role="status">
                 <Icon name="alert-circle" size="small" class="shrink-0 text-icon-weak-base" />
-                <span>{language.t("settings.storage.scanError", { error: String(message()) })}</span>
-                <Button size="small" variant="secondary" class="settings-panel-action" onClick={() => void retry()}>
-                  {language.t("settings.storage.retry")}
-                </Button>
+                <span>{language.t("settings.storage.skipped", { count: count() })}</span>
               </div>
             )}
           </Show>
@@ -420,15 +434,17 @@ export const Storage: Component = () => {
                       </Show>
                     </div>
                     <span class="settings-storage-size">
-                      {usage()?.scanning && !usage()?.updated_at
-                        ? language.t("settings.storage.calculating")
-                        : language.t("settings.storage.summary", {
-                            size: fmt(usage()!.total_bytes),
-                            updating: usage()?.scanning ? language.t("settings.storage.updating") : "",
-                            updated: updatedLabel()
-                              ? language.t("settings.storage.updated", { time: updatedLabel()! })
-                              : "",
-                          })}
+                      {unavailable()
+                        ? language.t("settings.storage.unavailable")
+                        : usage()?.scanning && !usage()?.updated_at
+                          ? language.t("settings.storage.calculating")
+                          : language.t("settings.storage.summary", {
+                              size: fmt(usage()!.total_bytes),
+                              updating: usage()?.scanning ? language.t("settings.storage.updating") : "",
+                              updated: updatedLabel()
+                                ? language.t("settings.storage.updated", { time: updatedLabel()! })
+                                : "",
+                            })}
                     </span>
                   </div>
                   <div class="settings-storage-location__actions flex shrink-0 items-center gap-1">
@@ -536,9 +552,11 @@ export const Storage: Component = () => {
                     </code>
                   </div>
                   <span class="settings-storage-metric text-12-regular text-text-weak">
-                    {usage()?.scanning && !usage()?.updated_at
-                      ? language.t("settings.storage.cache.calculating")
-                      : fmt(usage()?.cache_bytes ?? 0)}
+                    {unavailable()
+                      ? language.t("settings.storage.unavailable")
+                      : usage()?.scanning && !usage()?.updated_at
+                        ? language.t("settings.storage.cache.calculating")
+                        : fmt(usage()?.cache_bytes ?? 0)}
                   </span>
                   <button
                     type="button"
@@ -569,9 +587,11 @@ export const Storage: Component = () => {
                 fallback={
                   <div class="settings-card settings-preferences-card">
                     <p class="settings-card-empty" role="status">
-                      {usage()?.scanning
-                        ? language.t("settings.storage.usage.emptyScanning")
-                        : language.t("settings.storage.usage.empty")}
+                      {unavailable()
+                        ? language.t("settings.storage.unavailable")
+                        : usage()?.scanning
+                          ? language.t("settings.storage.usage.emptyScanning")
+                          : language.t("settings.storage.usage.empty")}
                     </p>
                   </div>
                 }

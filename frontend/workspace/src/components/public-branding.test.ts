@@ -22,7 +22,11 @@ describe("public Axiomics branding", () => {
   test("retains internal Atlas component names without rendering the old standalone brand", async () => {
     const violations: string[] = []
     for (const file of publicSources) {
+      // Expression Atlas and Human Protein Atlas are external database names
+      // the network allowlist shows verbatim; they are not the retired brand.
       const source = renderedSource(await Bun.file(new URL(file, import.meta.url)).text())
+        .replaceAll("Expression Atlas", "")
+        .replaceAll("Human Protein Atlas", "")
       if (/\bAtlas\b/.test(source)) violations.push(file)
     }
     expect(violations).toEqual([])

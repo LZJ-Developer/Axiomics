@@ -181,12 +181,13 @@ function CapabilityRow(props: {
   onAction?: () => void
   onOpenSource: () => void
 }) {
+  const language = useLanguage()
   const status = () => capabilityState(props.record)
   const target = () => scientificCapabilityTarget(props.record)
   const actionLabel = () => {
-    if (props.active) return "Installing…"
+    if (props.active) return language.t("settings.scientificTools.action.installing")
     if (!props.onAction || status().action !== "setup") return undefined
-    return status().tone === "warning" ? "Repair" : "Install"
+    return status().tone === "warning" ? language.t("settings.scientificTools.action.repair") : language.t("settings.scientificTools.action.install")
   }
   return (
     <article class="settings-row scientific-tool-row" data-target={target()} role="listitem">
@@ -222,8 +223,8 @@ function CapabilityRow(props: {
           class="scientific-tool-source"
           icon="link"
           variant="ghost"
-          aria-label={`Open ${props.record.name} source`}
-          title={`Open ${props.record.name} source`}
+          aria-label={language.t("settings.scientificTools.openSource", { name: props.record.name })}
+          title={language.t("settings.scientificTools.openSource", { name: props.record.name })}
           onClick={props.onOpenSource}
         />
       </span>

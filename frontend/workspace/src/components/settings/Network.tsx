@@ -6,6 +6,7 @@ import { useDialog } from "@axiomics/ui/context/dialog"
 import { confirmDialog } from "@/atlas/dialogs"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useLanguage } from "@/context/language"
+import type { dict as en } from "@/i18n/en"
 import { usePlatform } from "@/context/platform"
 import { networkEndpoint } from "./network-endpoint"
 import { canonicalNetworkDomain } from "./network-domain"
@@ -26,11 +27,54 @@ type State = NetworkSettingsState
 
 const emptyState: State = { allowlistEnabled: false, enabled: [], custom: [] }
 
+const GROUP_COPY: Record<string, { label: keyof typeof en; description: keyof typeof en }> = {
+  "package-management": {
+    label: "settings.network.group.package-management.label",
+    description: "settings.network.group.package-management.description",
+  },
+  "ncbi-nih": {
+    label: "settings.network.group.ncbi-nih.label",
+    description: "settings.network.group.ncbi-nih.description",
+  },
+  "genomics-biology": {
+    label: "settings.network.group.genomics-biology.label",
+    description: "settings.network.group.genomics-biology.description",
+  },
+  proteomics: {
+    label: "settings.network.group.proteomics.label",
+    description: "settings.network.group.proteomics.description",
+  },
+  "literature-citations": {
+    label: "settings.network.group.literature-citations.label",
+    description: "settings.network.group.literature-citations.description",
+  },
+  "chemistry-pharma": {
+    label: "settings.network.group.chemistry-pharma.label",
+    description: "settings.network.group.chemistry-pharma.description",
+  },
+  "omics-atlases": {
+    label: "settings.network.group.omics-atlases.label",
+    description: "settings.network.group.omics-atlases.description",
+  },
+  "clinical-regulatory": {
+    label: "settings.network.group.clinical-regulatory.label",
+    description: "settings.network.group.clinical-regulatory.description",
+  },
+}
+
 export default function Network() {
   const sdk = useGlobalSDK()
   const platform = usePlatform()
   const dialog = useDialog()
   const language = useLanguage()
+  // Group names ship from the server in English. Known ids get local copy;
+  // anything new falls back to the server text instead of showing a raw key.
+  const groupCopy = (group: { id: string; label: string; description: string }) => {
+    const known = GROUP_COPY[group.id]
+    return known
+      ? { label: language.t(known.label), description: language.t(known.description) }
+      : { label: group.label, description: group.description }
+  }
   const doFetch = platform.fetch ?? fetch
 
   const [catalog, setCatalog] = createSignal<Group[]>([])
@@ -265,6 +309,7 @@ export default function Network() {
                       const on = () => state().enabled.includes(group.id)
                       const open = () => !!expanded()[group.id]
                       const detailsId = () => `network-group-${group.id}`
+                      const copy = () => groupCopy(group)
                       return (
                         <div class="settings-list-item">
                           <div class="settings-row settings-preference-row settings-network-group-row">
@@ -274,7 +319,7 @@ export default function Network() {
                               onClick={() => toggleExpanded(group.id)}
                               aria-label={language.t(
                                 open() ? "settings.network.groups.collapse" : "settings.network.groups.expand",
-                                { name: group.label },
+                                { name: copy().label },
                               )}
                               aria-expanded={open()}
                               aria-controls={detailsId()}
@@ -285,9 +330,9 @@ export default function Network() {
                                 class="settings-network-disclosure__icon"
                               />
                               <span class="settings-row-copy">
-                                <strong class="truncate">{group.label}</strong>
+                                <strong class="truncate">{copy().label}</strong>
                                 <span class="settings-network-group-description">
-                                  {group.description} ·{" "}
+                                  {copy().description} ·{" "}
                                   <span class="tabular-nums">
                                     {language.t("settings.network.groups.domains", {
                                       count: group.domains.length,
@@ -297,7 +342,7 @@ export default function Network() {
                               </span>
                             </button>
                             <Switch hideLabel checked={on()} onChange={(v) => toggleGroup(group.id, v)}>
-                              {language.t("settings.network.groups.allow", { name: group.label })}
+                              {language.t("settings.network.groups.allow", { name: copy().label })}
                             </Switch>
                           </div>
                           <Show when={open()}>
@@ -305,7 +350,7 @@ export default function Network() {
                               <ul
                                 class="settings-preference-domain-list"
                                 aria-label={language.t("settings.network.groups.domainsAria", {
-                                  name: group.label,
+                                  name: copy().label,
                                 })}
                               >
                                 <For each={group.domains}>

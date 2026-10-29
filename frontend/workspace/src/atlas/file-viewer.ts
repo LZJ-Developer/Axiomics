@@ -1,5 +1,6 @@
 import { projectContains } from "@/utils/project-file"
 import { resolveArtifactPath } from "@/artifacts/context"
+import { translate } from "@/i18n/fallback"
 
 export type FileKind =
   | "markdown"
@@ -229,8 +230,8 @@ export function describeFile(input: {
 
 export function sourceViews(source: boolean): Array<{ id: "preview" | "source"; label: string; active: boolean }> {
   return [
-    { id: "preview", label: "Preview", active: !source },
-    { id: "source", label: "Source", active: source },
+    { id: "preview", label: translate("fileViewer.preview"), active: !source },
+    { id: "source", label: translate("fileViewer.source"), active: source },
   ]
 }
 
@@ -251,12 +252,18 @@ export function toolbarControls(input: {
   // the versioned artifact registration.
   const changes = input.dirty
     ? [
-        { id: "discard" as const, label: "Discard", disabled: input.saving },
-        { id: "save" as const, label: input.saving ? "Saving…" : "Save file", disabled: input.saving },
+        { id: "discard" as const, label: translate("fileViewer.discard"), disabled: input.saving },
+        {
+          id: "save" as const,
+          label: input.saving ? translate("fileViewer.saving") : translate("fileViewer.save"),
+          disabled: input.saving,
+        },
       ]
     : []
-  const copy = input.description.copy ? [{ id: "copy" as const, label: "Copy", disabled: false }] : []
-  const download = input.description.download ? [{ id: "download" as const, label: "Download", disabled: false }] : []
+  const copy = input.description.copy ? [{ id: "copy" as const, label: translate("fileViewer.copy"), disabled: false }] : []
+  const download = input.description.download
+    ? [{ id: "download" as const, label: translate("fileViewer.download"), disabled: false }]
+    : []
   return [...views, ...changes, ...copy, ...download]
 }
 
@@ -274,7 +281,11 @@ export function artifactControl(input: {
   if (!input.session) return
   return {
     id: "artifact",
-    label: input.busy ? "Saving result…" : input.dirty ? "Save file first" : "Save as Result",
+    label: input.busy
+      ? translate("fileViewer.artifact.saving")
+      : input.dirty
+        ? translate("fileViewer.artifact.dirty")
+        : translate("fileViewer.artifact.save"),
     disabled: input.busy || input.dirty,
   }
 }

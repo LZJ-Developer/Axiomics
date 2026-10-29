@@ -102,7 +102,9 @@ test("registers route-owned actions and removes the dead file.open palette path"
   expect(session).toContain('id: "project.files"')
   expect(session).toContain('id: "project.compute"')
   expect(session).toContain('id: "settings.open"')
-  expect(session).toContain('id: "documentation.open"')
+  // The documentation command was retired with the standalone docs route; the
+  // palette must not keep advertising an id no route registers.
+  expect(session).not.toContain('id: "documentation.open"')
   expect(commands).not.toContain('run("file.open", "palette")')
   expect(commands).not.toContain("showPalette")
 })

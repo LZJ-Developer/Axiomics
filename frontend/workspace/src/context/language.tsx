@@ -11,6 +11,9 @@ import { deploymentCapabilities } from "./capabilities"
 // the entry chunk (measured). Switching language loads its chunk on demand and
 // the UI updates reactively; until then it falls back to English.
 import { dict as en } from "@/i18n/en"
+// Plain functions (confirmation dialogs, toast helpers) translate through this
+// module; the provider installs the active locale into it.
+import { setTranslator } from "@/i18n/fallback"
 import { dict as uiEn } from "@axiomics/ui/i18n/en"
 
 export type Locale =
@@ -194,6 +197,7 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
       // this an all-Chinese page still says "1 month ago". Luxon wants BCP-47,
       // and our short tag for traditional Chinese is not one.
       LuxonSettings.defaultLocale = locale() === "zht" ? "zh-Hant" : locale()
+      setTranslator(t)
     })
 
     return {

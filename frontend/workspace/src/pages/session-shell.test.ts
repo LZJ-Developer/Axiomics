@@ -298,7 +298,7 @@ describe("focused workspace shell", () => {
     expect(session).toContain('aria-label={props.session.title || language.t("workspace.sidebar.session")}')
     expect(session).toContain("data-session-id={props.session.id}")
     expect(session).toContain('data-pinned={props.session.time?.pinned ? "true" : undefined}')
-    expect(session).toContain('title: "Delete this session?"')
+    expect(session).toContain('title: language.t("session.deleteDialog.title")')
     expect(session).toContain("uiStore.activateScope(sdk.scope, id)")
     expect(styles).toContain('.session-sidebar[data-collapsed="true"]')
     expect(styles).toContain("width: var(--session-sidebar-collapsed-width, 56px)")
