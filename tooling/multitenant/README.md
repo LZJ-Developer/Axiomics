@@ -117,6 +117,7 @@ systemd 单元与 linger。失败时直接指出是哪一层，不用对着浏�
 | 浏览器"隐私错误"，`curl` 返回 000 | 自签证书 | 浏览器点"继续"，`curl` 加 `-k` |
 | 改 `auth/configuration.yml` 不生效 | 容器实际加载的是 `/config/portless.yml` | 改 `portless.yml` 再 `podman restart ax-authelia` |
 | 租户过一阵子访问 502 | 空闲 20 分钟被回收，激活器正在拉起 | 属预期；别给租户加 `--restart=always`，会与回收打架 |
+| agent 装完包，下一条命令 `import` 不到 | 旧镜像：Bash 的最终进程边界按白名单重建 env，丢掉 `PIP_TARGET`/`PYTHONPATH`，包目录又只被授予读 | 已修（运行时键找回 + 安装命令走 `environment_mutation` 授权）；重建镜像后租户冷启动即生效 |
 
 ## 开机自恢复
 
