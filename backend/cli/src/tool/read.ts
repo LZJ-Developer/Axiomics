@@ -11,6 +11,7 @@ import { assertExternalDirectory, isAuthorizedPath, sessionToolDirectory } from 
 import { InstructionPrompt } from "../session/instruction"
 import { readImageDimensions } from "../util/image"
 import { SafeFileIO } from "@/file/safe-io"
+import { PathSpace } from "@/session/path-space"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -156,7 +157,10 @@ export const ReadTool = Tool.define("read", {
   }),
   async execute(params, ctx) {
     const directory = await sessionToolDirectory(ctx)
-    const requested = path.isAbsolute(params.filePath) ? params.filePath : path.resolve(directory, params.filePath)
+    // The model addresses its own machine's roots; resolve them before any
+    // host-side containment or permission check.
+    const requestedFile = await PathSpace.toHost(ctx.sessionID, params.filePath)
+    const requested = path.isAbsolute(requestedFile) ? requestedFile : path.resolve(directory, requestedFile)
     const retained = isAuthorizedPath(ctx.extra?.["fileAuthorization"]) ? ctx.extra?.["fileAuthorization"] : undefined
     if (retained && retained.path !== requested) {
       throw new Error("Retained file authorization does not match the requested path")

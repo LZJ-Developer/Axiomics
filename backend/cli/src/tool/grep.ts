@@ -6,6 +6,7 @@ import DESCRIPTION from "./grep.txt"
 import { Instance } from "../project/instance"
 import path from "path"
 import { assertExternalDirectory, sessionToolDirectory } from "./external-directory"
+import { PathSpace } from "@/session/path-space"
 
 const MAX_LINE_LENGTH = 2000
 const MAX_MATCHES = 100
@@ -62,7 +63,8 @@ export const GrepTool = Tool.define("grep", {
     })
 
     const directory = await sessionToolDirectory(ctx)
-    let searchPath = params.path ?? directory
+    const requested = params.path ? await PathSpace.toHost(ctx.sessionID, params.path) : undefined
+    let searchPath = requested ?? directory
     searchPath = path.isAbsolute(searchPath) ? searchPath : path.resolve(directory, searchPath)
     using authorized = await assertExternalDirectory(ctx, searchPath, { kind: "directory" })
     searchPath = authorized?.path ?? searchPath

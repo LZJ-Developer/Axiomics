@@ -27,6 +27,7 @@ import { CommandRuntime } from "@/science/command/registry"
 import { AuthoritySignal } from "@/project/authority-signal"
 import { KernelEnvironmentMutation } from "@/science/kernel/environment-mutation"
 import { ManagedInstallPolicy } from "@/science/capability/install-policy"
+import { PathSpace } from "@/session/path-space"
 
 const MAX_METADATA_LENGTH = 30_000
 const DEFAULT_TIMEOUT = Flag.AXIOMICS_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 0
@@ -200,7 +201,14 @@ export const BashTool = Tool.define("bash", async () => {
       const writable = authority.writable
       const readable = new Set(authority.readable)
       const workspace = authority.workspace
-      const requested = params.workdir || workspace
+      // The model may address its own machine's roots (`/home/example-user-d4f0bc/...`).
+      // Translate before any host-side resolution so the rest of this tool
+      // keeps operating on real paths.
+      const workdir =
+        params.workdir && PathSpace.mentions(params.workdir)
+          ? await PathSpace.toHost(ctx.sessionID, params.workdir)
+          : params.workdir
+      const requested = workdir || workspace
       const target = path.isAbsolute(requested) ? requested : path.resolve(workspace, requested)
       const cwd = (await Filesystem.canonical(target)) ?? path.resolve(target)
       const contained = (value: string) => writable.some((root) => Filesystem.contains(root, value))
@@ -476,30 +484,105 @@ export const BashTool = Tool.define("bash", async () => {
         }
         // Build the wrapper only after the final authority check, while trust
         // and filesystem mutations are excluded through durable registration.
+        const options = mutation ? { ...current.sandbox, network: "allow" as const } : current.sandbox
+        // A command run without an enforced sandbox keeps host spellings: the
+        // view is only truthful when bubblewrap actually assembles it.
+        const view =
+          options.enabled === false || Sandbox.backend() !== "bubblewrap"
+            ? undefined
+            : await PathSpace.view(ctx.sessionID, cwd)
+        // When the view is active the project roots appear only under the
+        // synthetic home; leaving them in the policy would mount the same
+        // directories at their host spelling and defeat the whole point.
+        const viewRoots = view ? PathSpace.hostRoots(view.roots) : []
+        const outsideView = (value: string) =>
+          !viewRoots.some((root) => value === root || value.startsWith(root + path.sep))
+        // Variables the payload sees inside the namespace. They are applied
+        // with bwrap --setenv, never on the spawn environment: the host-side
+        // launch gate boots this binary before bwrap exists and must keep
+        // host spellings for its own data/config root.
+        if (view) {
+          const virtual: Record<string, string> = {}
+          const cache = Sandbox.cacheEnvironment(current.workspace)
+          for (const [key, value] of Object.entries(cache)) {
+            virtual[key] = PathSpace.toModel(view.roots, value)
+          }
+          virtual.XDG_STATE_HOME = PathSpace.toModel(
+            view.roots,
+            path.join(current.workspace, ".axiomics", "state"),
+          )
+          for (const [key, value] of Object.entries(PathSpace.relocateEnv(view.relocate, runtimeEnv))) {
+            if (typeof value === "string") virtual[key] = value
+          }
+          virtual.PATH = PathSpace.remapHome(view.relocate, runtimeEnv.PATH ?? process.env.PATH ?? "")
+          view.env = { ...(view.env ?? {}), ...virtual }
+          // The spawn environment stays host-spelled because the launcher
+          // reads it, but the payload inherits every allowlisted variable it
+          // carries. An inherited value that names the host home (XDG_* and
+          // some runtime keys do) would therefore reach the payload intact, so
+          // each one gets an explicit relocated override.
+          PathSpace.hideHostHome(view, {
+            ...Axiomics.filterEnvForSubprocess({ ...process.env, ...runtimeEnv, ...cache }),
+            ...Axiomics.filterEnvForKernel(runtimeEnv),
+          })
+        }
+        // The shim symlink inside the sandbox temp root must point at the
+        // canonical, view-visible interpreter: a lexical host path behind the
+        // managed data-root link would dangle inside the namespace.
+        const pythonHost = runtime.binary ?? Bun.which("python3") ?? Bun.which("python") ?? undefined
+        const pythonBinary = pythonHost && view ? PathSpace.remapHome(view.relocate, pythonHost) : pythonHost
         const sandbox = Sandbox.plan({
           command: Shell.pipefail(shell, params.command),
           shell,
           cwd,
           workspace: [
-            ...current.writable,
+            ...current.writable.filter(outsideView),
             ...(runtime.extraWritable ?? []),
             ...(mutation?.language === "r" && rLibrary ? [rLibrary] : []),
           ],
-          readable: [...readable],
+          readable: [...readable].filter(outsideView),
           unreadable: Axiomics.kernelSensitivePaths(),
           runtime: {
-            python: runtime.binary ?? Bun.which("python3") ?? Bun.which("python") ?? undefined,
-            path: runtimeEnv.PATH,
+            // The shim symlink inside the sandbox temp root must point at the
+            // canonical, view-visible interpreter: a lexical host path behind
+            // the managed data-root link would dangle inside the namespace.
+            python: pythonHost,
+            pythonVisible: pythonBinary,
+            // `withTempEnvironment` writes PATH itself, so the view has to be
+            // applied here as well as on the spawn env.
+            path: view ? PathSpace.remapHome(view.relocate, runtimeEnv.PATH ?? process.env.PATH ?? "") : runtimeEnv.PATH,
           },
-          options: mutation ? { ...current.sandbox, network: "allow" as const } : current.sandbox,
+          view,
+          options,
         })
         return Axiomics.withSubprocessEnv(process.env, async (env, overlay) => {
+          // Host-spelled cache roots: the launch gate runs on the host, and
+          // the payload's virtual spellings arrive through view.env.
           const cache = sandbox.sandboxed ? Sandbox.cacheEnvironment(current.workspace) : {}
           let child: ReturnType<typeof spawn>
+          // A nested Axiomics process started from this shell inherits the
+          // synthetic home; give it an ephemeral data root instead of letting
+          // it create one on the read-only home tmpfs.
+          const shellData = view && sandbox.temporary ? path.join(sandbox.temporary, "data") : undefined
           const wrapped = await CommandRuntime.wrap({
             file: sandbox.file,
             args: sandbox.args ?? [],
             shell: sandbox.sandboxed ? false : sandbox.useShell,
+          })
+          log.debug("spawn plan", {
+            sandboxed: sandbox.sandboxed,
+            backend: sandbox.backend,
+            wrapped: wrapped.file,
+            payload: wrapped.args.slice(0, 2),
+            cwd,
+            envHome: env.HOME,
+            envData: shellData,
+            runtimePath: runtimeEnv.PATH?.slice(0, 80),
+            python: pythonHost,
+            pythonVisible: pythonBinary,
+            view: view
+              ? { home: view.home, cwd: view.cwd, relocate: view.relocate, envKeys: Object.keys(view.env ?? {}) }
+              : undefined,
           })
           try {
             child = spawn(wrapped.file, wrapped.args, {
@@ -525,6 +608,7 @@ export const BashTool = Tool.define("bash", async () => {
                 GIT_CONFIG_NOSYSTEM: env.GIT_CONFIG_NOSYSTEM,
                 GIT_CONFIG_GLOBAL: env.GIT_CONFIG_GLOBAL,
                 GIT_TERMINAL_PROMPT: env.GIT_TERMINAL_PROMPT,
+                ...(shellData ? { AXIOMICS_DATA_DIR: shellData } : {}),
               },
               stdio: ["ignore", "pipe", "pipe"],
               detached: process.platform !== "win32",

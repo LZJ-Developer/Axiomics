@@ -86,6 +86,7 @@ import { Auth } from "@/auth"
 import { SafeFileIO } from "@/file/safe-io"
 import { UpdateQuiescence } from "@/process/update-quiescence"
 import { MediaStore } from "@/media/store"
+import { PathSpace } from "@/session/path-space"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -2009,7 +2010,19 @@ export namespace SessionPrompt {
               args,
             },
           )
-          const result = await item.execute(args, ctx)
+          let result
+          try {
+            result = await item.execute(args, ctx)
+          } catch (error) {
+            // Tool errors reach the provider as text. Translate the workspace
+            // roots in place so a failure never teaches the model a host path;
+            // the error class and its data stay intact.
+            if (error instanceof Error && ctx.sessionID) {
+              const roots = await PathSpace.roots(ctx.sessionID).catch(() => undefined)
+              if (roots) error.message = PathSpace.rewriteText(roots, error.message)
+            }
+            throw error
+          }
           await Plugin.trigger(
             "tool.execute.after",
             {
@@ -2019,7 +2032,16 @@ export namespace SessionPrompt {
             },
             result,
           )
-          return result
+          // Tool output is the model's only view of what happened. Translate
+          // host spellings here, at the single boundary every native tool
+          // result crosses, so a tool that forgot to translate cannot leak.
+          const roots = await PathSpace.roots(ctx.sessionID).catch(() => undefined)
+          if (!roots) return result
+          return {
+            ...result,
+            title: PathSpace.rewriteText(roots, result.title),
+            output: PathSpace.rewriteText(roots, result.output),
+          }
         })
       },
     }))

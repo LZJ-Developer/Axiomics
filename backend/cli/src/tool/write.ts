@@ -13,6 +13,7 @@ import { Instance } from "../project/instance"
 import { trimDiff } from "./edit"
 import { assertExternalDirectory, sessionToolDirectory } from "./external-directory"
 import { SafeFileIO } from "@/file/safe-io"
+import { PathSpace } from "@/session/path-space"
 import { AuthoritySignal } from "@/project/authority-signal"
 
 const MAX_DIAGNOSTICS_PER_FILE = 20
@@ -26,7 +27,8 @@ export const WriteTool = Tool.define("write", {
   }),
   async execute(params, ctx) {
     const directory = await sessionToolDirectory(ctx)
-    const requested = path.isAbsolute(params.filePath) ? params.filePath : path.join(directory, params.filePath)
+    const target = await PathSpace.toHost(ctx.sessionID, params.filePath)
+    const requested = path.isAbsolute(target) ? target : path.join(directory, target)
     using access = await assertExternalDirectory(ctx, requested, { access: "write" })
     const filepath = access?.path ?? requested
 

@@ -20,6 +20,7 @@ import { FileTrash } from "../file/trash"
 import { Lock } from "@/util/lock"
 import type { SessionFilesystem } from "@/session/filesystem"
 import { AuthoritySignal } from "@/project/authority-signal"
+import { PathSpace } from "@/session/path-space"
 
 const PatchParams = z.object({
   patchText: z.string().describe("The full patch text that describes all changes to be made"),
@@ -384,7 +385,7 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
 
     const directory = await sessionToolDirectory(ctx)
     for (const hunk of hunks) {
-      const requested = path.resolve(directory, hunk.path)
+      const requested = path.resolve(directory, await PathSpace.toHost(ctx.sessionID, hunk.path))
       const access = await authorize(requested)
       const filePath = access?.path ?? requested
 
@@ -452,7 +453,9 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
             if (change.removed) deletions += change.count || 0
           }
 
-          const requestedMove = hunk.move_path ? path.resolve(directory, hunk.move_path) : undefined
+          const requestedMove = hunk.move_path
+            ? path.resolve(directory, await PathSpace.toHost(ctx.sessionID, hunk.move_path))
+            : undefined
           const targetAccess = requestedMove ? await authorize(requestedMove) : undefined
           const movePath = targetAccess?.path ?? requestedMove
           if (movePath) {

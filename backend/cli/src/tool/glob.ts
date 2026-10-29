@@ -5,6 +5,7 @@ import DESCRIPTION from "./glob.txt"
 import { Ripgrep } from "../file/ripgrep"
 import { Instance } from "../project/instance"
 import { assertExternalDirectory, sessionToolDirectory } from "./external-directory"
+import { PathSpace } from "@/session/path-space"
 
 export const GlobTool = Tool.define("glob", {
   description: DESCRIPTION,
@@ -29,7 +30,8 @@ export const GlobTool = Tool.define("glob", {
     })
 
     const directory = await sessionToolDirectory(ctx)
-    let search = params.path ?? directory
+    const requested = params.path ? await PathSpace.toHost(ctx.sessionID, params.path) : undefined
+    let search = requested ?? directory
     search = path.isAbsolute(search) ? search : path.resolve(directory, search)
     using authorized = await assertExternalDirectory(ctx, search, { kind: "directory" })
     search = authorized?.path ?? search
