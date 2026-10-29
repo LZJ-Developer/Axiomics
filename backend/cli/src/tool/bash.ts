@@ -383,6 +383,13 @@ export const BashTool = Tool.define("bash", async () => {
       // timing out behind environment maintenance.
       const runtime = await KernelEnvironmentMutation.pythonRuntime("python", mutation?.language === "python")
       if (runtime.env?.PIP_TARGET) readable.add(runtime.env.PIP_TARGET)
+      // A shared interpreter root is granted by its own rule: the sandbox adds
+      // <env>/bin from PATH, and for a conda-managed starter it also infers the
+      // whole <data>/conda/envs/<name>. A site-provisioned root such as
+      // /…/envs/omics-stamo-1.0.0 matches neither, so only its bin was readable
+      // and Python died on the missing stdlib ("No module named 'encodings'").
+      const sharedPython = KernelEnvironmentMutation.sharedBase("python")
+      if (sharedPython?.binary) readable.add(path.dirname(path.dirname(sharedPython.binary)))
       // R reaches a shell the same way Python does, and its project library has
       // to be exported on every launch, not only on the install — otherwise the
       // package one command installed is invisible to the next. rRuntime would
@@ -405,6 +412,14 @@ export const BashTool = Tool.define("bash", async () => {
         // "WARNING: ignoring environment value of R_HOME" on every command.
         runtimeEnv.R_LIBS_USER = rLibrary
         readable.add(rLibrary)
+        // A configured CRAN mirror reaches the shell the same way rRuntime
+        // hands it to a kernel: through a profile file, since R has no
+        // environment variable for the repository list.
+        const profile = KernelEnvironmentMutation.rProfile("r")
+        if (profile) {
+          runtimeEnv.R_PROFILE_USER = profile
+          readable.add(path.dirname(profile))
+        }
         // The interpreter itself lives in the read-only shared root, which is
         // outside the project grant; without it `Rscript` is not launchable
         // inside the sandbox even though it is on PATH.

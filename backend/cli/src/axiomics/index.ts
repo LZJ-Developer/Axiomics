@@ -128,6 +128,11 @@ const KERNEL_RUNTIME_KEYS = new Set([
   // launch; without it here the subprocess filter would drop it and a pip
   // install would land somewhere no later command can import from.
   "PIP_TARGET",
+  // Site-configured package sources. These are deployment config, not caller
+  // credentials: a mirror that needs a token still has to reach the installer
+  // that uses it, and the agent could set the same variable in a shell.
+  "PIP_INDEX_URL",
+  "R_PROFILE_USER",
   "VIRTUAL_ENV",
   "CONDA_PREFIX",
   "CONDA_DEFAULT_ENV",

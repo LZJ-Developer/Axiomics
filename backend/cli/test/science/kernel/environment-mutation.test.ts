@@ -355,3 +355,24 @@ test.skipIf(!Bun.which("Rscript"))(
   },
   60_000,
 )
+
+test("package mirrors are site configuration, read from the deployment environment", () => {
+  const saved = {
+    python: process.env.AXIOMICS_PIP_INDEX_URL,
+    cran: process.env.AXIOMICS_CRAN_MIRROR,
+  }
+  try {
+    process.env.AXIOMICS_PIP_INDEX_URL = "  https://mirror.example/simple  "
+    process.env.AXIOMICS_CRAN_MIRROR = "   "
+    expect(KernelEnvironmentMutation.pythonIndexUrl()).toBe("https://mirror.example/simple")
+    expect(KernelEnvironmentMutation.cranMirror()).toBeUndefined()
+  } finally {
+    for (const [key, value] of [
+      ["AXIOMICS_PIP_INDEX_URL", saved.python],
+      ["AXIOMICS_CRAN_MIRROR", saved.cran],
+    ] as const) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+})

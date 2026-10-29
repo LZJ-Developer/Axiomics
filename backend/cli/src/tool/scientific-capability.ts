@@ -55,9 +55,14 @@ async function writablePackages() {
   return Promise.all(
     targets.map(async (target) => {
       const entries = await fs.readdir(target.path).catch(() => [] as string[])
+      const repository =
+        target.language === "python"
+          ? KernelEnvironmentMutation.pythonIndexUrl()
+          : KernelEnvironmentMutation.cranMirror()
       return {
         ...target,
         scope: "project",
+        ...(repository ? { repository } : {}),
         exists: await fs
           .access(target.path)
           .then(() => true)

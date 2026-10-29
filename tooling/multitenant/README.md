@@ -99,6 +99,7 @@ systemd 单元与 linger。失败时直接指出是哪一层，不用对着浏�
 | 认证入口 | `AX_AUTHELIA_ADDR` | 默认 `127.0.0.1:9091`，只该留 loopback；跨机才有理由改 |
 | 租户端口段 | `AX_PORT_BASE` | 默认 42100 起，只发布到 loopback |
 | 模型上游 | `AX_MODEL_UPSTREAM` + `$AX_ROOT/secrets/deepseek.key` | 换模型供应商只改这两处 |
+| 包镜像源 | `AXIOMICS_PIP_INDEX_URL` / `AXIOMICS_CRAN_MIRROR` | 建租户时从环境透传。pip 认 `PIP_INDEX_URL`；R 没有对应环境变量，平台把它写成项目级 `Rprofile` 并用 `R_PROFILE_USER` 指过去。不设即走官方源 |
 | GPU 分配 | `axiomics-tenant add <用户> --gpu N` | 每租户直通一张卡；N 从 0 起 |
 | 案例切片 | `AX_CASE_SLICE` | 可选。没有切片时回放不可用，其余功能不受影响 |
 
@@ -118,6 +119,7 @@ systemd 单元与 linger。失败时直接指出是哪一层，不用对着浏�
 | 改 `auth/configuration.yml` 不生效 | 容器实际加载的是 `/config/portless.yml` | 改 `portless.yml` 再 `podman restart ax-authelia` |
 | 租户过一阵子访问 502 | 空闲 20 分钟被回收，激活器正在拉起 | 属预期；别给租户加 `--restart=always`，会与回收打架 |
 | agent 装完包，下一条命令 `import` 不到 | 旧镜像：Bash 的最终进程边界按白名单重建 env，丢掉 `PIP_TARGET`/`PYTHONPATH`，包目录又只被授予读 | 已修（运行时键找回 + 安装命令走 `environment_mutation` 授权）；重建镜像后租户冷启动即生效 |
+| 共享环境里的 `python` 报 `No module named 'encodings'` | 沙箱只从 PATH 授予了 `<env>/bin`，站点自建的 `<env>` 根（stdlib 所在）没被授予 | 已修（Bash 显式把共享解释器根加入可读面）；`<data>/conda/envs/…` 本来就有专门规则，不受影响 |
 
 ## 开机自恢复
 

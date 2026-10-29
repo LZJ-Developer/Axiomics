@@ -139,6 +139,13 @@ run_tenant() {
   local CORS_ARGS=()
   for o in $CORS_ORIGINS_RAW; do [ -n "$o" ] && CORS_ARGS+=(--cors "$o"); done
 
+  # 站点镜像源：设了就传给租户，没设则保持工具默认（官方源）。内网站点通常
+  # 两者都指向本单位的镜像；pip 走 PIP_INDEX_URL，R 没有对应环境变量，
+  # 平台会把它写成项目级 Rprofile 并用 R_PROFILE_USER 指过去。
+  local MIRROR_ARGS=()
+  [ -n "${AXIOMICS_PIP_INDEX_URL:-}" ] && MIRROR_ARGS+=(-e AXIOMICS_PIP_INDEX_URL="$AXIOMICS_PIP_INDEX_URL")
+  [ -n "${AXIOMICS_CRAN_MIRROR:-}" ] && MIRROR_ARGS+=(-e AXIOMICS_CRAN_MIRROR="$AXIOMICS_CRAN_MIRROR")
+
   podman run -d --name "ax-$tid" \
     --init \
     --userns=keep-id \
@@ -155,6 +162,7 @@ run_tenant() {
     -e PIP_CACHE_DIR=/cache/pip -e UV_CACHE_DIR=/cache/uv \
     -e AXIOMICS_SHARED_PYTHON="$SHARED_PYTHON" \
     -e AXIOMICS_SHARED_R="$SHARED_R" \
+    "${MIRROR_ARGS[@]}" \
     -e http_proxy= -e https_proxy= -e HTTP_PROXY= -e HTTPS_PROXY= \
     -e all_proxy= -e ALL_PROXY= -e no_proxy= -e NO_PROXY= \
     -e NODE_EXTRA_CA_CERTS=/etc/pki/ca-trust/source/anchors/axiomics-internal-ca.crt \
