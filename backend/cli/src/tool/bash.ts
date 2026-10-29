@@ -18,6 +18,7 @@ import { BashArity } from "@/permission/arity"
 import { Truncate } from "./truncation"
 import { Axiomics } from "@/axiomics"
 import { Sandbox } from "@/sandbox/sandbox"
+import { VIEW_TMP } from "@/sandbox/view"
 import { SessionFilesystem } from "@/session/filesystem"
 import { Filesystem } from "@/util/filesystem"
 import { Provenance } from "@/science/provenance/store"
@@ -172,6 +173,8 @@ export const BashTool = Tool.define("bash", async () => {
   log.info("bash tool using shell", { shell })
 
   return {
+    pathFields: ["workdir"],
+    localizeOutput: true,
     description: DESCRIPTION.replaceAll("${directory}", "the session workspace")
       .replaceAll("${maxLines}", String(Truncate.MAX_LINES))
       .replaceAll("${maxBytes}", String(Truncate.MAX_BYTES)),
@@ -201,14 +204,9 @@ export const BashTool = Tool.define("bash", async () => {
       const writable = authority.writable
       const readable = new Set(authority.readable)
       const workspace = authority.workspace
-      // The model may address its own machine's roots (`/home/example-user-d4f0bc/...`).
-      // Translate before any host-side resolution so the rest of this tool
-      // keeps operating on real paths.
-      const workdir =
-        params.workdir && PathSpace.mentions(params.workdir)
-          ? await PathSpace.toHost(ctx.sessionID, params.workdir)
-          : params.workdir
-      const requested = workdir || workspace
+      // The session boundary already translated the declared path fields, so
+      // this is a host path by the time it arrives.
+      const requested = params.workdir || workspace
       const target = path.isAbsolute(requested) ? requested : path.resolve(workspace, requested)
       const cwd = (await Filesystem.canonical(target)) ?? path.resolve(target)
       const contained = (value: string) => writable.some((root) => Filesystem.contains(root, value))
@@ -500,30 +498,19 @@ export const BashTool = Tool.define("bash", async () => {
         // Variables the payload sees inside the namespace. They are applied
         // with bwrap --setenv, never on the spawn environment: the host-side
         // launch gate boots this binary before bwrap exists and must keep
-        // host spellings for its own data/config root.
+        // host spellings for its own data/config root. The payload receives a
+        // complete environment, so the sandbox can drop everything else it
+        // would otherwise inherit from the launcher.
         if (view) {
-          const virtual: Record<string, string> = {}
           const cache = Sandbox.cacheEnvironment(current.workspace)
-          for (const [key, value] of Object.entries(cache)) {
-            virtual[key] = PathSpace.toModel(view.roots, value)
-          }
-          virtual.XDG_STATE_HOME = PathSpace.toModel(
-            view.roots,
-            path.join(current.workspace, ".axiomics", "state"),
-          )
-          for (const [key, value] of Object.entries(PathSpace.relocateEnv(view.relocate, runtimeEnv))) {
-            if (typeof value === "string") virtual[key] = value
-          }
-          virtual.PATH = PathSpace.remapHome(view.relocate, runtimeEnv.PATH ?? process.env.PATH ?? "")
-          view.env = { ...(view.env ?? {}), ...virtual }
-          // The spawn environment stays host-spelled because the launcher
-          // reads it, but the payload inherits every allowlisted variable it
-          // carries. An inherited value that names the host home (XDG_* and
-          // some runtime keys do) would therefore reach the payload intact, so
-          // each one gets an explicit relocated override.
-          PathSpace.hideHostHome(view, {
+          view.env = PathSpace.payloadEnv(view, {
             ...Axiomics.filterEnvForSubprocess({ ...process.env, ...runtimeEnv, ...cache }),
             ...Axiomics.filterEnvForKernel(runtimeEnv),
+            ...runtimeEnv,
+            XDG_STATE_HOME: path.join(current.workspace, ".axiomics", "state"),
+            // A nested Axiomics process would try to create its data root on
+            // the read-only synthetic home; give it the private temp mount.
+            AXIOMICS_DATA_DIR: `${VIEW_TMP}/data`,
           })
         }
         // The shim symlink inside the sandbox temp root must point at the

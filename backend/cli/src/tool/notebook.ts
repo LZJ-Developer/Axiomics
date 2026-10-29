@@ -354,19 +354,16 @@ class PythonKernel implements Kernel {
     // Confine the kernel to the workspace when the execution sandbox is on: the
     // runtime runs arbitrary agent-authored code — the same threat model as the
     // bash tool — so it must not be able to escape the boundary bash respects.
-    const env = PathSpace.relocateEnv(
-      view?.relocate,
-      Axiomics.kernelEnv(process.env, {
-        ...Axiomics.pythonThreadCapEnv(process.env),
-        ...(opts?.env ?? {}),
-        ATLAS_CLI_CONFIG_PATH: configPath,
-        MPLCONFIGDIR: path.join(cachePath, "matplotlib"),
-        XDG_CACHE_HOME: path.join(cachePath, "xdg"),
-        PYTHONPYCACHEPREFIX: path.join(cachePath, "pycache"),
-        PYTHONUNBUFFERED: "1",
-      }),
-    )
-    if (view) PathSpace.hideHostHome(view, env)
+    const env = Axiomics.kernelEnv(process.env, {
+      ...Axiomics.pythonThreadCapEnv(process.env),
+      ...(opts?.env ?? {}),
+      ATLAS_CLI_CONFIG_PATH: configPath,
+      MPLCONFIGDIR: path.join(cachePath, "matplotlib"),
+      XDG_CACHE_HOME: path.join(cachePath, "xdg"),
+      PYTHONPYCACHEPREFIX: path.join(cachePath, "pycache"),
+      PYTHONUNBUFFERED: "1",
+    })
+    if (view) view.env = PathSpace.payloadEnv(view, env)
     const sandboxed = Sandbox.wrapArgv({
       file: interpreter.binary,
       args: ["-u", scriptPath],

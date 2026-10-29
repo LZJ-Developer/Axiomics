@@ -7,6 +7,7 @@ import { Instance } from "../project/instance"
 import { PathSpace } from "@/session/path-space"
 
 export const MultiEditTool = Tool.define("multiedit", {
+  pathFields: ["filePath"],
   description: DESCRIPTION,
   parameters: z.object({
     filePath: z.string().describe("The absolute path to the file to modify"),
@@ -23,7 +24,7 @@ export const MultiEditTool = Tool.define("multiedit", {
   }),
   async execute(params, ctx) {
     const tool = await EditTool.init()
-    const filePath = await PathSpace.toHost(ctx.sessionID, params.filePath)
+    const filePath = params.filePath
     const results = []
     for (const [, edit] of params.edits.entries()) {
       const result = await tool.execute(

@@ -5,6 +5,7 @@ import { spawn, spawnSync } from "child_process"
 import { lazy } from "@/util/lazy"
 import { Log } from "@/util/log"
 import { Shell } from "@/shell/shell"
+import { VIEW_TMP, relocate as relocatePrefix } from "./view"
 
 const log = Log.create({ service: "sandbox" })
 
@@ -785,12 +786,7 @@ export namespace Sandbox {
     // The mapping is a pure prefix rewrite, so two sources can never collide
     // on one destination.
     const relocate = view?.relocate
-    const destination = (value: string) => {
-      if (!relocate || relocate.from === "/" || relocate.from === relocate.to) return value
-      if (value === relocate.from) return relocate.to
-      if (value.startsWith(relocate.from + path.sep)) return relocate.to + value.slice(relocate.from.length)
-      return value
-    }
+    const destination = (value: string) => relocatePrefix(relocate, value)
     if (policy.gpu) {
       for (const value of ["/sys/module/nvidia", "/sys/module/nvidia_uvm", "/sys/devices/system"]) {
         if (fs.existsSync(value)) args.push("--ro-bind", value, value)
@@ -879,6 +875,15 @@ export namespace Sandbox {
     // Applied after every mount: the child starts in the virtual workspace and
     // reports the synthetic home, so `pwd`, `ls` and `~` never name the host.
     if (view) {
+      // bubblewrap 0.4 has no --clearenv, so drop every inherited variable the
+      // view's environment does not define. Without this pass an allowlisted
+      // variable the caller never thought about (XDG_DATA_DIRS, a runtime
+      // root) reaches the payload still spelling the host home.
+      if (view.env) {
+        for (const key of Object.keys(process.env)) {
+          if (!(key in view.env)) args.push("--unsetenv", key)
+        }
+      }
       args.push("--setenv", "HOME", view.home)
       for (const [key, value] of Object.entries(view.env ?? {})) args.push("--setenv", key, value)
       args.push("--chdir", view.cwd)
@@ -989,7 +994,7 @@ export namespace Sandbox {
           ? {
               ...input.view,
               identity: input.view.identity ?? identityFiles(temporary, input.view),
-              temporary: input.view.temporary ?? { source: temporary, destination: "/home/example-user-d4f0bc/.tmp" },
+              temporary: input.view.temporary ?? { source: temporary, destination: VIEW_TMP },
             }
           : undefined
       const s = specForArgv(
@@ -1062,7 +1067,7 @@ export namespace Sandbox {
           ? {
               ...input.view,
               identity: input.view.identity ?? identityFiles(temporary, input.view),
-              temporary: input.view.temporary ?? { source: temporary, destination: "/home/example-user-d4f0bc/.tmp" },
+              temporary: input.view.temporary ?? { source: temporary, destination: VIEW_TMP },
             }
           : undefined
       // The interpreter and generated script may live under the host home,
@@ -1080,9 +1085,7 @@ export namespace Sandbox {
         try {
           resolved = fs.realpathSync.native(value)
         } catch {}
-        if (resolved === relocate.from) return relocate.to
-        if (resolved.startsWith(relocate.from + path.sep)) return relocate.to + resolved.slice(relocate.from.length)
-        return value
+        return relocatePrefix(relocate, resolved)
       }
       const s = specForArgv(
         withTempEnvironment(

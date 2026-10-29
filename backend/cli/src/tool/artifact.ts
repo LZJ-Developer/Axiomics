@@ -101,6 +101,7 @@ async function traceSavedArtifact(saved: ArtifactStore.Artifact, run?: Run) {
 }
 
 export const ArtifactTool = Tool.define("artifact", {
+  pathFields: ["path"],
   description:
     "Save an important workspace file as a durable Result with a stable identity, immutable versions, and optional execution provenance. Empirical contract Results need provenance_id to pass completion. Keep drafts and large mutable working data in the workspace instead.",
   parameters: z.object({

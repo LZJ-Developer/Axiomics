@@ -285,14 +285,11 @@ class RKernel implements Kernel {
     // Confine the kernel to the workspace when the execution sandbox is on: the R
     // kernel runs arbitrary agent-authored code — the same threat model as the
     // bash tool — so it must respect the same boundary.
-    const env = PathSpace.relocateEnv(
-      view?.relocate,
-      Axiomics.kernelEnv(process.env, {
-        ...(opts?.env ?? {}),
-        ATLAS_CLI_CONFIG_PATH: configPath,
-      }),
-    )
-    if (view) PathSpace.hideHostHome(view, env)
+    const env = Axiomics.kernelEnv(process.env, {
+      ...(opts?.env ?? {}),
+      ATLAS_CLI_CONFIG_PATH: configPath,
+    })
+    if (view) view.env = PathSpace.payloadEnv(view, env)
     const sandboxed = Sandbox.wrapArgv({
       file: interpreter.binary,
       args: ["--vanilla", scriptPath],

@@ -20,6 +20,7 @@ const MAX_DIAGNOSTICS_PER_FILE = 20
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
 export const WriteTool = Tool.define("write", {
+  pathFields: ["filePath"],
   description: DESCRIPTION,
   parameters: z.object({
     content: z.string().describe("The content to write to the file"),
@@ -27,7 +28,7 @@ export const WriteTool = Tool.define("write", {
   }),
   async execute(params, ctx) {
     const directory = await sessionToolDirectory(ctx)
-    const target = await PathSpace.toHost(ctx.sessionID, params.filePath)
+    const target = params.filePath
     const requested = path.isAbsolute(target) ? target : path.join(directory, target)
     using access = await assertExternalDirectory(ctx, requested, { access: "write" })
     const filepath = access?.path ?? requested

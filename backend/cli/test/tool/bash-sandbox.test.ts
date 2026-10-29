@@ -83,6 +83,48 @@ describe("tool.bash sandbox integration", () => {
     }
   }, 15_000)
 
+  test("presents a synthetic machine instead of the host", async () => {
+    if (!Sandbox.available()) return
+
+    await using _sandbox = await sandboxedExecution()
+    await using tmp = await tmpdir({ git: true })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const ctx = await context()
+        const bash = await BashTool.init()
+        const home = os.homedir()
+        // The command only reads its own environment and hostname: every
+        // string it prints is what the model would learn about the machine.
+        const result = await bash.execute(
+          {
+            command: [
+              `echo "HOME=$HOME"`,
+              `echo "USER=$(id -un)"`,
+              `echo "HOST=$(hostname)"`,
+              `echo "PWD=$(pwd)"`,
+              `echo "HOMES=$(ls /home | tr '\\n' ,)"`,
+              `echo "LEAK=$(env | grep -c -- '${home}' || true)"`,
+            ].join("; "),
+            description: "inspect the synthetic machine",
+          },
+          ctx,
+        )
+        expect(result.metadata.exit, result.output).toBe(0)
+        expect(result.output).toContain("HOME=/home/example-user-d4f0bc")
+        expect(result.output).toContain("USER=agent")
+        expect(result.output).toContain("HOST=axiomics")
+        expect(result.output).toMatch(/PWD=\/home\/agent\//)
+        expect(result.output).toContain("HOMES=agent,")
+        // No environment value may spell the host home: it is both a
+        // disclosure and a path that does not exist inside the namespace.
+        expect(result.output).toContain("LEAK=0")
+        expect(result.output).not.toContain(home)
+      },
+    })
+  }, 15_000)
+
   test("runs Git normally from a linked worktree", async () => {
     if (!Sandbox.available()) return
 

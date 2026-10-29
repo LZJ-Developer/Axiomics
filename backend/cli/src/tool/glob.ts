@@ -8,6 +8,8 @@ import { assertExternalDirectory, sessionToolDirectory } from "./external-direct
 import { PathSpace } from "@/session/path-space"
 
 export const GlobTool = Tool.define("glob", {
+  pathFields: ["path"],
+  localizeOutput: true,
   description: DESCRIPTION,
   parameters: z.object({
     pattern: z.string().describe("The glob pattern to match files against"),
@@ -30,7 +32,7 @@ export const GlobTool = Tool.define("glob", {
     })
 
     const directory = await sessionToolDirectory(ctx)
-    const requested = params.path ? await PathSpace.toHost(ctx.sessionID, params.path) : undefined
+    const requested = params.path ? params.path : undefined
     let search = requested ?? directory
     search = path.isAbsolute(search) ? search : path.resolve(directory, search)
     using authorized = await assertExternalDirectory(ctx, search, { kind: "directory" })

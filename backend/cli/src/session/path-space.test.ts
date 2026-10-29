@@ -67,31 +67,33 @@ describe("path space", () => {
     expect(PathSpace.mentions("project/a")).toBe(false)
   })
 
-  test("relocates every value that spells the host home for the payload", () => {
-    const relocated = { from: "/data/home", to: "/home/example-user-d4f0bc" }
-    const env = PathSpace.relocateVariables(relocated, {
+  test("builds a complete payload environment with no host spelling left", () => {
+    const view = {
+      home: "/home/example-user-d4f0bc",
+      cwd: "/home/example-user-d4f0bc/project",
+      mounts: [],
+      relocate: { from: "/data/home", to: "/home/example-user-d4f0bc" },
+      env: { USER: "agent", LOGNAME: "agent" },
+      roots,
+    }
+    const env = PathSpace.payloadEnv(view, {
+      HOME: "/data/home",
+      PATH: "/data/home/example-user-5d62ef/py/bin:/usr/bin",
       XDG_DATA_DIRS: "/data/home/example-user-a5d2f2/share/flatpak/exports/share:/usr/share",
       MAMBA_ROOT_PREFIX: "/data/home/example-user-d397a5/mamba",
-      VIRTUAL_ENV: "/data/home/example-user-5d62ef/py",
+      XDG_STATE_HOME: "/data/projects/p1/.axiomics/state",
       OPENAI_API_KEY: "sk-live-9f2c",
       LS_COLORS: "di=01;34:ln=01;36",
+      USER: "dabiao",
     })
+    expect(env.HOME).toBe("/home/example-user-d4f0bc")
+    expect(env.PATH).toBe("/home/example-user-d4f0bc/envs/py/bin:/usr/bin")
     expect(env.XDG_DATA_DIRS).toBe("/home/example-user-d4f0bc/.local/share/flatpak/exports/share:/usr/share")
     expect(env.MAMBA_ROOT_PREFIX).toBe("/home/example-user-d4f0bc/.axiomics/mamba")
-    expect(env.VIRTUAL_ENV).toBe("/home/example-user-d4f0bc/envs/py")
+    expect(env.XDG_STATE_HOME).toBe("/home/example-user-d4f0bc/project/.axiomics/state")
     expect(env.OPENAI_API_KEY).toBe("sk-live-9f2c")
     expect(env.LS_COLORS).toBe("di=01;34:ln=01;36")
-  })
-
-  test("leaves the launcher's own HOME alone when relocating spawn variables", () => {
-    const relocated = { from: "/data/home", to: "/home/example-user-d4f0bc" }
-    const env = PathSpace.relocateEnv(relocated, {
-      HOME: "/data/home",
-      XDG_DATA_DIRS: "/data/home/example-user-a5d2f2/share",
-      PATH: "/data/home/example-user-5d62ef/py/bin:/usr/bin",
-    })
-    expect(env.HOME).toBe("/data/home")
-    expect(env.XDG_DATA_DIRS).toBe("/data/home/example-user-a5d2f2/share")
-    expect(env.PATH).toBe("/home/example-user-d4f0bc/envs/py/bin:/usr/bin")
+    expect(env.USER).toBe("agent")
+    expect(env.LOGNAME).toBe("agent")
   })
 })

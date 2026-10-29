@@ -28,6 +28,7 @@ function normalizeLineEndings(text: string): string {
 }
 
 export const EditTool = Tool.define("edit", {
+  pathFields: ["filePath"],
   description: DESCRIPTION,
   parameters: z.object({
     filePath: z.string().describe("The absolute path to the file to modify"),
@@ -45,7 +46,7 @@ export const EditTool = Tool.define("edit", {
     }
 
     const directory = await sessionToolDirectory(ctx)
-    const target = await PathSpace.toHost(ctx.sessionID, params.filePath)
+    const target = params.filePath
     const requested = path.isAbsolute(target) ? target : path.join(directory, target)
     using access = await assertExternalDirectory(ctx, requested, { access: "write" })
     const filePath = access?.path ?? requested

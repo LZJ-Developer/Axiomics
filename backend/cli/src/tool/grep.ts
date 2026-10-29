@@ -40,6 +40,8 @@ async function output(proc: { stdout: ReadableStream<Uint8Array>; kill(): void }
 }
 
 export const GrepTool = Tool.define("grep", {
+  pathFields: ["path"],
+  localizeOutput: true,
   description: DESCRIPTION,
   parameters: z.object({
     pattern: z.string().describe("The regex pattern to search for in file contents"),
@@ -63,7 +65,7 @@ export const GrepTool = Tool.define("grep", {
     })
 
     const directory = await sessionToolDirectory(ctx)
-    const requested = params.path ? await PathSpace.toHost(ctx.sessionID, params.path) : undefined
+    const requested = params.path ? params.path : undefined
     let searchPath = requested ?? directory
     searchPath = path.isAbsolute(searchPath) ? searchPath : path.resolve(directory, searchPath)
     using authorized = await assertExternalDirectory(ctx, searchPath, { kind: "directory" })

@@ -5,6 +5,7 @@ import { Instance } from "@/project/instance"
 import { SessionFilesystem } from "@/session/filesystem"
 import { Config } from "@/config/config"
 import { Sandbox } from "@/sandbox/sandbox"
+import { VIEW_HOME, VIEW_TMP, relocate as relocatePrefix } from "@/sandbox/view"
 import { Log } from "@/util/log"
 
 const log = Log.create({ service: "path-space" })
@@ -27,7 +28,7 @@ const log = Log.create({ service: "path-space" })
  * that reaches the model is translated.
  */
 export namespace PathSpace {
-  export const home = "/home/example-user-d4f0bc"
+  export const home = VIEW_HOME
   export const project = `${home}/project`
   export const scratch = `${home}/scratch`
 
@@ -62,82 +63,65 @@ export namespace PathSpace {
    * own path (Python, R) must be given that same spelling. */
   export function remapHome(relocate: { from: string; to: string } | undefined, value: string) {
     if (!relocate) return value
-    const one = (segment: string) => {
-      const match = (candidate: string) =>
-        candidate === relocate.from || candidate.startsWith(relocate.from + path.sep)
-          ? relocate.to + candidate.slice(relocate.from.length)
-          : undefined
-      let resolved = segment
-      try {
-        resolved = fs.realpathSync.native(segment)
-      } catch {}
-      return match(resolved) ?? match(segment) ?? segment
-    }
-    return value.split(":").map(one).join(":")
+    return value.split(":").map(remapSegment.bind(undefined, relocate)).join(":")
   }
 
-  /** Path-list environment variables. These are rewritten even when their
-   * segments do not exist yet (a venv that will be created, an install target
-   * in a fresh session): the value still describes the home the process will
-   * see. Every other variable is rewritten only when it actually spells the
-   * host home, so tokens, flags, and unrelated values stay byte-for-byte
-   * intact. */
-  const PATH_ENVIRONMENT_KEYS = new Set([
-    "PATH",
-    "PYTHONPATH",
-    "PYTHONHOME",
-    "PIP_TARGET",
-    "R_LIBS_USER",
-    "R_PROFILE_USER",
-    "R_HOME",
-    "VIRTUAL_ENV",
-    "CONDA_PREFIX",
-  ])
+  function remapSegment(relocate: { from: string; to: string } | undefined, segment: string) {
+    if (!relocate) return segment
+    let resolved = segment
+    try {
+      resolved = fs.realpathSync.native(segment)
+    } catch {}
+    const canonical = relocatePrefix(relocate, resolved)
+    if (canonical !== resolved) return canonical
+    return relocatePrefix(relocate, segment)
+  }
 
-  export function relocateEnv(
+  /** Translate one environment value into the view's vocabulary. Workspace
+   * roots are named by their model spelling; anything else under the host home
+   * follows the same prefix relocation as the mounts. Colon-separated path
+   * lists are handled segment by segment so a token or flag keeps its bytes. */
+  export function translateValue(
+    current: Roots,
     relocate: { from: string; to: string } | undefined,
-    input: Record<string, string | undefined>,
+    value: string,
   ) {
-    if (!relocate) return input
+    return value
+      .split(":")
+      .map((segment) => {
+        const rooted = toModel(current, segment)
+        return rooted !== segment ? rooted : remapSegment(relocate, segment)
+      })
+      .join(":")
+  }
+
+  /** The complete environment of the sandboxed payload. Everything the spawn
+   * carries is translated, so the payload never inherits a host path or host
+   * identity; bubblewrap applies the result with `--setenv` and drops every
+   * inherited variable this map does not name. */
+  export function payloadEnv(view: SandboxView, base: Record<string, string | undefined>) {
+    const output: Record<string, string> = {}
+    for (const [key, value] of Object.entries(base)) {
+      if (typeof value === "string") output[key] = translateValue(view.roots, view.relocate, value)
+    }
+    output.HOME = view.home
+    // Explicit view entries (USER, LOGNAME, a private data root) describe the
+    // synthetic machine and win over anything the host supplied.
+    return { ...output, ...view.env }
+  }
+
+  /** Translate the declared path fields of a tool call from the model's
+   * vocabulary to host spellings. The session boundary calls this once for
+   * every tool, so an individual tool cannot forget to. */
+  export async function localizeArgs(sessionID: string, fields: readonly string[], args: unknown) {
+    if (!args || typeof args !== "object") return args
+    const input = args as Record<string, unknown>
     const output = { ...input }
-    for (const key of PATH_ENVIRONMENT_KEYS) {
-      const value = output[key]
-      if (typeof value === "string") output[key] = remapHome(relocate, value)
+    for (const field of fields) {
+      const value = output[field]
+      if (typeof value === "string") output[field] = await toHost(sessionID, value)
     }
     return output
-  }
-
-  /** Rewrite every value that spells the host home, whatever its key. This is
-   * the environment that reaches the payload through bwrap --setenv: there a
-   * host path is both a disclosure and a broken path. It is never applied to a
-   * spawn environment that the host-side launcher itself reads, because the
-   * launcher still needs its real HOME to open its data root. */
-  export function relocateVariables(
-    relocate: { from: string; to: string } | undefined,
-    input: Record<string, string | undefined>,
-  ) {
-    if (!relocate) return input
-    const output = { ...input }
-    for (const [key, value] of Object.entries(output)) {
-      if (typeof value !== "string" || !value.includes(relocate.from)) continue
-      output[key] = remapHome(relocate, value)
-    }
-    return output
-  }
-
-  /** Give the payload a relocated override for every variable the launcher
-   * would otherwise hand it host-spelled. `visible` is the environment the
-   * spawn carries; the overrides travel through view.env, which bubblewrap
-   * applies with --setenv. The spawn environment itself is left untouched
-   * because the host-side launcher reads it before the namespace exists. */
-  export function hideHostHome(view: SandboxView, visible: Record<string, string | undefined>) {
-    const merged = { ...visible, ...view.env }
-    const overrides: Record<string, string> = {}
-    for (const [key, value] of Object.entries(relocateVariables(view.relocate, merged))) {
-      if (typeof value === "string" && value !== merged[key]) overrides[key] = value
-    }
-    if (Object.keys(overrides).length) view.env = { ...(view.env ?? {}), ...overrides }
-    return view
   }
 
   /** Whether this host can actually present the view. The model vocabulary is
@@ -303,7 +287,7 @@ export namespace PathSpace {
       .filter((root) => contains(root.host, cwd))
       .sort((left, right) => right.host.length - left.host.length)[0]
     if (!target) {
-      log.info("view unavailable: cwd outside workspace roots", { cwd, roots: all(current) })
+      log.debug("view unavailable: cwd outside workspace roots", { cwd, roots: all(current) })
       return
     }
     const mountRoot = current.repository ?? current.project
@@ -318,7 +302,7 @@ export namespace PathSpace {
       if (root.access === "write") mounts.push({ source: root.host, destination: root.model })
     }
     const targetCwd = join(target.model, relative(target.host, cwd))
-    log.info("view active", { cwd: targetCwd, mounts, relocate: current.relocate })
+    log.debug("view active", { cwd: targetCwd, mounts, relocate: current.relocate })
     return {
       home,
       cwd: targetCwd,
@@ -330,15 +314,7 @@ export namespace PathSpace {
     }
   }
 
-  /** Shape expected by Sandbox.View; kept structural so the sandbox module
-   * never depends on session storage. */
-  export type SandboxView = {
-    home: string
-    cwd: string
-    mounts: { source: string; destination: string }[]
-    readOnlyMounts?: { source: string; destination: string }[]
-    relocate?: { from: string; to: string }
-    env?: Record<string, string>
-    roots: Roots
-  }
+  /** The sandbox view plus the roots it was derived from: the sandbox module
+   * never depends on session storage, so callers carry the roots alongside. */
+  export type SandboxView = Sandbox.View & { roots: Roots }
 }

@@ -2012,7 +2012,13 @@ export namespace SessionPrompt {
           )
           let result
           try {
-            result = await item.execute(args, ctx)
+            // Tools declare which arguments name a workspace path; translate
+            // them here, at the single boundary every native call crosses, so
+            // an individual tool cannot forget to.
+            const localized = item.pathFields?.length
+              ? await PathSpace.localizeArgs(ctx.sessionID, item.pathFields, args)
+              : args
+            result = await item.execute(localized, ctx)
           } catch (error) {
             // Tool errors reach the provider as text. Translate the workspace
             // roots in place so a failure never teaches the model a host path;
@@ -2035,12 +2041,15 @@ export namespace SessionPrompt {
           // Tool output is the model's only view of what happened. Translate
           // host spellings here, at the single boundary every native tool
           // result crosses, so a tool that forgot to translate cannot leak.
+          // Only location-bearing output is rewritten: a read result carries
+          // file content, and rewriting its bytes would corrupt data the model
+          // later writes back.
           const roots = await PathSpace.roots(ctx.sessionID).catch(() => undefined)
           if (!roots) return result
           return {
             ...result,
             title: PathSpace.rewriteText(roots, result.title),
-            output: PathSpace.rewriteText(roots, result.output),
+            output: item.localizeOutput ? PathSpace.rewriteText(roots, result.output) : result.output,
           }
         })
       },

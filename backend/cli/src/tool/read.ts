@@ -138,6 +138,7 @@ async function textWindow(filepath: string, offset: number, limit: number) {
 }
 
 export const ReadTool = Tool.define("read", {
+  pathFields: ["filePath"],
   description: DESCRIPTION,
   parameters: z.object({
     filePath: z.string().describe("The path to the file to read"),
@@ -159,7 +160,7 @@ export const ReadTool = Tool.define("read", {
     const directory = await sessionToolDirectory(ctx)
     // The model addresses its own machine's roots; resolve them before any
     // host-side containment or permission check.
-    const requestedFile = await PathSpace.toHost(ctx.sessionID, params.filePath)
+    const requestedFile = params.filePath
     const requested = path.isAbsolute(requestedFile) ? requestedFile : path.resolve(directory, requestedFile)
     const retained = isAuthorizedPath(ctx.extra?.["fileAuthorization"]) ? ctx.extra?.["fileAuthorization"] : undefined
     if (retained && retained.path !== requested) {
