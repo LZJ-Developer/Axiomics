@@ -132,6 +132,7 @@ const KERNEL_RUNTIME_KEYS = new Set([
   // credentials: a mirror that needs a token still has to reach the installer
   // that uses it, and the agent could set the same variable in a shell.
   "PIP_INDEX_URL",
+  "PIP_TRUSTED_HOST",
   "R_PROFILE_USER",
   "VIRTUAL_ENV",
   "CONDA_PREFIX",

@@ -99,7 +99,7 @@ systemd 单元与 linger。失败时直接指出是哪一层，不用对着浏�
 | 认证入口 | `AX_AUTHELIA_ADDR` | 默认 `127.0.0.1:9091`，只该留 loopback；跨机才有理由改 |
 | 租户端口段 | `AX_PORT_BASE` | 默认 42100 起，只发布到 loopback |
 | 模型上游 | `AX_MODEL_UPSTREAM` + `$AX_ROOT/secrets/deepseek.key` | 换模型供应商只改这两处 |
-| 包镜像源 | `AXIOMICS_PIP_INDEX_URL` / `AXIOMICS_CRAN_MIRROR` | 建租户时从环境透传。pip 认 `PIP_INDEX_URL`；R 没有对应环境变量，平台把它写成项目级 `Rprofile` 并用 `R_PROFILE_USER` 指过去。不设即走官方源 |
+| 包镜像源 | `AXIOMICS_PIP_INDEX_URL` / `AXIOMICS_PIP_TRUSTED_HOST` / `AXIOMICS_CRAN_MIRROR` | 建租户时从环境透传。pip 认 `PIP_INDEX_URL`（内网 http 镜像另需 `AXIOMICS_PIP_TRUSTED_HOST`）；R 没有对应环境变量，平台把它写成项目级 `Rprofile` 并用 `R_PROFILE_USER` 指过去。不设即走官方源 |
 | GPU 分配 | `axiomics-tenant add <用户> --gpu N` | 每租户直通一张卡；N 从 0 起 |
 | 案例切片 | `AX_CASE_SLICE` | 可选。没有切片时回放不可用，其余功能不受影响 |
 

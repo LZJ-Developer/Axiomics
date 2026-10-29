@@ -144,6 +144,8 @@ run_tenant() {
   # 平台会把它写成项目级 Rprofile 并用 R_PROFILE_USER 指过去。
   local MIRROR_ARGS=()
   [ -n "${AXIOMICS_PIP_INDEX_URL:-}" ] && MIRROR_ARGS+=(-e AXIOMICS_PIP_INDEX_URL="$AXIOMICS_PIP_INDEX_URL")
+  # 内网镜像多为 http，pip 需要显式信任该主机，否则报 not a trusted host。
+  [ -n "${AXIOMICS_PIP_TRUSTED_HOST:-}" ] && MIRROR_ARGS+=(-e AXIOMICS_PIP_TRUSTED_HOST="$AXIOMICS_PIP_TRUSTED_HOST")
   [ -n "${AXIOMICS_CRAN_MIRROR:-}" ] && MIRROR_ARGS+=(-e AXIOMICS_CRAN_MIRROR="$AXIOMICS_CRAN_MIRROR")
 
   podman run -d --name "ax-$tid" \

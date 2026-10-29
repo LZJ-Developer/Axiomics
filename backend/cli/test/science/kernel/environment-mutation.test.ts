@@ -359,16 +359,20 @@ test.skipIf(!Bun.which("Rscript"))(
 test("package mirrors are site configuration, read from the deployment environment", () => {
   const saved = {
     python: process.env.AXIOMICS_PIP_INDEX_URL,
+    trusted: process.env.AXIOMICS_PIP_TRUSTED_HOST,
     cran: process.env.AXIOMICS_CRAN_MIRROR,
   }
   try {
     process.env.AXIOMICS_PIP_INDEX_URL = "  https://mirror.example/simple  "
+    process.env.AXIOMICS_PIP_TRUSTED_HOST = "mirror.example"
     process.env.AXIOMICS_CRAN_MIRROR = "   "
     expect(KernelEnvironmentMutation.pythonIndexUrl()).toBe("https://mirror.example/simple")
+    expect(KernelEnvironmentMutation.pythonTrustedHost()).toBe("mirror.example")
     expect(KernelEnvironmentMutation.cranMirror()).toBeUndefined()
   } finally {
     for (const [key, value] of [
       ["AXIOMICS_PIP_INDEX_URL", saved.python],
+      ["AXIOMICS_PIP_TRUSTED_HOST", saved.trusted],
       ["AXIOMICS_CRAN_MIRROR", saved.cran],
     ] as const) {
       if (value === undefined) delete process.env[key]

@@ -301,6 +301,7 @@ export namespace KernelEnvironmentMutation {
         PIP_TARGET: packages,
         PYTHONPATH: [packages, managed.env?.PYTHONPATH, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
         ...(pythonIndexUrl() ? { PIP_INDEX_URL: pythonIndexUrl() } : {}),
+        ...(pythonTrustedHost() ? { PIP_TRUSTED_HOST: pythonTrustedHost() } : {}),
       },
       ...(allowMutation ? { extraWritable: [packages], sandboxNetwork: "allow" as const } : {}),
     }
@@ -318,6 +319,13 @@ export namespace KernelEnvironmentMutation {
 
   export function cranMirror() {
     return process.env.AXIOMICS_CRAN_MIRROR?.trim() || undefined
+  }
+
+  /** Internal mirrors are frequently plain HTTP, which pip refuses as an
+   * untrusted host. The allowlist is site configuration for the same reason as
+   * the index URL itself. */
+  export function pythonTrustedHost() {
+    return process.env.AXIOMICS_PIP_TRUSTED_HOST?.trim() || undefined
   }
 
   /** R has no environment variable for the repository list, and a

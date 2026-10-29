@@ -149,6 +149,7 @@ test("kernel env filtering keeps runtime configuration but drops credentials", (
     R_LIBS: "/work/R",
     PIP_TARGET: "/work/python/site-packages",
     PIP_INDEX_URL: "https://mirror.example/simple",
+    PIP_TRUSTED_HOST: "mirror.example",
     R_PROFILE_USER: "/work/Rprofile",
     ATLAS_API_KEY: "thk_atlas",
     OPENROUTER_API_KEY: "sk-or-user-owned",
@@ -165,6 +166,7 @@ test("kernel env filtering keeps runtime configuration but drops credentials", (
     R_LIBS: "/work/R",
     PIP_TARGET: "/work/python/site-packages",
     PIP_INDEX_URL: "https://mirror.example/simple",
+    PIP_TRUSTED_HOST: "mirror.example",
     R_PROFILE_USER: "/work/Rprofile",
   })
 })
