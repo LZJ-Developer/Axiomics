@@ -722,11 +722,13 @@ async function executeR(params: RInput, ctx: Tool.Context, compatibilityNamed: b
     })
     await KernelRuntime.release(identity)
   } else {
+    // The classifier reads `shell.command`; an empty metadata object classifies
+    // as "unknown" and forces a prompt even in unattended sandbox mode.
     await ctx.ask({
       permission: "bash",
       patterns: ["R"],
       always: ["Rscript*"],
-      metadata: {},
+      metadata: { shell: { command: "R" } },
     })
   }
 

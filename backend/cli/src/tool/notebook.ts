@@ -863,11 +863,13 @@ async function executePython(params: PythonInput, ctx: Tool.Context, compatibili
     await KernelRuntime.release(identity)
   } else {
     // Executes arbitrary code — same permission gate as bash.
+    // The classifier reads `shell.command`; an empty metadata object classifies
+    // as "unknown" and forces a prompt even in unattended sandbox mode.
     await ctx.ask({
       permission: "bash",
       patterns: ["python"],
       always: ["python*"],
-      metadata: {},
+      metadata: { shell: { command: "python" } },
     })
   }
 
