@@ -71,6 +71,12 @@ _IPS_CMD="$_HERE/axiomics-gateway-ips"
 # 返回 127 → 赋值失败 → set -e 当场杀掉整个脚本。现象是 **add / list / retire /
 # reclaim 全部静默退出 127、一个字都不打印** —— 分不清是脚本坏了还是环境不对。
 # 而 deploy.sh 的 install 清单里恰好漏了它，所以"全新机器首次部署"就是这个状态。
+# 持久化覆盖：部署事实放在 $AX_ROOT/cors-origins（与 gateway-ip 同一套做法）。
+# 回收→唤醒会用 `start` 重建容器；若白名单只来自一次性环境变量，重建后就丢了，
+# 表现为工作区 JS/CSS 带 Origin 全部 403、页面白屏。文件里一行一个 Origin。
+if [ -z "${AX_CORS_ORIGIN:-}" ] && [ -f "$AX_ROOT/cors-origins" ]; then
+  AX_CORS_ORIGIN="$(tr '\n' ' ' < "$AX_ROOT/cors-origins")"
+fi
 if [ -z "${AX_CORS_ORIGIN:-}" ] && [ ! -x "$_IPS_CMD" ]; then
   die "缺少 $_IPS_CMD
       它由 deploy.sh 安装；手工部署请一并 install 到 \$AX_ROOT/bin/。
@@ -564,8 +570,12 @@ cmd_reclaim() {
       [ -n "$ts" ] && audit_last=$(date -d "$ts" +%s 2>/dev/null || echo 0)
     fi
 
+    # 与上面的 tac 同一类失败模式，只是信号换成了 EACCES：kernel-overlay 的
+    # work/work 是 0000 权限，find 走到那里返回 1；`set -o pipefail` + `set -e`
+    # 会让整个赋值失败、脚本静默退出（systemd 里只看到 status=1）。
+    # 值由 awk 的 END 写出，吞掉的是 find 的退出码，不是结果。
     mtime=$(find "$TENANTS/$t/data" -type f -not -path '*/cache/*' -printf '%T@\n' 2>/dev/null \
-            | awk 'BEGIN{m=0}{v=$1+0; if(v>m)m=v}END{printf "%d", m}')
+            | awk 'BEGIN{m=0}{v=$1+0; if(v>m)m=v}END{printf "%d", m}' || true)
     mtime=${mtime:-0}
 
     now=$(date +%s)

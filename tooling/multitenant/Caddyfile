@@ -33,16 +33,21 @@
 		}
 
 		# 三张映射表由 tenants.map 渲染，租户增删后无需改本文件
+		# default - makes "no such user" a judgeable state; without it a
+		# map miss leaves {tid} carrying the lookup input.
 		map {http.request.header.Remote-User} {tid} {
 			import /etc/caddy/maps/tenants.caddy
+			default -
 		}
 		map {tid} {upstream} {
 			import /etc/caddy/maps/upstreams.caddy
+			default -
 		}
 		map {tid} {token} {
 			import /etc/caddy/maps/tokens.caddy
+			default -
 		}
-		@unknown expression {tid} == ""
+		@unknown expression {tid} == "-"
 		respond @unknown 403
 
 		handle_path /axiomics/* {
@@ -64,5 +69,83 @@
 	# 不剥前缀、不改 Authorization（代理需要拿到租户占位符）。
 	handle /model/* {
 		reverse_proxy {$AX_MODEL_PROXY_ADDR:127.0.0.1:43002}
+	}
+}
+
+# 三机受限部署的可选入口：GPU 只对 Web 放行 :8005。
+# 单机部署（参考架构直接监听 :443）可以整段删除。
+:8005 {
+	route {
+		@denied not remote_ip {$AX_WEB_IP:192.0.2.229} 127.0.0.1
+		respond @denied "forbidden" 403
+
+		@health path /health
+		reverse_proxy @health 127.0.0.1:43002
+
+		@ledger path /ledger/usage.jsonl
+		handle @ledger {
+			header Content-Type "application/x-ndjson"
+			header Cache-Control "no-store"
+			rewrite * /usage.jsonl
+			root * /var/log/caddy
+			file_server
+		}
+
+		# Activator access audit (existing file, different schema).
+		@activator path /ledger/audit.jsonl
+		handle @activator {
+			header Content-Type "application/x-ndjson"
+			header Cache-Control "no-store"
+			rewrite * /audit.jsonl
+			root * /var/log/caddy
+			file_server
+		}
+
+		# Operator provisioning audit, written by ax-admin-api.
+		@adminaudit path /ledger/admin-audit.jsonl
+		handle @adminaudit {
+			header Content-Type "application/x-ndjson"
+			header Cache-Control "no-store"
+			rewrite * /admin-audit.jsonl
+			root * /var/log/caddy
+			file_server
+		}
+
+		# Tenant traffic from the Web edge. Authelia runs on Web and sets
+		# Remote-User; the source-IP gate at the top of this site is what
+		# makes that header trustworthy (only Web can reach :8005).
+		map {http.request.header.Remote-User} {tid} {
+			import /etc/caddy/maps/tenants.caddy
+			default -
+		}
+		map {tid} {upstream} {
+			import /etc/caddy/maps/upstreams.caddy
+			default -
+		}
+		map {tid} {token} {
+			import /etc/caddy/maps/tokens.caddy
+			default -
+		}
+		@noTenant expression {tid} == "-"
+		respond @noTenant "no tenant" 403
+
+		# Wake a reclaimed tenant before proxying, and record the access in
+		# audit.jsonl — the reclaim job's only real-usage signal. The :443
+		# edge already does this; the Web edge (:8005) must behave the same,
+		# otherwise reclaim would stop an active tenant and nothing would wake it.
+		forward_auth 127.0.0.1:9300 {
+			uri /ensure
+		}
+
+		handle_path /axiomics/* {
+			reverse_proxy {upstream} {
+				header_up Host 127.0.0.1:4096
+				header_up Authorization "Bearer {token}"
+			}
+		}
+		reverse_proxy {upstream} {
+			header_up Host 127.0.0.1:4096
+			header_up Authorization "Bearer {token}"
+		}
 	}
 }
