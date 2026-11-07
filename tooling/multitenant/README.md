@@ -6,6 +6,9 @@
 日常操作与排障见 [`docs/多租户运维手册.md`](../../docs/多租户运维手册.md)。
 本目录是**实现**；那两份是**为什么这么做**和**出问题怎么办**。
 
+已有环境的三机（GPU / Web / DB）+ Casdoor 身份变体、用户与管理员手册，见
+[`docs/manual/`](../../docs/manual/README.md)；其中的 IP 与端口是示例，异地部署需替换。
+
 ## 组成
 
 ```
@@ -16,6 +19,7 @@ entrypoint.sh           容器入口：relay（socat）
 Caddyfile               网关：Authelia forward_auth → 按身份路由到租户
 auth/*.tmpl             Authelia 配置模板（从零部署时由 deploy.sh 生成）
 bin/axiomics-tenant     租户生命周期：add / retire / list / start / reclaim / sweep / idp-add / idp-del
+bin/axiomics-user       开通预演（dry-run）与 map ↔ gateway ↔ 目录 ↔ token 三方一致性检查
 bin/axiomics-activator.ts  按需激活：被回收的租户在下一个认证请求时被拉起
 bin/axiomics-model-proxy.ts 模型网关：按占位符识别租户、换成真密钥、记账
 bin/axiomics-usage      用量报表
