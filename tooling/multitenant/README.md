@@ -25,6 +25,8 @@ bin/axiomics-model-proxy.ts 模型网关：按占位符识别租户、换成真�
 bin/axiomics-usage      用量报表
 bin/axiomics-audit      审计报表
 bin/axiomics-verify     部署自检：一次跑完 15 项断言
+ledger/axiomics-ledger-pull.py  GPU 账本 → MySQL 拉取器（轮转靠 AX_LEDGER_EPOCH 显式恢复）
+tests/                  三层测试：unit / integration / e2e，入口 run-all.sh
 systemd/*.service.tmpl  开机自恢复单元（Authelia / 网关 / 激活器 / 模型代理）
 systemd/axiomics-reclaim.*  回收 timer
 ```
