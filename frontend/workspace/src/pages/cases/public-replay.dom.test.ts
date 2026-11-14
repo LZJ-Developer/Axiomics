@@ -357,3 +357,23 @@ test("a case id with no recording stays on the public page instead of the worksp
   expect(host.querySelector<HTMLAnchorElement>(".case-replay-status a")?.getAttribute("href")).toMatch(/^#\/?$/)
   expect(calls).toEqual(["/cases/replay/does-not-exist.json"])
 })
+
+test("the workbench mounts the same replay without the public rail", async () => {
+  const source = recording()
+  const fixture: { session: Session; recording: Recording } = JSON.parse(
+    JSON.stringify({ session: source.session, recording: source.messages }),
+  )
+  serve(fixture)
+
+  const host = mount(() => publicReplay.default({ caseID: "scenic-action", embedded: true }), true)
+  await ready(() => host.textContent?.includes("First question") === true)
+
+  // The workbench already owns a rail, and a signed-in visitor must not be
+  // offered the public sign-in entry from inside it.
+  expect(host.querySelector(".public-replay__rail")).toBeNull()
+  expect(host.querySelector(".public-replay__login")).toBeNull()
+  expect(host.querySelector(".public-replay__rail-toggle")).toBeNull()
+  // Leaving a showcase returns to the gallery, not to the anonymous entry.
+  expect(host.querySelector<HTMLAnchorElement>(".public-replay__back")?.getAttribute("href")).toBe("/cases")
+  expect(calls).toEqual(["/cases/replay/scenic-action.json"])
+})

@@ -26,6 +26,10 @@ import { AppBaseProviders } from "./app-base"
 export { AppBaseProviders }
 
 const CasesGallery = lazy(() => import("@/pages/cases-gallery"))
+// The showcase replay plays an exported recording. It is the same surface the
+// public entry mounts, in its embedded form: no tenant project or session is
+// involved, which is what lets a fresh account start with an empty workspace.
+const CaseReplay = lazy(() => import("@/pages/cases/public-replay"))
 
 const Loading = () => {
   const language = useLanguage()
@@ -158,6 +162,14 @@ export function AppInterface(props: { defaultUrl?: string }) {
                     </Suspense>
                   )}
                 />
+                <Route
+                  path="/cases/:caseID"
+                  component={(p) => (
+                    <Suspense fallback={<Loading />}>
+                      <CaseReplay caseID={p.params.caseID} embedded />
+                    </Suspense>
+                  )}
+                />
                 {/* Declared before the project catch-all: `/projects` is a page,
                     not a project segment. */}
                 <Route path="/:dir" component={DirectoryLayout}>
@@ -174,10 +186,7 @@ export function AppInterface(props: { defaultUrl?: string }) {
                       </Show>
                     )}
                   />
-                  <Route
-                    path="/cases"
-                    component={() => <Navigate href="/cases" />}
-                  />
+                  <Route path="/cases" component={() => <Navigate href="/cases" />} />
                 </Route>
                 <Route path="*404" component={NotFound} />
               </Router>

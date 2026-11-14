@@ -204,7 +204,12 @@ run_tenant() {
 }
 
 reload_gateway() {
-  podman exec "$GATEWAY" caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 \
+  # 容器里的 /etc/caddy/Caddyfile 是按 inode 绑定的只读文件：宿主这边只要换过
+  # 文件（编辑器、"cp"、备份恢复），容器就继续看到旧内容，reload 静默退回旧配置
+  # —— 实测把 :8005 的 /release 路由整条丢掉了，Web 的 shell-pull 一直 404。
+  # 所以每次重载都先把宿主文件拷进容器，网关配置以宿主文件为准。
+  podman cp "$AX_ROOT/Caddyfile" "$GATEWAY:/tmp/Caddyfile.reload" >/dev/null 2>&1 \
+    && podman exec "$GATEWAY" caddy reload --config /tmp/Caddyfile.reload >/dev/null 2>&1 \
     || echo "警告: 网关重载失败（核对站点数 grep -c '^:' Caddyfile）" >&2
 }
 
@@ -267,7 +272,8 @@ JSON
   sort -u "$MAP.new" -o "$MAP.new"; mv "$MAP.new" "$MAP"
   render_maps
 
-  seed_cases "$tid" optional
+  # 不注入案例切片：演示已改成只读回放（前端 fixture），新账号从空白开始。
+  # 需要手工铺数据时仍可 `axiomics-tenant seed-cases <租户ID>`。
   echo "已开通 $name → $tid  端口 $port  GPU $gpu"
   echo "  IdP 账号需另行创建（file 后端：axiomics-tenant idp-add $name <密码>）"
 }
@@ -421,14 +427,19 @@ cmd_retire() {
   [ -n "$tid" ] || die "未找到用户 $name"
 
   podman stop -t 10 "ax-$tid" >/dev/null 2>&1 || true
+  # token 必须先删再打包：archive/ 长期保留，不能把凭据一起存进去。
+  # 它同时是撤权动作，早删不影响后面的 tar（tar 用 --exclude 再兜一层）。
+  rm -f "$TENANTS/$tid/token"
   # overlayfs 把自己的 work 目录建成 0000；不先放松权限，tar 读不到，
   # 归档里就少了整个项目的环境覆盖层，而错误被 `|| true` 吞掉。
   chmod -R u+rwX "$TENANTS/$tid/data/kernel-overlay" 2>/dev/null || true
   mkdir -p "$AX_ROOT/archive"
-  tar -czf "$AX_ROOT/archive/$tid-$(date +%F).tar.gz" -C "$TENANTS" "$tid" 2>/dev/null || true
-  grep -v "^$name " "$MAP" > "$MAP.new"; mv "$MAP.new" "$MAP"
+  tar -czf "$AX_ROOT/archive/$tid-$(date +%F).tar.gz" --exclude="$tid/token" \
+    -C "$TENANTS" "$tid" 2>/dev/null || true
+  # map 只剩待退役这一行时 `grep -v` 无输出、返回 1，set -euo pipefail 会在 mv 之前中断：
+  # 容器已停、归档已写、map 仍留着该行。awk 对空输出返回 0，且保留注释与空行。
+  awk -v n="$name" '$1 != n' "$MAP" > "$MAP.new"; mv "$MAP.new" "$MAP"
   echo "$tid retired $(date +%F) $name" >> "$AX_ROOT/retired.log"
-  rm -f "$TENANTS/$tid/token"
   cmd_idp_del "$name" >/dev/null 2>&1 || true
   render_maps
   echo "已注销 $name（$tid）。数据卷保留，序号 $tid 不再复用。"

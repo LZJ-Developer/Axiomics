@@ -13,7 +13,12 @@ test("publishes the approved demonstrations through project-independent replay r
     "scenic-action",
   ])
   expect(new Set(cases.map((item) => item.segment.split("~", 1)[0])).size).toBe(8)
-  expect(cases.every((item) => replay(item).endsWith(`${item.sessionID}?replay=1`))).toBe(true)
+  // A replay plays an exported recording. It must not address a project or a
+  // session, or a fresh tenant would have to be seeded with demo data before
+  // the showcase could open.
+  expect(cases.every((item) => replay(item) === `/cases/${item.id}`)).toBe(true)
+  // The source ids stay in the catalog for the slice exporter.
+  expect(cases.every((item) => item.segment && item.sessionID)).toBe(true)
   expect(cases.every((item) => item.frames > 0 && item.question && item.data && item.result)).toBe(true)
   expect(cases.every((item) => item.images.length === 3 && item.images.every((image) => image.startsWith("/cases/")))).toBe(
     true,

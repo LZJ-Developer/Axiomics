@@ -1,0 +1,252 @@
+#!/usr/bin/env python3
+"""把案例切片注入的内容从租户里精确摘掉。
+
+`seed_cases` 是**合并写入**（cp -a，可以反复执行），所以摘除也不能整目录删：
+租户可能已经在注入的会话里接着提问、改过标题、往项目里加过文件。这里逐文件
+比对 sha256——只删与切片逐字节相同的那一份，动过的一律保留并报告。
+
+判定单位是「会话」和「项目」：
+  * 某个会话下只要有一个文件与切片不同、或者租户多出切片里没有的文件，
+    整个会话保留（删一半会话比不删更糟）。
+  * 项目记录只有在没有存活会话引用它时才删；用户在建种项目里新建的会话
+    会让项目继续留着。
+
+默认 dry-run，只打印计划；--apply 才动手。产物库单独处理：删掉切片里有的
+artifact 行与版本行，再删不再被任何存活版本引用的 blob（含磁盘文件）。
+
+用法：
+  AX_ROOT=/disk1/dabiao/axiomics-mt axiomics-unseed <租户ID> [--apply]
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import sqlite3
+import sys
+from pathlib import Path
+
+AX_ROOT = Path(os.environ.get("AX_ROOT", "/srv/axiomics"))
+TENANTS = AX_ROOT / "tenants"
+SCOPES = ("storage", "projects")
+# 派生状态：打开会话就会重写（路径、scratch 根），不能当成"用户改过"。
+# 判定是否被使用时忽略它们，删除时仍随会话一起删。
+DERIVED = ("storage/session_workspace/", "storage/session_filesystem/")
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def normalise(node: object) -> object:
+    """把绝对路径整体折成占位符。
+
+    租户启动时会把切片里的宿主路径改写成自己的：会话记录里的
+    `directory` 从 `/disk1/.../09-scenic-action` 变成
+    `/data/projects/prj_…`，工作区记录里的 `scratchRoot` 同理。那是同一份
+    记录的两种拼写，不是用户改动 —— 目录名由项目 id 决定，租户改不了它。
+    """
+    if isinstance(node, str):
+        return "<path>" if node.startswith("/") else node
+    if isinstance(node, list):
+        return [normalise(item) for item in node]
+    if isinstance(node, dict):
+        return {key: normalise(value) for key, value in node.items()}
+    return node
+
+
+def same_content(tenant: Path, source: Path) -> bool:
+    if not source.is_file():
+        return False
+    if tenant.suffix == ".json" and source.suffix == ".json":
+        try:
+            return normalise(json.loads(tenant.read_text())) == normalise(json.loads(source.read_text()))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+    return sha256(tenant) == sha256(source)
+
+
+def slice_tree(root: Path) -> list[Path]:
+    files: list[Path] = []
+    for part in SCOPES:
+        base = root / part
+        if base.is_dir():
+            files.extend(p.relative_to(root) for p in base.rglob("*") if p.is_file())
+    return files
+
+
+def owned_files(files: list[Path], ident: str) -> list[Path]:
+    return [rel for rel in files if ident in str(rel)]
+
+
+def mention_files(data: Path, ident: str) -> list[Path]:
+    """租户里路径中提到这个 id 的**文件**（项目名常常出现在目录名上）。"""
+    hits: list[Path] = []
+    for part in SCOPES:
+        base = data / part
+        if not base.exists():
+            continue
+        for path in base.rglob("*"):
+            if path.is_file() and ident in str(path.relative_to(data)):
+                hits.append(path)
+    return hits
+
+
+def plan_sessions(slice_root: Path, data: Path, files: list[Path], sessions: list[str]):
+    delete: list[Path] = []
+    keep: list[tuple[str, str]] = []
+    for sid in sessions:
+        changed = []
+        for path in mention_files(data, sid):
+            rel = str(path.relative_to(data))
+            if rel.startswith(DERIVED):
+                continue
+            if not same_content(path, slice_root / path.relative_to(data)):
+                changed.append(rel)
+        if changed:
+            keep.append((sid, f"{len(changed)} 个文件与切片不同或为租户新增，例：{changed[0]}"))
+            continue
+        delete.extend(rel for rel in owned_files(files, sid) if (data / rel).is_file())
+    return delete, keep
+
+
+def plan_projects(slice_root: Path, data: Path, files: list[Path], projects: list[str], kept: set[str]):
+    delete: list[Path] = []
+    keep: list[tuple[str, str]] = []
+    for pid in projects:
+        owned = owned_files(files, pid)
+        if any(sid in str(rel) for rel in owned for sid in kept):
+            keep.append((pid, "仍有租户自己的会话引用"))
+            continue
+        extra = [p for p in mention_files(data, pid) if p.relative_to(data) not in owned]
+        if extra:
+            keep.append((pid, f"租户新增了 {len(extra)} 个文件，例：{extra[0].relative_to(data)}"))
+            continue
+        delete.extend(rel for rel in owned if (data / rel).is_file())
+    return delete, keep
+
+
+def remove_empty_dirs(root: Path) -> None:
+    for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        if path.is_dir():
+            try:
+                path.rmdir()
+            except OSError:
+                pass
+
+
+def plan_artifacts(slice_store: Path, store: Path):
+    source_db, store_db = slice_store / "artifacts.db", store / "artifacts.db"
+    if not source_db.is_file() or not store_db.is_file():
+        return [], []
+    source = sqlite3.connect(f"file:{source_db}?mode=ro", uri=True)
+    ids = [row[0] for row in source.execute("select id from artifacts")]
+    shas = [row[0] for row in source.execute("select distinct sha256 from versions")]
+    source.close()
+
+    target = sqlite3.connect(f"file:{store_db}?mode=ro", uri=True)
+    have = []
+    if ids:
+        marks = ",".join("?" * len(ids))
+        have = [row[0] for row in target.execute(f"select id from artifacts where id in ({marks})", ids)]
+    target.close()
+    return have, shas
+
+
+def apply_artifacts(store: Path, artifact_ids: list[str], slice_shas: list[str]) -> tuple[int, int]:
+    db = store / "artifacts.db"
+    if not db.is_file() or not artifact_ids:
+        return 0, 0
+    conn = sqlite3.connect(str(db))
+    marks = ",".join("?" * len(artifact_ids))
+    conn.execute(f"delete from versions where artifact_id in ({marks})", artifact_ids)
+    conn.execute(f"delete from artifacts where id in ({marks})", artifact_ids)
+    conn.commit()
+    alive = {row[0] for row in conn.execute("select distinct sha256 from versions")}
+    gone = [sha for sha in slice_shas if sha not in alive]
+    removed = 0
+    if gone:
+        marks = ",".join("?" * len(gone))
+        rows = conn.execute(f"select path from blobs where sha256 in ({marks})", gone).fetchall()
+        conn.execute(f"delete from blobs where sha256 in ({marks})", gone)
+        conn.commit()
+        for (path,) in rows:
+            try:
+                (store / path).unlink()
+                removed += 1
+            except FileNotFoundError:
+                pass
+    conn.close()
+    return len(artifact_ids), removed
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("tenant")
+    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--slice", default=str(AX_ROOT / "case-slice"))
+    args = parser.parse_args()
+
+    slice_root = Path(args.slice)
+    data = TENANTS / args.tenant / "data"
+    if not data.is_dir():
+        sys.exit(f"没有这个租户的数据目录：{data}")
+    if not (slice_root / "storage").is_dir():
+        sys.exit(f"没有案例切片：{slice_root}")
+
+    files = slice_tree(slice_root)
+    sessions = sorted({Path(rel.name).stem for rel in files if rel.parts[:2] == ("storage", "session")})
+    projects = sorted({Path(rel.name).stem for rel in files if rel.parts[:2] == ("storage", "project")})
+
+    session_delete, session_keep = plan_sessions(slice_root, data, files, sessions)
+    kept = {sid for sid, _ in session_keep}
+    project_delete, project_keep = plan_projects(slice_root, data, files, projects, kept)
+    artifact_ids, slice_shas = plan_artifacts(slice_root / "artifact-store", data / "artifact-store")
+
+    print(f"租户 {args.tenant}（{data}）")
+    print(f"  会话：删 {len(session_delete)} 个文件；保留 {len(session_keep)} 个会话")
+    for sid, why in session_keep:
+        print(f"    · 保留 {sid}：{why}")
+    print(f"  项目：删 {len(project_delete)} 个文件；保留 {len(project_keep)} 个项目")
+    for pid, why in project_keep:
+        print(f"    · 保留 {pid}：{why}")
+    print(f"  产物：删 {len(artifact_ids)} 条 artifact 记录")
+
+    if not args.apply:
+        shown = 0
+        for rel in session_delete + project_delete:
+            if shown >= 10:
+                print(f"    … 另有 {len(session_delete) + len(project_delete) - shown} 个文件")
+                break
+            print(f"    - {rel}")
+            shown += 1
+        print("dry-run：没有改动任何文件。加 --apply 执行。")
+        return
+
+    removed = 0
+    for rel in session_delete + project_delete:
+        try:
+            (data / rel).unlink()
+            removed += 1
+        except FileNotFoundError:
+            pass
+    # 会话的工作区目录（workspaces/<prj>/<sid>）不在切片里，随会话一起清掉。
+    for sid in {s for s in sessions if s not in kept}:
+        for workspace in (data / "workspaces").glob(f"*/{sid}"):
+            for path in sorted(workspace.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+                path.rmdir() if path.is_dir() else path.unlink(missing_ok=True)
+            workspace.rmdir()
+    remove_empty_dirs(data / "storage")
+    remove_empty_dirs(data / "projects")
+    artifacts, blobs = apply_artifacts(data / "artifact-store", artifact_ids, slice_shas)
+    print(f"已删除 {removed} 个文件、{artifacts} 条产物记录、{blobs} 个 blob")
+
+
+if __name__ == "__main__":
+    main()
