@@ -90,18 +90,27 @@ print(f"{row[0]} {row[1]}" if row else "")
 PY
 )
   sample_id=${sample%% *}
-  sample_prj=${sample##* }
-  target=$(awk 'NR==1{print $2" "$3}' "$MAP")
-  set -- $target
-  if [ -n "${sample_id:-}" ] && [ -n "${1:-}" ] && [ -f "$AX_ROOT/tenants/$1/token" ] && [ -n "$(podman ps --filter "name=^ax-$1$" --format '{{.Names}}' 2>/dev/null)" ]; then
-    code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(cat "$AX_ROOT/tenants/$1/token")" \
-      "http://127.0.0.1:$2/file/artifact-store/$sample_id?project=$sample_prj")
-    [ "$code" = "200" ] && ok "产物记录可取（$1 → $sample_id）" || bad "产物取不到：$code（期望 200）"
-    code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(cat "$AX_ROOT/tenants/$1/token")" \
-      "http://127.0.0.1:$2/file/artifact-store/$sample_id/raw?project=$sample_prj")
-    [ "$code" = "200" ] && ok "产物字节可取（/raw 200）" || bad "产物字节取不到：$code（期望 200）"
+  # 演示数据不再注入租户（改成只读回放，见 internal/拓扑与发布.md），所以这里验
+  # 的是**切片自身完整**：抽到的产物记录能解析出 blob 路径，且该文件在盘上。
+  # 原先"拿租户 token 去取产物"的写法，在租户不再带演示数据后必然 404。
+  if [ -n "${sample_id:-}" ]; then
+    blob=$(python3 - "$AX_ROOT/case-slice/artifact-store/artifacts.db" "$sample_id" <<'BLOBPY' 2>/dev/null
+import sqlite3, sys
+db = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+row = db.execute(
+    "select path from blobs where sha256=(select sha256 from versions where artifact_id=? limit 1)",
+    (sys.argv[2],),
+).fetchone()
+print(row[0] if row else "")
+BLOBPY
+)
+    if [ -n "$blob" ] && [ -f "$AX_ROOT/case-slice/artifact-store/$blob" ]; then
+      ok "切片产物可取（$sample_id → ${blob%%/*}/…）"
+    else
+      bad "切片产物取不到：$sample_id 的 blob 缺失（${blob:-没有记录}）"
+    fi
   else
-    note "没有运行中的租户可取产物"
+    note "切片里没有可抽样的产物"
   fi
 else
   bad "没有 $AX_ROOT/case-slice/artifact-store —— 案例回放只能看对话，点开 Results 会 404"
