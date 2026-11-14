@@ -2,9 +2,16 @@ import { createEffect, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 
 /** Owned by the mounted recording; disposal cancels playback on navigation. */
-export function playback(total: number) {
+export function playback(total: number, options: { autoplay?: boolean } = {}) {
   const initial = Math.min(1, total)
-  const [state, setState] = createStore({ cursor: initial, playing: false, speed: 1, tick: 0 })
+  // A case page is opened in order to be watched, so its recording starts on
+  // its own. Motion is a preference, not a default: a visitor who asked the
+  // system to reduce motion keeps the paused first frame and presses play.
+  const reduced =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+  const playing = options.autoplay === true && total > initial && !reduced
+  const [state, setState] = createStore({ cursor: initial, playing, speed: 1, tick: 0 })
   createEffect(() => {
     if (!state.playing) return
     const delay = Math.min(2600, Math.max(380, Math.round(30000 / Math.max(total, 1)))) / state.speed

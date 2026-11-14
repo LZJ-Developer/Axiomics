@@ -37,3 +37,19 @@ test("empty playback remains stopped", () => {
     dispose()
   })
 })
+
+test("autoplay starts a recording that has somewhere to go", () => {
+  createRoot((dispose) => {
+    expect(playback(100, { autoplay: true }).state).toMatchObject({ cursor: 1, playing: true })
+    dispose()
+  })
+})
+
+test("autoplay leaves a single-frame recording paused", () => {
+  createRoot((dispose) => {
+    // One frame is the whole recording: playing it would just sit still.
+    expect(playback(1, { autoplay: true }).state.playing).toBe(false)
+    expect(playback(0, { autoplay: true }).state.playing).toBe(false)
+    dispose()
+  })
+})

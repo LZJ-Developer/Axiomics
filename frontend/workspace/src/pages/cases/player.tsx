@@ -53,7 +53,7 @@ export function ReplayPlayer(props: ReplayPlayerProps) {
   const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure)
   onCleanup(() => observer?.disconnect())
 
-  const player = playback(props.frames.length)
+  const player = playback(props.frames.length, { autoplay: true })
   const scroll = createAutoScroll({
     working: () => player.state.playing,
     overflowAnchor: "dynamic",

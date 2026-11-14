@@ -306,6 +306,12 @@ test("the public replay renders the recorded transcript from one static fixture 
   await ready(() => host.textContent?.includes("First question") === true)
 
   const position = () => host.querySelector(".case-player__position")?.textContent?.trim() ?? ""
+  const toggle = () => host.querySelector<HTMLButtonElement>(".case-player__toggle")!
+  // A case page is opened to be watched: playback runs without a click.
+  expect(toggle().textContent).toContain("Pause")
+  // Pause it so the keyboard assertions below are not racing the clock.
+  toggle().click()
+  await ready(() => toggle().textContent?.includes("Continue") === true)
   expect(position()).toBe(`1 / ${frames}`)
   expect(host.textContent).not.toContain("Final answer")
 
