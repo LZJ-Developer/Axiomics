@@ -8,12 +8,13 @@ import "./login-dialog.css"
  * Login and registration both stay in this dialog.
  *
  * Login posts to Authelia's first-factor API on the same origin, so the address
- * bar never leaves the gallery. Registration posts to Casdoor's public signup
- * API for app-axiomics-web; the account lands in the `pending` tag and an
- * administrator approves it in the console. Casdoor signs a new user in
- * automatically, which would leave a non-admin Casdoor session that the
- * admin-only console would later see — so a successful signup immediately
- * logs that session out. The workspace session is Authelia's, not Casdoor's.
+ * bar never leaves the gallery. Registration posts to `/signup/api`, an edge
+ * route that forwards to Casdoor's signup API for app-axiomics-web and drops
+ * its `Set-Cookie`; the account lands in the `pending` tag and an administrator
+ * approves it in the console. The route exists so the product never calls
+ * `/console/*`: Casdoor mints a console session cookie for any anonymous
+ * `/api/*` call, and the admin-only console must never see a session the
+ * product created. The workspace session is Authelia's, not Casdoor's.
  *
  * The fallback hrefs on the callers still point at `/auth`, so a visitor with
  * JavaScript disabled (or before hydration) can still sign in through the
@@ -138,9 +139,8 @@ export function LoginDialog(props: {
     setSignupError(undefined)
     const locale = language.locale()
     try {
-      const response = await fetch("/console/api/signup", {
+      const response = await fetch("/signup/api", {
         method: "POST",
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           "Accept-Language": locale.startsWith("zh") ? "zh-CN" : locale,
@@ -159,11 +159,6 @@ export function LoginDialog(props: {
         setSignupError(result.msg || language.t("cases.signup.failed"))
         return
       }
-      // Drop the Casdoor session the signup API just created. The console is
-      // admin-only, and the workspace authenticates through Authelia.
-      await fetch("/console/api/logout", { method: "POST", credentials: "include" }).catch(
-        () => undefined,
-      )
       setSignupDone(true)
     } catch {
       setSignupError(language.t("cases.signup.network"))

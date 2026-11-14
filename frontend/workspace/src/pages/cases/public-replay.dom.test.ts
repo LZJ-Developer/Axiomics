@@ -205,7 +205,7 @@ test("the login dialog posts to the Authelia API and only leaves on success", as
   expect(host.querySelector(".login-dialog__error")).toBeNull()
 })
 
-test("registration stays in the dialog and posts to the Casdoor signup API", async () => {
+test("registration stays in the dialog and posts to the product signup route", async () => {
   const requests: Array<{ url: string; body?: any }> = []
   globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
@@ -245,16 +245,17 @@ test("registration stays in the dialog and posts to the Casdoor signup API", asy
     (host.querySelector(".login-dialog__title")?.textContent ?? "").includes("Registration submitted"),
   )
 
-  const signup = requests.find((request) => request.url === "/console/api/signup")
+  const signup = requests.find((request) => request.url === "/signup/api")
   expect(signup?.body).toMatchObject({
     application: "app-axiomics-web",
     organization: "axiomics",
     username: "probe_signup",
     password: "secret-1",
   })
-  // The signup API would otherwise leave a Casdoor session the admin-only
-  // console could see; the dialog drops it before showing success.
-  expect(requests.some((request) => request.url === "/console/api/logout")).toBe(true)
+  // The product must not reach into the console namespace at all: the edge
+  // route is what drops the session cookie Casdoor would otherwise mint, so
+  // there is no logout call to make afterwards.
+  expect(requests.some((request) => request.url.startsWith("/console/"))).toBe(false)
 })
 
 test("a pending account gets a closable dialog over the gallery, not a separate page", async () => {
