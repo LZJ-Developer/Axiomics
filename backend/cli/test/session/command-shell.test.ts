@@ -7,6 +7,7 @@ import { ProjectTrust } from "../../src/project/trust"
 import { PermissionNext } from "../../src/permission/next"
 import { Session } from "../../src/session"
 import { SessionPrompt } from "../../src/session/prompt"
+import { SessionFilesystem } from "../../src/session/filesystem"
 import { tmpdir, trustProject } from "../fixture/fixture"
 
 async function commandFile(directory: string, shell: string) {
@@ -43,9 +44,10 @@ test("trusted command shell interpolation uses the governed shell boundary", asy
   await using tmp = await tmpdir({
     git: true,
     init: async (directory) => {
-      const marker = path.join(directory, "trusted-command-ran")
-      await commandFile(directory, `printf governed > ${JSON.stringify(marker)}`)
-      return marker
+      // The interpolation runs with the session scratch as its working
+      // directory. A relative marker lands there through the sandbox mount,
+      // so the assertion does not depend on the shell learning a host path.
+      await commandFile(directory, "printf governed > trusted-command-ran")
     },
   })
 
@@ -80,8 +82,9 @@ test("trusted command shell interpolation uses the governed shell boundary", asy
 
       const failure = await execution
       expect(failure).toBeInstanceOf(Error)
-      expect(await Bun.file(tmp.extra).exists()).toBe(true)
-      expect(await Bun.file(tmp.extra).text()).toBe("governed")
+      const marker = path.join(await SessionFilesystem.workspace(session.id), "trusted-command-ran")
+      expect(await Bun.file(marker).exists()).toBe(true)
+      expect(await Bun.file(marker).text()).toBe("governed")
     },
   })
 }, 10_000)

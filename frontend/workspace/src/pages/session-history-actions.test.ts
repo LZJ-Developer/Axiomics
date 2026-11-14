@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test"
 
 const session = await Bun.file(new URL("./session.tsx", import.meta.url)).text()
-const replay = await Bun.file(new URL("./cases/replay.tsx", import.meta.url)).text()
+// Replay renders through the shared read-only player now; that is where the
+// compaction handoff surface lives.
+const replay = await Bun.file(new URL("./cases/player.tsx", import.meta.url)).text()
 const compaction = await Bun.file(new URL("./session-compaction.tsx", import.meta.url)).text()
 
 test("loads older history without moving the visible anchor", () => {

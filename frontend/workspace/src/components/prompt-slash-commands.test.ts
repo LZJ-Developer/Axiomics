@@ -39,7 +39,7 @@ test("slash menu exposes accessible listbox semantics without an entrance animat
   expect(component).toContain('if (!edit || !replaceSlash("", false)) return')
   expect(styles).toMatch(/\.workspace-composer__slash-row\s*\{[^}]*display: grid/s)
   expect(styles).toMatch(/\.workspace-composer__slash-group\s*\{[^}]*display: grid/s)
-  expect(styles).toMatch(/\.workspace-composer__slash-heading\s*\{[^}]*font-size: 12px/s)
+  expect(styles).toMatch(/\.workspace-composer__slash-heading\s*\{[^}]*font-size: var\(--type-meta\)/s)
   expect(styles).toMatch(/\.workspace-composer__suggestions\s*\{[^}]*border-radius: var\(--radius-xl\)/s)
   expect(styles).toMatch(/\.workspace-composer__suggestions\s*\{[^}]*max-height: min\(360px, 48vh\)/s)
   expect(styles).not.toMatch(/\.workspace-composer__suggestions\s*\{[^}]*animation:/s)

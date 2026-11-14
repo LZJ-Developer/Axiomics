@@ -1,5 +1,5 @@
 import { A } from "@solidjs/router"
-import { createMemo, For, Show } from "solid-js"
+import { createMemo, createSignal, For, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import {
   IconBookOpen,
@@ -9,33 +9,103 @@ import {
 import { Wordmark } from "@/atlas/Wordmark"
 import { useLanguage } from "@/context/language"
 import { cases, replay, select } from "./cases/catalog"
+import { LoginDialog } from "./cases/login-dialog"
 import "./cases/cases.css"
 
-export default function CasesGallery() {
+/** Router links in the authenticated app; plain anchors on the public page so
+ * a click never enters the SPA router (and never calls a tenant API). */
+function NavLink(props: {
+  href: string
+  anchor: boolean
+  class?: string
+  label?: string
+  current?: boolean
+  onClick?: (event: MouseEvent) => void
+  children: JSX.Element
+}) {
+  if (props.anchor)
+    return (
+      <a
+        href={props.href}
+        class={props.class}
+        aria-label={props.label}
+        aria-current={props.current ? "page" : undefined}
+        onClick={props.onClick}
+      >
+        {props.children}
+      </a>
+    )
+  return (
+    <A href={props.href} class={props.class} aria-label={props.label} aria-current={props.current ? "page" : undefined}>
+      {props.children}
+    </A>
+  )
+}
+
+function CaseCard(props: { href: string; anchor: boolean; id: string; children: JSX.Element }) {
+  if (props.anchor)
+    return (
+      <a class="case-card" href={props.href} data-case={props.id}>
+        {props.children}
+      </a>
+    )
+  return (
+    <A class="case-card" href={props.href} data-case={props.id}>
+      {props.children}
+    </A>
+  )
+}
+
+export default function CasesGallery(props: { public?: boolean } = {}) {
   const language = useLanguage()
   const [state, setState] = createStore({ query: "", filter: "all" })
   const groups = [...new Set(cases.map((item) => item.omics))]
   const filters = [...groups, ...new Set(cases.flatMap((item) => "series" in item ? [item.series] : []))]
   const tools = new Set(cases.flatMap((item) => item.tool.split(" + "))).size
   const shown = createMemo(() => select(state.query, state.filter))
+  // The edge sends a signed-in but not-yet-approved account to `?pending=1`.
+  // Keep the gallery as the page and open the pending view in the same dialog
+  // (closable), instead of replacing the whole page with a review screen.
+  const pendingEntry = (() => {
+    if (!props.public || typeof window === "undefined") return false
+    try {
+      return new URLSearchParams(window.location.search).get("pending") === "1"
+    } catch {
+      return false
+    }
+  })()
+  const [loginOpen, setLoginOpen] = createSignal(pendingEntry)
+  const [dialogMode, setDialogMode] = createSignal<"login" | "pending">(pendingEntry ? "pending" : "login")
+  const closeLogin = () => {
+    setLoginOpen(false)
+    setDialogMode("login")
+    if (pendingEntry) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete("pending")
+      history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`)
+    }
+  }
+  // "New research" opens the conversation first and asks for an account only
+  // when the visitor submits: the static shell carries the empty workspace, so
+  // the gallery links into it rather than to the login portal.
+  const newHref = () => (props.public ? "#/new" : "/")
 
   return (
     <main class="cases-shell">
       <aside class="cases-nav">
-        <A class="cases-brand" href="/" aria-label="Axiomics">
+        <NavLink class="cases-brand" href={props.public ? "#/" : "/"} anchor={props.public ?? false} label="Axiomics">
           <Wordmark size="sm" />
-        </A>
+        </NavLink>
         <nav aria-label={language.t("cases.navigation")}>
-          <A href="/">
+          <NavLink href={newHref()} anchor={props.public ?? false}>
             <IconResearch size={16} />
             {language.t("cases.new")}
-          </A>
-          <A href="/cases" aria-current="page">
+          </NavLink>
+          <NavLink href={props.public ? "#/" : "/cases"} anchor={props.public ?? false} current>
             <IconBookOpen size={16} />
             {language.t("cases.title")}
-          </A>
+          </NavLink>
         </nav>
-        <p>{language.t("cases.sidebarNote")}</p>
       </aside>
 
       <section class="cases-page" aria-labelledby="cases-title">
@@ -100,7 +170,11 @@ export default function CasesGallery() {
           <div class="cases-grid">
             <For each={shown()}>
               {(item) => (
-                <A class="case-card" href={replay(item)} data-case={item.id}>
+                <CaseCard
+                  href={props.public ? `#/replay/${item.id}` : replay(item)}
+                  anchor={props.public ?? false}
+                  id={item.id}
+                >
                   <span class="case-cover" data-fit={"imageFit" in item ? item.imageFit : undefined} aria-hidden="true">
                     <img src={item.images[0]} alt="" />
                     <img src={item.images[1]} alt="" />
@@ -131,12 +205,14 @@ export default function CasesGallery() {
                     </span>
                   </span>
                   <span class="case-action">{language.t("cases.open")} →</span>
-                </A>
+                </CaseCard>
               )}
             </For>
           </div>
         </Show>
       </section>
+
+      <LoginDialog open={loginOpen()} onClose={closeLogin} initialMode={dialogMode()} />
     </main>
   )
 }

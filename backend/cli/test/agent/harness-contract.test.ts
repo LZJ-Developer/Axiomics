@@ -39,8 +39,10 @@ test("every provider receives one compact product operating contract", async () 
   const instructions = SystemPrompt.instructions()
   expect(SystemPrompt.provider(undefined as never)[0]?.trim()).toBe(instructions)
   // Preserve the operating-core budget while accounting for the shared,
-  // separately bounded response-structure defaults.
-  expect((await read("session/prompt/core.txt")).length).toBeLessThan(4_000)
+  // separately bounded response-structure defaults. The cap is a compactness
+  // guard, not a byte target: it grew by the artifact and environment guidance
+  // that the product now states once instead of repeating per agent.
+  expect((await read("session/prompt/core.txt")).length).toBeLessThan(4_100)
   expect((await read("session/prompt/response.txt")).length).toBeLessThan(1_600)
   expect(instructions.length).toBeLessThan(5_600)
   expect(instructions).toContain("Keep simple work simple")
@@ -90,7 +92,10 @@ test("the primary, domain, and specialist prompts stay adaptive instead of proce
     read("agent/prompt/explore.txt"),
   ])
   for (const prompt of [research, ml, biology, physics, write, explore]) {
-    expect(prompt.length).toBeLessThan(4_000)
+    // Research carries the full evidence, compute, and download contract; the
+    // compatibility profiles stay far below. Keep the guard wide enough for
+    // that contract without turning it into a second product manual.
+    expect(prompt.length).toBeLessThan(4_600)
     expect(prompt).not.toContain("literature-review.md")
     expect(prompt).not.toContain("reasoning.md")
     expect(prompt).not.toContain("methodology.md")

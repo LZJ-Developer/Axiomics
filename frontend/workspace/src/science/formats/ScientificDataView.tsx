@@ -12,10 +12,10 @@ import {
   type VcfFile,
 } from "./biological"
 
-const CONTROL_FONT_SIZE = "12px"
-const HELPER_FONT_SIZE = "11.5px"
-const TABLE_FONT_SIZE = "12px"
-const SECTION_FONT_SIZE = "13px"
+const CONTROL_FONT_SIZE = "var(--type-meta)"
+const HELPER_FONT_SIZE = "var(--type-meta)"
+const TABLE_FONT_SIZE = "var(--type-meta)"
+const SECTION_FONT_SIZE = "var(--type-ui)"
 
 function sentence(value: string) {
   const text = value.trim()

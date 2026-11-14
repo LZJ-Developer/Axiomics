@@ -5,6 +5,8 @@ interface WordmarkProps {
   size?: "sm" | "md" | "lg"
   /** Label only (no logo) for tight spaces. */
   textOnly?: boolean
+  /** Logo only, for a screen that supplies its own wording. */
+  markOnly?: boolean
   onClick?: () => void
 }
 
@@ -16,7 +18,7 @@ export function Wordmark(props: WordmarkProps): JSX.Element {
   const bgId = `ax-bg-${seq}`
   const strandId = `ax-strand-${seq}`
   const px = () =>
-    size() === "lg" ? { logo: 30, text: 28 } : size() === "sm" ? { logo: 20, text: 14.5 } : { logo: 26, text: 22 }
+    size() === "lg" ? { logo: 30, text: 28 } : size() === "sm" ? { logo: 20, text: 14 } : { logo: 26, text: 22 }
   const weight = () => (size() === "sm" ? "var(--font-weight-emphasis)" : "var(--font-weight-regular)")
   const rootStyle = (): JSX.CSSProperties => ({
     all: "unset",
@@ -66,19 +68,21 @@ export function Wordmark(props: WordmarkProps): JSX.Element {
           </g>
         </svg>
       </Show>
-      <span
-        aria-hidden="true"
-        style={{
-          "font-family": FONT_SANS,
-          "font-size": `${px().text}px`,
-          "font-weight": weight(),
-          "letter-spacing": "-0.02em",
-          color: "var(--color-text)",
-          "white-space": "nowrap",
-        }}
-      >
-        Axiomics
-      </span>
+      <Show when={!props.markOnly}>
+        <span
+          aria-hidden="true"
+          style={{
+            "font-family": FONT_SANS,
+            "font-size": `${px().text}px`,
+            "font-weight": weight(),
+            "letter-spacing": "-0.02em",
+            color: "var(--color-text)",
+            "white-space": "nowrap",
+          }}
+        >
+          Axiomics
+        </span>
+      </Show>
     </>
   )
   return (

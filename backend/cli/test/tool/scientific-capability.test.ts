@@ -98,34 +98,42 @@ describe("scientific_capability tool", () => {
     expect(tool.normalizeInput?.({ action: "status", id: "open2c" })).toEqual({ action: "status", id: "open2c" })
   })
 
-  test("lists the current 61-entry maturity and availability inventory without claiming verification", async () => {
-    const tool = await ScientificCapabilityTool.init()
-    const listed = await tool.execute({ action: "list" }, context)
-    const catalog = JSON.parse(listed.output) as {
-      capabilities: Array<{ id: string; maturity: string; availability: { local: string; hosted: string } }>
-      ready_local: string[]
-      next: string
-    }
-    expect(catalog.capabilities).toHaveLength(61)
-    expect(catalog.capabilities.every((item) => item.maturity !== "verified")).toBe(true)
-    expect(catalog.capabilities.find((item) => item.id === "boltz2")?.availability.hosted).toBe("setup_needed")
-    expect(catalog.capabilities.find((item) => item.id === "openfold3")?.availability.hosted).toBe("setup_needed")
-    expect(catalog.capabilities.find((item) => item.id === "paper-qa")?.availability.local).toBe("setup_needed")
-    const squidpy = CapabilityRegistry.describe("squidpy")!
-    const current = await CapabilityRuntime.doctor(squidpy, { verification: "status" })
-    expect(catalog.capabilities.find((item) => item.id === "squidpy")?.availability).toEqual(current.availability)
-    expect(catalog.ready_local.includes("squidpy")).toBe(["ready", "configured"].includes(current.availability.local))
-    expect(catalog.next).toContain("plan/start")
-    expect(catalog.next).toContain("platform injects the runtime")
-    expect(catalog.capabilities.filter((item) => item.maturity === "blocked")).toHaveLength(2)
-    expect(listed.metadata.scientific_capability.dispatched).toBe(false)
+  test("lists the current 65-entry maturity and availability inventory without claiming verification", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const tool = await ScientificCapabilityTool.init()
+        const listed = await tool.execute({ action: "list" }, context)
+        const catalog = JSON.parse(listed.output) as {
+          capabilities: Array<{ id: string; maturity: string; availability: { local: string; hosted: string } }>
+          ready_local: string[]
+          next: string
+        }
+        expect(catalog.capabilities).toHaveLength(65)
+        expect(catalog.capabilities.every((item) => item.maturity !== "verified")).toBe(true)
+        expect(catalog.capabilities.find((item) => item.id === "boltz2")?.availability.hosted).toBe("setup_needed")
+        expect(catalog.capabilities.find((item) => item.id === "openfold3")?.availability.hosted).toBe("setup_needed")
+        expect(catalog.capabilities.find((item) => item.id === "paper-qa")?.availability.local).toBe("setup_needed")
+        const squidpy = CapabilityRegistry.describe("squidpy")!
+        const current = await CapabilityRuntime.doctor(squidpy, { verification: "status" })
+        expect(catalog.capabilities.find((item) => item.id === "squidpy")?.availability).toEqual(current.availability)
+        expect(catalog.ready_local.includes("squidpy")).toBe(
+          ["ready", "configured"].includes(current.availability.local),
+        )
+        expect(catalog.next).toContain("plan/start")
+        expect(catalog.next).toContain("platform injects the runtime")
+        expect(catalog.capabilities.filter((item) => item.maturity === "blocked")).toHaveLength(2)
+        expect(listed.metadata.scientific_capability.dispatched).toBe(false)
 
-    const checked = await tool.execute({ action: "doctor", id: "squidpy" }, context)
-    const health = JSON.parse(checked.output)
-    expect(health.local).not.toHaveProperty("path")
-    expect(health.local).not.toHaveProperty("manifest")
-    expect(health.next).toContain("scientific_capability plan and start")
-    expect(health.next).toContain("do not locate, activate, or invoke")
+        const checked = await tool.execute({ action: "doctor", id: "squidpy" }, context)
+        const health = JSON.parse(checked.output)
+        expect(health.local).not.toHaveProperty("path")
+        expect(health.local).not.toHaveProperty("manifest")
+        expect(health.next).toContain("scientific_capability plan and start")
+        expect(health.next).toContain("do not locate, activate, or invoke")
+      },
+    })
   })
 
   test("compiles a packaged plan without dispatching or exposing environment controls", async () => {

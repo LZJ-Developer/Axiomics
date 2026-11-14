@@ -235,7 +235,7 @@
   background: transparent;
   color: var(--text-weak);
   font-family: var(--font-family-sans);
-  font-size: 12.5px;
+  font-size: var(--type-ui);
   font-weight: var(--font-weight-regular);
   line-height: 18px;
   text-overflow: ellipsis;

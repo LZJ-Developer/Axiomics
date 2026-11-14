@@ -3,6 +3,7 @@ import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { SessionFilesystem } from "../../src/session/filesystem"
 import { SystemPrompt } from "../../src/session/system"
+import { PathSpace } from "../../src/session/path-space"
 import { tmpdir } from "../fixture/fixture"
 import { ProjectAccess } from "../../src/project/access"
 
@@ -27,18 +28,19 @@ describe("session environment prompt", () => {
           "\n",
         )
 
-        expect(prompt).toContain(`- ${source.path} (read and write, project scope)`)
-        expect(prompt).toContain(`Project files: ${project.path} (durable and shared across this project)`)
-        expect(prompt).toContain(`Session scratch: ${await SessionFilesystem.workspace(session.id)}`)
+        // The prompt names roots in the model's vocabulary, which is the host
+        // spelling whenever the view cannot be presented.
+        const pathSpace = await PathSpace.roots(session.id)
+        expect(prompt).toContain(`- ${PathSpace.toModel(pathSpace, source.path)} (read and write, project scope)`)
+        expect(prompt).toContain(`Project files: ${pathSpace.project.model} (durable and shared across this project)`)
+        expect(prompt).toContain(`Session scratch: ${pathSpace.scratch.model}`)
         expect(prompt).toContain("Results: immutable project-wide deliverables")
         expect(prompt).toContain("may aggregate multiple connected folders and files")
         expect(prompt).toContain("a normal workspace file is not a Result")
         expect(prompt).toContain("Use Session scratch by default for one-off downloads")
         expect(prompt).toContain("Do not create a new project subfolder for an ordinary answer")
         expect(prompt).toContain("Use the human project name in conversation, not UUID directory components")
-        expect(prompt).toContain(
-          "Do not expose scratch, managed-project, or connected-folder paths in a generic greeting",
-        )
+        expect(prompt).toContain("Do not expose scratch, project, or connected-folder paths in a generic greeting")
         expect(prompt).toContain("Access mode: Full access")
         await Session.remove(session.id)
       },

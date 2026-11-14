@@ -195,9 +195,9 @@ describe("scientific data workbench integration", () => {
   test("keeps scientific controls readable without changing scientific acronyms", () => {
     const view = read("./ScientificDataView.tsx")
 
-    expect(view).toContain('const CONTROL_FONT_SIZE = "12px"')
-    expect(view).toContain('const HELPER_FONT_SIZE = "11.5px"')
-    expect(view).toContain('const TABLE_FONT_SIZE = "12px"')
+    expect(view).toContain('const CONTROL_FONT_SIZE = "var(--type-meta)"')
+    expect(view).toContain('const HELPER_FONT_SIZE = "var(--type-meta)"')
+    expect(view).toContain('const TABLE_FONT_SIZE = "var(--type-meta)"')
     expect(view).not.toMatch(/"font-size": "(?:8|9|10|11)px"/)
     expect(view).not.toContain("FONT_MONO")
     expect(view).toMatch(/>\s*Overview\s*</)

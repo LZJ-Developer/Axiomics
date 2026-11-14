@@ -29,4 +29,22 @@ describe("workspace typography drift", () => {
       expect(text.match(/\b(?:uppercase|lowercase|capitalize)\b(?=[^"'\n]*["'])/g), path).toBeNull()
     }
   })
+
+  test("keeps readable sizes on the role ramp instead of fractional one-offs", async () => {
+    for (const path of files) {
+      if (path.includes(".test.")) continue
+      const text = await source(path)
+      // Sub-8px values are drawing, not type: artifact thumbnails render text at
+      // 3.6px/8px as texture. Everything a reader actually reads uses the ramp.
+      const fractional = [...text.matchAll(/font-size:\s*(\d+\.\d+)px/g)]
+        .map((match) => Number(match[1]))
+        .filter((size) => size >= 8)
+      const inline = [...text.matchAll(/["']font-size["']:\s*["'](\d+\.\d+)px["']/g)]
+        .map((match) => Number(match[1]))
+        .filter((size) => size >= 8)
+
+      expect(fractional, path).toEqual([])
+      expect(inline, path).toEqual([])
+    }
+  })
 })

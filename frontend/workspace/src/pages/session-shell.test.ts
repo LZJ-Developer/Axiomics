@@ -18,22 +18,29 @@ describe("session render boundary", () => {
     expect(app).not.toContain("@/science/tool-renderer")
   })
 
-  test("preserves registration and provider order inside the session shell", () => {
+  test("preserves registration and provider order behind the session shell boundary", () => {
     const shell = read("./session-shell.tsx")
+    const providers = read("./session-render-providers.tsx")
     const session = read("./session.tsx")
-    const registration = shell.indexOf('import "@/science/tool-renderer"')
-    const sessionPage = shell.indexOf('import SessionPage from "./session"')
-    const marked = shell.indexOf("<MarkedProvider")
-    const diff = shell.indexOf("<DiffComponentProvider")
-    const code = shell.indexOf("<CodeComponentProvider")
-    const children = shell.indexOf("{props.children}")
+    // The renderers moved into their own module so the public replay can reuse
+    // them without the session shell; the order inside that module is the
+    // contract that must not regress.
+    const registration = providers.indexOf('import "@/science/tool-renderer"')
+    const marked = providers.indexOf("<MarkedProvider")
+    const diff = providers.indexOf("<DiffComponentProvider")
+    const code = providers.indexOf("<CodeComponentProvider")
+    const children = providers.indexOf("{props.children}")
 
     expect(registration).toBeGreaterThan(-1)
-    expect(sessionPage).toBeGreaterThan(registration)
     expect(marked).toBeGreaterThan(-1)
     expect(diff).toBeGreaterThan(marked)
     expect(code).toBeGreaterThan(diff)
     expect(children).toBeGreaterThan(code)
+    // The shell must mount the shared providers before either session path.
+    const shellProviders = shell.indexOf("<SessionRenderProviders>")
+    const shellPage = shell.indexOf("<SessionPage")
+    expect(shellProviders).toBeGreaterThan(-1)
+    expect(shellPage).toBeGreaterThan(shellProviders)
     expect(shell).not.toContain("<CaseReplay")
     expect(session).toContain('lazy(() => import("./cases/replay"))')
     expect(session).toContain("<CaseReplay sessionID={id}")
@@ -230,19 +237,23 @@ describe("focused workspace shell", () => {
   test("keeps replay inside the session shell and replaces only the header content and composer dock", () => {
     const session = read("./session.tsx")
     const replay = read("./cases/replay.tsx")
+    // The dock and transcript live in the shared player now; replay.tsx only
+    // fetches the recording and hands it over.
+    const player = read("./cases/player.tsx")
     const styles = read("./cases/cases.css")
 
     expect(session).toContain('class="workspace-replay-title"')
     expect(session).toContain('class="workspace-replay-actions"')
     expect(session).toContain("<CaseReplay sessionID={id}")
-    expect(replay).toContain('class="session-prompt-dock case-player-dock"')
-    expect(replay).toContain('class="atlas-scroll atlas-chat-scroll session-scroller case-transcript"')
+    expect(replay).toContain("<ReplayPlayer")
+    expect(player).toContain('class="session-prompt-dock case-player-dock"')
+    expect(player).toContain('class="atlas-scroll atlas-chat-scroll session-scroller case-transcript"')
     expect(replay).not.toContain("<PromptInput")
     expect(session).toContain('language.t("cases.replay.label")')
     expect(session).toContain('language.t("cases.replay.list")')
     expect(session).toContain('language.t("cases.replay.exit")')
-    expect(replay).toContain('language.t("cases.replay.current")')
-    expect(replay).toContain('language.t("cases.replay.speed")')
+    expect(player).toContain('language.t("cases.replay.current")')
+    expect(player).toContain('language.t("cases.replay.speed")')
     expect(session).not.toContain(">Replay<")
     expect(replay).not.toContain("Current frame")
     expect(replay).not.toContain("Playback speed")
@@ -272,7 +283,7 @@ describe("focused workspace shell", () => {
     expect(styles).toContain("width: var(--session-sidebar-width, 232px)")
     expect(styles).toContain(".session-sidebar__resize")
     expect(styles).toContain("min-height: 32px")
-    expect(styles).toContain("font-size: 12.5px")
+    expect(styles).toContain("font-size: var(--type-ui)")
     expect(styles).toContain('.session-sidebar__session[data-active="true"]')
     expect(styles).not.toContain('.session-sidebar__session[data-active="true"]::before')
     expect(styles).toContain("grid-template-columns: minmax(0, 1fr)")
@@ -288,7 +299,7 @@ describe("focused workspace shell", () => {
     expect(session).toContain('id="session-sidebar"')
     expect(session).toContain('aria-controls="session-sidebar"')
     expect(session).toContain("aria-expanded={compact() ? props.mobileOpen : !props.collapsed}")
-    expect(session).toContain('data-tooltip={language.t("workspace.sidebar.projects")}')
+    expect(session).toContain('data-tooltip={language.t("workspace.sidebar.switchProject")}')
     expect(session).toContain("<IconHome")
     expect(session).toContain("<IconChevronRight")
     expect(session).toContain("<IconX")

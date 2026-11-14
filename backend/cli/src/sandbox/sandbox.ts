@@ -820,6 +820,16 @@ export namespace Sandbox {
     // the mounts below give it contents. Creating it before the binds lets
     // bwrap place nested destinations without inheriting a host directory.
     if (view) args.push("--dir", view.home)
+    // Absolute symlinks written outside the view commonly point at the host
+    // home (a venv's bin/python → ~/.local/bin/python3). Policy mounts inside
+    // the view use the synthetic spelling, so those links would dangle and
+    // Python would silently fall back to the base interpreter. The host home
+    // spelling is an alias of the same tree, not an extra grant: it resolves
+    // to the view home, so files are visible only where the view already
+    // exposes them.
+    if (view?.relocate && view.relocate.from !== view.relocate.to) {
+      args.push("--symlink", view.relocate.to, view.relocate.from)
+    }
     // Every policy path keeps its host source but may change its destination.
     // The mapping is a pure prefix rewrite, so two sources can never collide
     // on one destination.

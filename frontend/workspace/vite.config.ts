@@ -1,6 +1,7 @@
 import { createReadStream, existsSync, readFileSync, readdirSync, realpathSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { createRequire } from "node:module"
+import { fileURLToPath } from "node:url"
 import { defineConfig, searchForWorkspaceRoot, type Plugin } from "vite"
 import desktopPlugin from "./vite"
 
@@ -80,6 +81,13 @@ export default defineConfig({
   build: {
     target: "esnext",
     rollupOptions: {
+      // Two HTML surfaces: the authenticated workbench and the public cases
+      // gallery. They share chunks but have separate entry graphs, so the
+      // public page never pulls the SDK or tenant stores into its boot path.
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        cases: fileURLToPath(new URL("./cases.html", import.meta.url)),
+      },
       output: {
         // Molstar has circular re-exports throughout its package. Its three
         // lazy entry imports must share one chunk or Rollup can split those

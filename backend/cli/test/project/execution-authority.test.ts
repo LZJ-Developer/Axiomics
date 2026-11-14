@@ -11,6 +11,7 @@ import { KernelRuntime } from "../../src/science/kernel/registry"
 import { Server } from "../../src/server/server"
 import { Session } from "../../src/session"
 import { SessionFilesystem } from "../../src/session/filesystem"
+import { PathSpace } from "../../src/session/path-space"
 import { BashTool } from "../../src/tool/bash"
 import "../../src/tool/notebook"
 import { sandboxedExecution, tmpdir } from "../fixture/fixture"
@@ -79,6 +80,11 @@ test("untrusted projects run routine terminals, shells, and kernels only in an e
       const session = await Session.create({})
       const shellMarker = path.join(tmp.path, "shell-spawned")
       const kernelMarker = path.join(tmp.path, "kernel-spawned")
+      // Sandboxed shells and kernels address the project by its model
+      // spelling; the host file is the same inode through the mount.
+      const pathSpace = await PathSpace.roots(session.id)
+      const shellMarkerRun = PathSpace.toModel(pathSpace, shellMarker)
+      const kernelMarkerRun = PathSpace.toModel(pathSpace, kernelMarker)
       const decision = await ExecutionAuthority.decide({
         projectID: Instance.project.id,
         sessionID: session.id,
@@ -117,14 +123,14 @@ test("untrusted projects run routine terminals, shells, and kernels only in an e
         await expect(
           bash.execute(
             {
-              command: `printf spawned > ${JSON.stringify(shellMarker)}`,
+              command: `printf spawned > ${JSON.stringify(shellMarkerRun)}`,
               description: "Attempt unavailable sandbox spawn",
             },
             context(session.id),
           ),
         ).rejects.toBeInstanceOf(ExecutionAuthority.DeniedError)
         await expect(
-          KernelRuntime.execute(identity, `open(${JSON.stringify(kernelMarker)}, "w").write("spawned")`),
+          KernelRuntime.execute(identity, `open(${JSON.stringify(kernelMarkerRun)}, "w").write("spawned")`),
         ).rejects.toBeInstanceOf(ExecutionAuthority.DeniedError)
         expect(await Bun.file(shellMarker).exists()).toBe(false)
         expect(await Bun.file(kernelMarker).exists()).toBe(false)
@@ -136,7 +142,7 @@ test("untrusted projects run routine terminals, shells, and kernels only in an e
         expect(terminal.authority).toMatchObject({ allowed: true, mode: "sandboxed", sandbox: { enforced: true } })
         const result = await bash.execute(
           {
-            command: `printf spawned > ${JSON.stringify(shellMarker)}`,
+            command: `printf spawned > ${JSON.stringify(shellMarkerRun)}`,
             description: "Run sandboxed untrusted shell",
           },
           context(session.id),
@@ -144,7 +150,7 @@ test("untrusted projects run routine terminals, shells, and kernels only in an e
         expect(result.metadata.exit).toBe(0)
         expect(await Bun.file(shellMarker).text()).toBe("spawned")
 
-        await KernelRuntime.execute(identity, `open(${JSON.stringify(kernelMarker)}, "w").write("spawned")`)
+        await KernelRuntime.execute(identity, `open(${JSON.stringify(kernelMarkerRun)}, "w").write("spawned")`)
         expect(KernelRuntime.status(identity)).toMatchObject({
           active: true,
           authority: { allowed: true, mode: "sandboxed", sandbox: { enforced: true } },

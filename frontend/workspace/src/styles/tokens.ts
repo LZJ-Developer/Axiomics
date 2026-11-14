@@ -1,7 +1,7 @@
 import type { JSX } from "solid-js"
 
 export const FONT_SANS =
-  'var(--font-family-sans, "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif)'
+  'var(--font-family-sans, "Inter Variable", Inter, "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif)'
 /** Code font — resolves through the theme/Settings-owned mono variable so the
  *  user's mono-font choice applies everywhere code renders. */
 export const FONT_CODE =

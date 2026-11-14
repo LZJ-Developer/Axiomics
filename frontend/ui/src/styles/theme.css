@@ -2,8 +2,9 @@
   /* Inter Variable is bundled by the workspace entrypoint. Computer Modern
      remains the editorial serif for papers and long-form scientific output. */
   --font-family-sans:
-    "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+    "Inter Variable", Inter, "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
   --font-family-sans--font-feature-settings: normal;
   --font-family-mono:
     "Söhne Mono", "Sohne Mono", "IBM Plex Mono", "IBM Plex Mono Fallback", ui-monospace, SFMono-Regular, Menlo, Monaco,
@@ -18,6 +19,22 @@
   --font-size-base: 14px;
   --font-size-large: 16px;
   --font-size-x-large: 20px;
+
+  /* Type roles — the job each step does. The size tokens above are primitives;
+     product surfaces use these names so a list row, a group label and a hint
+     stop drifting to 12.5px, 13.5px and 11.5px respectively. */
+  --type-micro: var(--font-size-2x-small); /* 10px — counters, dense chips */
+  --type-label: var(--font-size-x-small); /* 11px — group labels, captions */
+  --type-meta: var(--font-size-small); /* 12px — metadata, helper copy */
+  --type-ui: 13px; /* navigation, tabs, list rows, controls */
+  --type-body: var(--font-size-base); /* 14px — conversation, prose, inputs */
+  --type-title: var(--font-size-large); /* 16px — section headings */
+  --type-display: 18px; /* dialog and page titles */
+  --type-leading-label: 1.4;
+  --type-leading-meta: 1.45;
+  --type-leading-ui: 1.35;
+  --type-leading-body: 1.55;
+
   /* A deliberately quiet three-step scale. Inter Variable can render the
      in-between values precisely; static fallbacks resolve to their nearest
      available face. Keep body and controls light, and reserve emphasis for

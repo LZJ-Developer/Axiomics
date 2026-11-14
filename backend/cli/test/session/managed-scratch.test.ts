@@ -8,6 +8,7 @@ import { Instance } from "../../src/project/instance"
 import { KernelRuntime, type KernelIdentity } from "../../src/science/kernel/registry"
 import { Session } from "../../src/session"
 import { SessionFilesystem } from "../../src/session/filesystem"
+import { PathSpace } from "../../src/session/path-space"
 import { SessionWorkspace } from "../../src/session/workspace"
 import { Storage } from "../../src/storage/storage"
 import { BashTool } from "../../src/tool/bash"
@@ -321,6 +322,10 @@ describe("managed project session scratch", () => {
       const second = await Session.create({ title: "second" })
       const firstRoot = await SessionFilesystem.workspace(first.id)
       const secondRoot = await SessionFilesystem.workspace(second.id)
+      // Shells and kernels see the workspace under the model's spelling; the
+      // host root still owns the files and stays the authority for reads.
+      const roots = await PathSpace.roots(first.id)
+      const firstView = PathSpace.toModel(roots, firstRoot)
       const bash = await BashTool.init()
       const shell = await bash.execute(
         {
@@ -329,7 +334,7 @@ describe("managed project session scratch", () => {
         },
         context(first.id),
       )
-      expect(shell.output).toContain(firstRoot)
+      expect(shell.output).toContain(firstView)
       expect(await Bun.file(path.join(firstRoot, "shell.txt")).text()).toBe("shell")
       const durable = await bash.execute(
         {
@@ -362,13 +367,13 @@ describe("managed project session scratch", () => {
         python,
         "import os\nprint(os.getcwd())\nopen('python.txt', 'w').write('python')",
       )
-      expect(pythonResult.stdout).toContain(firstRoot)
+      expect(pythonResult.stdout).toContain(firstView)
       expect(KernelRuntime.status(python).environment?.cwd).toBe(firstRoot)
       expect(await Bun.file(path.join(firstRoot, "python.txt")).text()).toBe("python")
       const pythonProject = path.join(root, "python-project.txt")
       const pythonProjectResult = await KernelRuntime.execute(
         python,
-        `open(${JSON.stringify(pythonProject)}, "w").write("durable-python")`,
+        `open(${JSON.stringify(PathSpace.toModel(roots, pythonProject))}, "w").write("durable-python")`,
       )
       expect(pythonProjectResult.ok).toBe(true)
       expect(await Bun.file(pythonProject).text()).toBe("durable-python")
@@ -381,10 +386,13 @@ describe("managed project session scratch", () => {
           language: "r",
         }
         const rResult = await KernelRuntime.execute(r, "cat(getwd())")
-        expect(rResult.stdout).toContain(firstRoot)
+        expect(rResult.stdout).toContain(firstView)
         expect(KernelRuntime.status(r).environment?.cwd).toBe(firstRoot)
         const rProject = path.join(root, "r-project.txt")
-        const rProjectResult = await KernelRuntime.execute(r, `writeLines("durable-r", ${JSON.stringify(rProject)})`)
+        const rProjectResult = await KernelRuntime.execute(
+          r,
+          `writeLines("durable-r", ${JSON.stringify(PathSpace.toModel(roots, rProject))})`,
+        )
         expect(rProjectResult.ok).toBe(true)
         expect(await Bun.file(rProject).text()).toBe("durable-r\n")
       }

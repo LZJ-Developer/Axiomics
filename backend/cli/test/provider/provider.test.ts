@@ -60,7 +60,7 @@ const FRONTIER_MODELS = {
 const SONNET = "claude-sonnet-4-6"
 const OPUS = "claude-opus-4-5"
 
-test("Ace exposes the reviewed 21 models with exact names and context even when the bundled catalog lags", async () => {
+test("Ace exposes the reviewed models with exact names and context even when the bundled catalog lags", async () => {
   await using tmp = await tmpdir({ config: { billing: { llm: "managed" } } })
   await Axiomics.saveSession({
     api_key: "osk_fixture_managed_catalog",
@@ -74,8 +74,9 @@ test("Ace exposes the reviewed 21 models with exact names and context even when 
       fn: async () => {
         const provider = (await Provider.list()).openrouter
         expect(provider.source).toBe("managed")
+        // The reviewed catalog constant is the source of truth; a second
+        // hardcoded count only drifts when the catalog is extended.
         expect(Object.keys(provider.models).sort()).toEqual([...MANAGED_OPENROUTER_MODELS].sort())
-        expect(Object.keys(provider.models)).toHaveLength(21)
         for (const id of MANAGED_OPENROUTER_MODELS) {
           const model = provider.models[id]
           const reviewed = MANAGED_MODEL_DETAILS[id]

@@ -64,6 +64,11 @@ tooling/acceptance-cases/cases/*/tracer/*.h5ad
 tooling/acceptance-cases/cases/*/tracer/*.tsv.gz
 tooling/acceptance-cases/cases/*/tracer/result.json
 
+# Public replay fixtures are exported from tenant storage at release time by
+# frontend/workspace/script/export-cases.ts. They contain real session data;
+# keep them out of the source tree and regenerate from the deployment.
+frontend/workspace/public/cases/replay/
+
 # Internal deployment record (real addresses, host paths, tenant roster).
 # Tracked on the local `internal` branch only, force-added there; see its
 # internal/README.md. Kept out of `main` so the public tree stays reproducible

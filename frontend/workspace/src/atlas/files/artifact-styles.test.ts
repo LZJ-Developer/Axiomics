@@ -30,6 +30,12 @@ describe("artifact grid styles", () => {
       "--font-weight-emphasis",
       "--font-weight-medium",
       "--letter-spacing-normal",
+      // shared type roles (workspace/src/styles/theme.css)
+      "--type-micro",
+      "--type-label",
+      "--type-meta",
+      "--type-ui",
+      "--type-body",
       "--atlas-radius-xs",
       "--atlas-radius-sm",
       "--atlas-radius-md",

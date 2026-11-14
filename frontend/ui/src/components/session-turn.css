@@ -239,7 +239,7 @@
   }
 
   [data-slot="session-turn-summary-title"] {
-    font-size: 13px;
+    font-size: var(--type-ui);
     /* text-12-medium */
     font-weight: var(--font-weight-medium);
     color: var(--text-weak);
@@ -253,7 +253,7 @@
 
   [data-slot="session-turn-markdown"] {
     &[data-diffs="true"] {
-      font-size: 15px;
+      font-size: var(--type-body);
     }
 
     &[data-fade="true"] > * {
@@ -661,13 +661,16 @@
   }
 
   [data-slot="session-turn-details-text"] {
-    font-size: 13px;
+    font-size: var(--type-ui);
     /* text-12-medium */
     font-weight: var(--font-weight-medium);
   }
 
   .error-card {
-    color: var(--text-on-critical-base);
+    /* The base critical token is 12px text on the critical-weak surface
+       (#c65c58 on #fff0ee, ~3.9:1). Use the strong token so recorded tool
+       failures stay legible; this also clears Lighthouse color-contrast. */
+    color: var(--text-on-critical-strong);
     max-height: 240px;
     overflow-y: auto;
   }
@@ -750,7 +753,7 @@
       gap: 5px;
       padding: 7px 9px;
       color: var(--text-weak);
-      font-size: 11px;
+      font-size: var(--type-label);
       font-weight: var(--font-weight-medium);
       border-bottom: 1px solid var(--border-weak-base);
 
@@ -768,7 +771,7 @@
 
       small {
         color: var(--text-weak);
-        font-size: 10px;
+        font-size: var(--type-micro);
         font-weight: var(--font-weight-normal);
       }
     }
@@ -790,7 +793,7 @@
       align-items: center;
       gap: 4px;
       color: var(--text-weak);
-      font-size: 11px;
+      font-size: var(--type-label);
       line-height: 16px;
       letter-spacing: var(--letter-spacing-normal);
 
@@ -867,13 +870,13 @@
     }
 
     strong {
-      font-size: 12px;
+      font-size: var(--type-meta);
       font-weight: var(--font-weight-medium);
     }
 
     small {
       color: var(--text-weak);
-      font-size: 10px;
+      font-size: var(--type-micro);
     }
   }
 

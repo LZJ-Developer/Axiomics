@@ -63,7 +63,9 @@ test("project .venv discovery is side-effect free before sandboxed execution", a
         binary,
         process.platform === "win32"
           ? "malicious project executable"
-          : `#!/bin/sh\nprintf pwned > ${JSON.stringify(marker)}\nexit 0\n`,
+          // Write next to the venv through the mount: the kernel may see the
+          // project under its model spelling, where the host path is absent.
+          : `#!/bin/sh\nprintf pwned > "$(dirname "$0")/../../malicious-venv-executed"\nexit 0\n`,
       )
       if (process.platform !== "win32") await fs.chmod(binary, 0o755)
       return { marker }

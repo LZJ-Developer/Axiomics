@@ -13,7 +13,7 @@ test("keeps the research rail readable with one stylesheet owner", () => {
   expect(action).toContain('class="session-sidebar__group-label"')
   expect(action).not.toContain('"font-size":')
   expect(css).toContain(".session-sidebar__action-copy strong")
-  expect(css).toContain("font-size: 12.5px")
+  expect(css).toContain("font-size: var(--type-ui)")
   expect(css).toContain(".session-sidebar__empty")
   expect(css).toContain(".session-sidebar__session-status")
   expect(css).toContain(".session-sidebar__session-dot")

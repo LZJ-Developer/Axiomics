@@ -1,0 +1,587 @@
+/* Public workspace: the session surface with a public data source.
+   Left rail = showcased cases, centre = transcript (or an empty conversation),
+   right pane = the results the recording saved. The playback bar sits in the
+   composer's place. */
+
+.public-replay {
+  position: relative;
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  color: var(--color-text);
+  background: var(--color-bg);
+  font-family: var(--font-family-sans);
+}
+
+/* Rail --------------------------------------------------------------------- */
+
+.public-replay__rail {
+  height: 100dvh;
+  flex: 0 0 var(--session-sidebar-width, 232px);
+  border-right: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+
+.public-replay__rail .session-sidebar__project {
+  text-decoration: none;
+}
+
+.public-replay__rail .session-sidebar__session-main {
+  text-decoration: none;
+}
+
+.public-replay__rail .session-sidebar__actions {
+  padding: 0 var(--sidebar-space-2) var(--sidebar-space-2);
+}
+
+.public-replay__login {
+  appearance: none;
+  margin: auto 8px 10px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--atlas-radius-xs);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-sans);
+  font-size: var(--type-ui);
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.public-replay__login:hover,
+.public-replay__login:focus-visible {
+  background: var(--surface-base-hover);
+  color: var(--color-text);
+}
+
+.public-replay__backdrop,
+.public-replay__rail-toggle {
+  display: none;
+}
+
+/* Main column -------------------------------------------------------------- */
+
+.public-replay__main {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.public-replay__bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+}
+
+/* Progress belongs to the header as a hairline: the playback bar already
+   carries the numbers, so a second counter would only repeat them. */
+.public-replay__bar-progress {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  height: 1px;
+  background: var(--surface-brand-base);
+  transition: width 120ms linear;
+}
+
+.public-replay__back {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: var(--type-ui);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.public-replay__back:hover,
+.public-replay__back:focus-visible {
+  color: var(--color-text);
+}
+
+.public-replay__heading {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.public-replay__heading span {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: var(--type-label);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.08em;
+}
+
+.public-replay__heading strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--type-ui);
+  font-weight: var(--font-weight-emphasis);
+}
+
+.public-replay__action {
+  appearance: none;
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--atlas-radius-xs);
+  background: var(--surface-raised-base);
+  color: var(--color-text-muted);
+  font-family: var(--font-family-sans);
+  font-size: var(--type-ui);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.public-replay__action:hover,
+.public-replay__action[aria-expanded="true"] {
+  background: var(--surface-base-hover);
+  color: var(--color-text);
+}
+
+.public-replay .case-replay {
+  flex: 1;
+  min-height: 0;
+}
+
+/* The workbench keeps the transcript above its absolute composer through this
+   padding (chat-surface.css). The public entry does not load that sheet, so
+   the same clearance is declared here from the height the player measures. */
+.public-replay .case-replay-scroll-frame {
+  padding-bottom: var(--workspace-composer-height, 76px);
+}
+
+/* Same transcript column as the workbench (md:max-w-200 centered). Without
+   this the public page spreads one message across the whole viewport. */
+.public-replay .case-transcript .session-transcript {
+  width: 100%;
+  max-width: 50rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 768px) {
+  .public-replay .case-transcript .session-transcript {
+    padding-inline: 1.5rem;
+  }
+}
+
+/* The playback bar sits where the composer sits in a live session. */
+.public-replay .case-player-dock {
+  padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+}
+
+.public-replay .case-player-dock .session-prompt-dock__inner {
+  width: min(100%, 740px);
+  margin-inline: auto;
+}
+
+/* Empty conversation ------------------------------------------------------- */
+
+.public-new {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--color-border) 34%, transparent) 1px, transparent 0)
+      0 0 / 18px 18px,
+    transparent;
+}
+
+.public-new .session-prompt-dock {
+  padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+}
+
+.public-new__composer {
+  width: min(100%, 740px);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 12px 8px 14px;
+  border: 1px solid var(--border-weak-base);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-solid, var(--surface-raised-stronger-non-alpha));
+  transition: border-color 150ms var(--ease-standard);
+}
+
+.public-new__composer:focus-within {
+  border-color: var(--border-base);
+  box-shadow: var(--focus-lit);
+}
+
+.public-new__input {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  max-height: 200px;
+  resize: none;
+  color: var(--color-text);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-regular);
+  line-height: 20px;
+}
+
+.public-new__input::placeholder {
+  color: var(--color-text-faint);
+}
+
+.public-new__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.public-new__hint {
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: var(--type-meta);
+  line-height: 1.4;
+}
+
+.public-new__send {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-text);
+  color: var(--color-bg);
+  cursor: pointer;
+  transition: opacity 140ms var(--agent-ease);
+}
+
+.public-new__send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Inspector ---------------------------------------------------------------- */
+
+/* Collapsed by default, like the workspace inspector: the replay expands it
+   when the playhead reaches a result, and a manual collapse is respected for
+   the rest of that frame. */
+.public-inspector {
+  position: relative;
+  flex: 0 0 340px;
+  width: 340px;
+  min-height: 0;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.public-inspector[data-open="true"] {
+  display: flex;
+}
+
+.public-inspector__tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.public-inspector__tabs button {
+  appearance: none;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--atlas-radius-xs);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-sans);
+  font-size: var(--type-meta);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.public-inspector__tabs button[data-active="true"] {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  color: var(--color-text);
+}
+
+.public-inspector__tabs button span {
+  color: var(--color-text-faint);
+  font-size: var(--type-label);
+  font-variant-numeric: tabular-nums;
+}
+
+.public-inspector__list {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.public-inspector__row {
+  appearance: none;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: calc(var(--atlas-radius-xs) - 1px);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.public-inspector__row:hover,
+.public-inspector__row:focus-visible {
+  background: var(--surface-base-hover);
+  color: var(--color-text);
+}
+
+.public-inspector__row[data-active="true"] {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  color: var(--color-text);
+}
+
+.public-inspector__kind {
+  overflow: hidden;
+  padding-top: 1px;
+  color: var(--color-text-faint);
+  font-size: var(--type-micro);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-inspector__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.public-inspector__copy strong {
+  overflow: hidden;
+  color: inherit;
+  font-size: var(--type-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-inspector__copy span {
+  overflow: hidden;
+  color: var(--color-text-faint);
+  font-size: var(--type-label);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-inspector__detail {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.public-inspector__back {
+  appearance: none;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 8px 4px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--atlas-radius-xs);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-sans);
+  font-size: var(--type-meta);
+  cursor: pointer;
+}
+
+.public-inspector__back:hover {
+  background: var(--surface-base-hover);
+  color: var(--color-text);
+}
+
+.public-inspector__head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 12px 10px;
+}
+
+.public-inspector__head strong {
+  color: var(--color-text);
+  font-size: var(--type-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.35;
+}
+
+.public-inspector__head span {
+  overflow-wrap: anywhere;
+  color: var(--color-text-faint);
+  font-size: var(--type-label);
+  line-height: 1.4;
+}
+
+.public-inspector__text {
+  margin: 0;
+  padding: 0 12px 16px;
+  overflow-x: auto;
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--type-meta);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.public-inspector__image {
+  width: calc(100% - 24px);
+  margin: 0 12px 16px;
+  border-radius: var(--atlas-radius-sm, 6px);
+  background: var(--surface-raised-base);
+}
+
+.public-inspector__empty {
+  margin: 0;
+  padding: 14px 12px;
+  color: var(--color-text-muted);
+  font-size: var(--type-meta);
+  line-height: 1.5;
+}
+
+.public-inspector__close {
+  appearance: none;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: none;
+  place-items: center;
+  border: 0;
+  border-radius: var(--atlas-radius-xs);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.public-inspector__close:hover {
+  background: var(--surface-base-hover);
+  color: var(--color-text);
+}
+
+/* Responsive --------------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  .public-inspector {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(380px, 100%);
+    flex-basis: auto;
+    display: none;
+    border-left-color: var(--color-border-strong);
+    box-shadow: var(--atlas-shadow-float);
+  }
+
+  .public-inspector[data-open="true"] {
+    display: flex;
+  }
+
+  .public-inspector__close {
+    display: grid;
+  }
+}
+
+@media (max-width: 900px) {
+  .public-replay__rail {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 180ms var(--agent-ease);
+    box-shadow: var(--atlas-shadow-float);
+  }
+
+  .public-replay__rail[data-mobile-open="true"] {
+    transform: none;
+  }
+
+  .public-replay__rail-toggle {
+    appearance: none;
+    flex: 0 0 auto;
+    width: 28px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--color-border);
+    border-radius: var(--atlas-radius-xs);
+    background: var(--surface-raised-base);
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  .public-replay__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    display: block;
+    border: 0;
+    background: light-dark(hsl(35 18% 12% / 0.2), hsl(24 14% 2% / 0.5));
+    backdrop-filter: blur(3px);
+  }
+}
+
+@media (max-width: 640px) {
+  .public-replay__heading span {
+    display: none;
+  }
+  .public-replay__bar {
+    gap: 10px;
+  }
+}

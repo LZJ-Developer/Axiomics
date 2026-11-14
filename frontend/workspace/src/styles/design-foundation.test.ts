@@ -55,7 +55,7 @@ describe("workspace design foundation", () => {
     expect(terminal).toMatch(/\.terminal-surface__search button\s*\{[^}]*height:\s*32px[^}]*font-size:\s*12px/s)
     expect(terminal).toMatch(/\.terminal-surface__tab,\s*\.terminal-surface__close\s*\{[^}]*height:\s*32px/s)
     expect(atlas).not.toContain(".terminal-surface")
-    expect(settings).toMatch(/--settings-type-helper:\s*12px/)
+    expect(settings).toMatch(/--settings-type-helper:\s*var\(--type-meta\)/)
     expect(settings).toMatch(
       /\.settings-dialog :where\(\.text-11-medium, \.text-10-medium\)\s*\{[^}]*font-size:\s*var\(--settings-type-helper\)/s,
     )

@@ -17,6 +17,7 @@ import { createMediaQuery } from "@solid-primitives/media"
 import { SessionTurn } from "@axiomics/ui/session-turn"
 import { createAutoScroll } from "@axiomics/ui/hooks"
 import { useSync } from "@/context/sync"
+import { useGlobalSync } from "@/context/global-sync"
 import { useSDK } from "@/context/sdk"
 import { useLayout } from "@/context/layout"
 import { usePrompt } from "@/context/prompt"
@@ -45,7 +46,9 @@ import {
   IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
+  IconCheckCircle,
   IconHome,
+  IconLayoutGrid,
   IconPlus,
   IconSearch,
   IconSettings,
@@ -74,8 +77,16 @@ import { useExecutionAuthority } from "@/atlas/use-execution-authority"
 import { sessionEntryTarget } from "@/pages/session-entry"
 import { shouldConfirmUndo, undoPreview, undoSummary, type UndoPreview } from "@/pages/session-undo"
 import { SessionContextUsage } from "@/components/session-context-usage"
+import { SessionEmptyHero, SessionStarterCards } from "@/pages/session-empty"
+import type { ShowcaseCase } from "@/pages/cases/catalog"
 import { estimate, latestContext, type ContextEstimate, type ContextSample } from "@/pages/session-context"
 import { CompactionBoundary, compaction, handoff } from "@/pages/session-compaction"
+import { prepareProjects, projectName as projectLabel } from "@/pages/home-projects"
+import { useProjectCreate } from "@/pages/project-create"
+import { projectPrefs } from "@/atlas/store/projectPrefs"
+import { projectHref } from "@/utils/project-route"
+import { signOut } from "@/pages/signout"
+import { takeDraft } from "@/pages/cases/draft"
 import "./session-header.css"
 import "./session-undo.css"
 import "../components/chat-surface.css"
@@ -532,6 +543,44 @@ export default function Page(): JSX.Element {
   }
 
   const messages = createMemo(() => (params.id ? (sync.data.message[params.id] ?? []) : []))
+
+  // The empty first screen only shows once we know the session has no turns.
+  // "new" has nothing to hydrate; a saved session waits for its message window
+  // so the greeting cannot flash in before the transcript lands.
+  const emptyConversation = createMemo(() => {
+    const id = params.id
+    if (!id || replay()) return false
+    if (id === "new") return messages().length === 0
+    return sync.data.message[id] !== undefined && messages().length === 0
+  })
+
+  // A starter card drafts its research question. It never sends: the first
+  // interaction stays free and the text is editable before anything runs.
+  function pickStarterCase(item: ShowcaseCase) {
+    const text = item.question
+    prompt.set([{ type: "text", content: text, start: 0, end: text.length }], text.length)
+    requestAnimationFrame(() => {
+      promptDockElement?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus()
+    })
+  }
+
+  // A visitor may type a question on the public page before signing in; it
+  // arrives here through localStorage. Fill the composer once and stop —
+  // sending stays the analyst's decision, and an existing draft is never
+  // overwritten.
+  let handoffConsumed = false
+  createEffect(() => {
+    if (handoffConsumed || replay() || !prompt.ready()) return
+    handoffConsumed = true
+    if (prompt.dirty()) return
+    const draft = takeDraft()
+    if (!draft) return
+    prompt.set([{ type: "text", content: draft, start: 0, end: draft.length }], draft.length)
+    requestAnimationFrame(() => {
+      promptDockElement?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus()
+    })
+  })
+
   const lastUserMessage = createMemo(() => {
     const ms = messages()
     for (let i = ms.length - 1; i >= 0; i--) if (ms[i].role === "user") return ms[i]
@@ -937,6 +986,10 @@ export default function Page(): JSX.Element {
   let conversationPanelElement: HTMLElement | undefined
   let promptDockElement: HTMLDivElement | undefined
   let promptDockObserver: ResizeObserver | undefined
+  let emptyObserver: ResizeObserver | undefined
+  let emptyHeroElement: HTMLElement | undefined
+  let emptyCardsElement: HTMLElement | undefined
+  let emptyMeasureFrame = 0
 
   const cancelRestoration = () => {
     restoration.target = undefined
@@ -994,6 +1047,41 @@ export default function Page(): JSX.Element {
     if (project()) layout.projects.open(project()!.worktree)
   })
 
+  // Centre the empty group from its measured height instead of a fixed
+  // fraction. The greeting, the composer and the starter index all change
+  // height — rows restack on narrow panes, titles wrap, and a locale switch
+  // rewrites every row — so a baked-in lift would push the last row into the
+  // bottom edge while the greeting drifted toward the top.
+  function measureEmptyState() {
+    const panel = conversationPanelElement
+    if (!panel || !promptDockElement || !emptyHeroElement || !emptyCardsElement) return
+    const lift = Math.round(
+      (panel.clientHeight -
+        promptDockElement.offsetHeight -
+        emptyHeroElement.offsetHeight +
+        emptyCardsElement.offsetHeight) /
+        2,
+    )
+    panel.style.setProperty("--session-empty-lift", `${Math.max(96, lift)}px`)
+  }
+
+  function queueEmptyMeasure() {
+    cancelAnimationFrame(emptyMeasureFrame)
+    emptyMeasureFrame = requestAnimationFrame(measureEmptyState)
+  }
+
+  // The lift is derived from four heights, so all four are watched. Watching
+  // the panel alone leaves the lift stale whenever the index changes height
+  // without the pane changing width or height — a locale switch, or a row
+  // restacking inside the same pane.
+  function observeEmptyParts() {
+    if (!emptyObserver) return
+    emptyObserver.disconnect()
+    for (const element of [conversationPanelElement, emptyHeroElement, emptyCardsElement]) {
+      if (element) emptyObserver.observe(element)
+    }
+  }
+
   onMount(() => {
     observer = new ResizeObserver(applyRestoration)
     if (contentElement) observer.observe(contentElement)
@@ -1003,15 +1091,23 @@ export default function Page(): JSX.Element {
       const height = Math.ceil(promptDockElement.getBoundingClientRect().height)
       if (height <= 0) return
       conversationPanelElement.style.setProperty("--workspace-composer-height", `${height}px`)
+      measureEmptyState()
     }
 
     measurePromptDock()
     promptDockObserver = new ResizeObserver(measurePromptDock)
     if (promptDockElement) promptDockObserver.observe(promptDockElement)
 
+    if (conversationPanelElement) {
+      emptyObserver = new ResizeObserver(queueEmptyMeasure)
+      observeEmptyParts()
+    }
+
     onCleanup(() => {
       observer?.disconnect()
       promptDockObserver?.disconnect()
+      emptyObserver?.disconnect()
+      cancelAnimationFrame(emptyMeasureFrame)
     })
   })
 
@@ -1073,7 +1169,7 @@ export default function Page(): JSX.Element {
             setMobileSessionsOpen(false)
             newSession()
           }}
-          onBack={() => navigate("/")}
+          onBack={() => navigate("/projects")}
           onCollapse={toggleSessions}
           onResize={(width, done) => {
             const next = clampSidebarWidth(width)
@@ -1145,7 +1241,7 @@ export default function Page(): JSX.Element {
                 if (!discardUnavailableSession(id, error)) prewarmed.delete(id)
               })
             }}
-            onBack={() => navigate("/")}
+            onBack={() => navigate("/projects")}
             onCases={() => navigate("/cases")}
             onExitReplay={exitReplay}
             onToggleSessions={() => setMobileSessionsOpen((open) => !open)}
@@ -1167,6 +1263,7 @@ export default function Page(): JSX.Element {
               role="tabpanel"
               aria-labelledby={sessionTabID(params.id ?? "new")}
               data-component="conversation-center"
+              data-empty={emptyConversation() ? "true" : undefined}
               aria-label={language.t("workspace.conversation")}
               style={{
                 display: "flex",
@@ -1438,6 +1535,15 @@ export default function Page(): JSX.Element {
                         </div>
                       </div>
                     </Match>
+                    <Match when={emptyConversation()}>
+                      <SessionEmptyHero
+                        ref={(element) => {
+                          emptyHeroElement = element
+                          observeEmptyParts()
+                          queueEmptyMeasure()
+                        }}
+                      />
+                    </Match>
                     <Match when={true}>
                       <div aria-hidden="true" style={{ flex: 1, "min-height": 0 }} />
                     </Match>
@@ -1475,6 +1581,17 @@ export default function Page(): JSX.Element {
                       <PromptInput />
                     </div>
                   </div>
+
+                  <Show when={emptyConversation()}>
+                    <SessionStarterCards
+                      onPick={pickStarterCase}
+                      ref={(element) => {
+                        emptyCardsElement = element
+                        observeEmptyParts()
+                        queueEmptyMeasure()
+                      }}
+                    />
+                  </Show>
                 </>
               </Show>
             </section>
@@ -1586,9 +1703,23 @@ function SessionsSidebar(props: {
   onPin: (id: string, pinned: boolean) => void
 }): JSX.Element {
   const language = useLanguage()
+  const sync = useSync()
+  const navigate = useNavigate()
   const compact = createMediaQuery("(max-width: 719px)")
   const mobileHidden = () => compact() && !props.mobileOpen
   let sidebar: HTMLElement | undefined
+
+  // Switching projects used to mean leaving the conversation for the list page.
+  // The same catalog the list page renders now lives one click from the title,
+  // newest first, so the common case never leaves the conversation.
+  const [projectMenu, setProjectMenu] = createSignal(false)
+  const createProject = useProjectCreate((project) => navigate(projectHref(project)))
+  // `sync.data.project` is the id of the project this pane is showing; the
+  // catalog the switcher lists lives on the global sync.
+  const catalog = useGlobalSync()
+  const recentProjects = createMemo(() =>
+    prepareProjects(catalog.data.project, projectPrefs.hidden(), projectPrefs.favorites()).slice(0, 6),
+  )
 
   createEffect(() => {
     if (!compact() || !props.mobileOpen || !sidebar) return
@@ -1644,16 +1775,44 @@ function SessionsSidebar(props: {
       }}
     >
       <div class="session-sidebar__top">
-        <button
-          type="button"
-          class="session-sidebar__project"
-          aria-label={language.t("workspace.sidebar.backProjects")}
-          data-tooltip={language.t("workspace.sidebar.projects")}
-          onClick={props.onBack}
-        >
-          <IconHome size={15} strokeWidth={1.5} />
-          <strong>{props.projectName}</strong>
-        </button>
+        <DropdownMenu open={projectMenu()} onOpenChange={setProjectMenu}>
+          <DropdownMenu.Trigger
+            class="session-sidebar__project"
+            aria-label={language.t("workspace.sidebar.switchProject")}
+            data-tooltip={language.t("workspace.sidebar.switchProject")}
+          >
+            <IconHome size={15} strokeWidth={1.5} />
+            <strong>{props.projectName}</strong>
+            <IconChevronDown class="session-sidebar__project-chevron" size={12} strokeWidth={1.5} />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content class="session-sidebar__project-menu">
+              <For each={recentProjects()}>
+                {(project) => (
+                  <DropdownMenu.Item
+                    aria-current={project.id === sync.data.project ? "true" : undefined}
+                    data-current={project.id === sync.data.project ? "true" : undefined}
+                    onSelect={() => navigate(projectHref(project))}
+                  >
+                    <DropdownMenu.ItemLabel>{projectLabel(project)}</DropdownMenu.ItemLabel>
+                    <Show when={project.id === sync.data.project}>
+                      <IconCheckCircle size={12} strokeWidth={1.5} />
+                    </Show>
+                  </DropdownMenu.Item>
+                )}
+              </For>
+              <DropdownMenu.Separator />
+              <DropdownMenu.Item onSelect={props.onBack}>
+                <IconLayoutGrid size={12} strokeWidth={1.5} />
+                <DropdownMenu.ItemLabel>{language.t("workspace.sidebar.allProjects")}</DropdownMenu.ItemLabel>
+              </DropdownMenu.Item>
+              <DropdownMenu.Item onSelect={() => createProject.show()}>
+                <IconPlus size={12} strokeWidth={1.5} />
+                <DropdownMenu.ItemLabel>{language.t("workspace.sidebar.newProject")}</DropdownMenu.ItemLabel>
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu>
         <button
           type="button"
           class="session-sidebar__collapse"
@@ -1808,6 +1967,9 @@ function SessionsSidebar(props: {
       <A href="/cases" class="session-case-link">
         {language.t("cases.title")}
       </A>
+      <button type="button" class="session-signout" onClick={() => void signOut()}>
+        {language.t("workspace.sidebar.signout")}
+      </button>
     </aside>
   )
 }

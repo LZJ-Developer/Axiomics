@@ -53,10 +53,10 @@ const SETTINGS_STYLES = `
   --settings-toggle-active: var(--surface-brand-base);
   --settings-shadow-modal: var(--atlas-shadow-md, var(--shadow-lg));
   --settings-shadow-card: none;
-  --settings-type-title: 18px;
-  --settings-type-heading: 13px;
-  --settings-type-body: 13px;
-  --settings-type-helper: 12px;
+  --settings-type-title: var(--type-display);
+  --settings-type-heading: var(--type-ui);
+  --settings-type-body: var(--type-ui);
+  --settings-type-helper: var(--type-meta);
   --settings-leading-title: 24px;
   --settings-leading-body: 20px;
   --settings-leading-helper: 18px;

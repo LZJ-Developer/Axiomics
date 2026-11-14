@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { FONT_CODE, FONT_SANS, RADIUS, SURFACE_RADIUS } from "./tokens"
 
 const SANS =
-  '"Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+  '"Inter Variable", Inter, "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
 
 describe("workspace font tokens", () => {
   test("uses the exact canonical sans fallback in TypeScript", () => {

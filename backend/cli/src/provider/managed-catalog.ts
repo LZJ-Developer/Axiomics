@@ -13,7 +13,9 @@ export const MANAGED_OPENROUTER_MODELS = Object.freeze([
   "z-ai/glm-5.3",
   "z-ai/glm-5.3-flash",
   "deepseek/deepseek-v4-pro",
+  "deepseek/deepseek-v4.1-flash-1017",
   "deepseek/deepseek-v4-flash",
+  "deepseek/deepseek-v4-flash-vision-exp",
   "qwen/qwen3.8-max",
   "qwen/qwen3.8-flash",
   "moonshotai/kimi-k3",
@@ -106,8 +108,21 @@ export const MANAGED_MODEL_DETAILS: Record<(typeof MANAGED_OPENROUTER_MODELS)[nu
     output: 131_072,
     input: ["text", "image", "video"],
   },
-  "deepseek/deepseek-v4-pro": { name: "DeepSeek V4 Pro", context: 1_048_576, output: 384_000, input: ["text"] },
-  "deepseek/deepseek-v4-flash": { name: "DeepSeek V4 Flash", context: 1_048_576, output: 384_000, input: ["text"] },
+  "deepseek/deepseek-v4-pro": { name: "DeepSeek V4 Pro", context: 1_048_576, output: 393_216, input: ["text"] },
+  // V4.1 Flash, released 2026-10-17; the direct DeepSeek API serves it as `deepseek-flash`.
+  "deepseek/deepseek-v4.1-flash-1017": {
+    name: "DeepSeek V4.1 Flash 1017",
+    context: 1_048_576,
+    output: 393_216,
+    input: ["text", "image"],
+  },
+  "deepseek/deepseek-v4-flash": { name: "DeepSeek V4 Flash", context: 1_048_576, output: 943_717, input: ["text"] },
+  "deepseek/deepseek-v4-flash-vision-exp": {
+    name: "DeepSeek V4 Flash Vision (exp)",
+    context: 1_048_576,
+    output: 262_144,
+    input: ["text", "image"],
+  },
   "qwen/qwen3.8-max": { name: "Qwen 3.8 Max", context: 1_000_000, output: 131_072, input: ["text", "image", "video"] },
   // Official Flash-Next production API: https://qwen.ai/blog?id=qwen3.8-flash-next
   "qwen/qwen3.8-flash": {

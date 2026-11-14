@@ -38,7 +38,7 @@
   padding: 0 10px;
   border-radius: var(--atlas-radius-sm);
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-size: var(--type-ui);
   font-weight: var(--font-weight-medium);
   text-decoration: none;
 }
@@ -60,21 +60,21 @@
   box-shadow: var(--shadow-xs);
 }
 
-.cases-nav > p {
-  margin: auto 8px 0;
-  color: var(--color-text-muted);
-  font-size: 11px;
-  line-height: 1.55;
-}
-
 .cases-page {
   min-width: 0;
   min-height: 0;
   padding: clamp(30px, 4vw, 62px) clamp(28px, 6vw, 92px) 70px;
   overflow: auto;
+  /* The gallery owns the viewport; a visible scrollbar on the right edge
+     competes with the case grid and reads as a second navigation rail. */
+  scrollbar-width: none;
   background:
     radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--color-border) 42%, transparent) 1px, transparent 0) 0 0 / 18px 18px,
     var(--color-bg);
+}
+
+.cases-page::-webkit-scrollbar {
+  display: none;
 }
 
 .cases-header,
@@ -99,7 +99,7 @@
 
 .cases-eyebrow {
   color: var(--surface-brand-base);
-  font-size: 12px;
+  font-size: var(--type-meta);
   font-weight: var(--font-weight-emphasis);
   letter-spacing: 0.08em;
 }
@@ -115,7 +115,7 @@
   max-width: 720px;
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 14px;
+  font-size: var(--type-body);
   line-height: 1.7;
 }
 
@@ -135,12 +135,14 @@
 
 .cases-stats dt {
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--type-label);
+  font-weight: var(--font-weight-medium);
 }
 
 .cases-stats dd {
   margin: 0;
   font-size: 26px;
+  line-height: 1.1;
   font-weight: var(--font-weight-emphasis);
   font-variant-numeric: tabular-nums;
 }
@@ -177,7 +179,7 @@
   color: var(--color-text);
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--type-ui);
 }
 
 .cases-search input::placeholder {
@@ -200,7 +202,7 @@
   border-radius: 999px;
   color: var(--color-text-muted);
   background: var(--surface-base);
-  font-size: 12px;
+  font-size: var(--type-meta);
   cursor: pointer;
 }
 
@@ -237,12 +239,12 @@
 
 .cases-results h2 {
   margin: 0;
-  font-size: 19px;
+  font-size: var(--type-display);
 }
 
 .cases-results span {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--type-meta);
 }
 
 .cases-grid {
@@ -326,7 +328,8 @@
   color: #fff;
   background: rgb(9 24 29 / 80%);
   box-shadow: 0 5px 18px rgb(0 0 0 / 22%);
-  font-size: 14px;
+  font-size: var(--type-body);
+  font-weight: var(--font-weight-medium);
   backdrop-filter: blur(8px);
 }
 
@@ -340,7 +343,7 @@
 
 .case-meta > span:last-child {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--type-meta);
 }
 
 .case-tags {
@@ -355,13 +358,14 @@
   border-radius: 999px;
   color: var(--color-text-muted);
   background: var(--surface-base);
-  font-size: 10px;
+  font-size: var(--type-micro);
   font-weight: var(--font-weight-medium);
 }
 
 .case-title {
   font-size: clamp(17px, 1.5vw, 21px);
   line-height: 1.35;
+  font-weight: var(--font-weight-emphasis);
 }
 
 .case-story {
@@ -374,20 +378,20 @@
   grid-template-columns: 36px minmax(0, 1fr);
   gap: 8px;
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--type-meta);
   line-height: 1.55;
 }
 
 .case-story b {
   color: var(--color-text);
-  font-size: 11px;
-  font-weight: var(--font-weight-emphasis);
+  font-size: var(--type-label);
+  font-weight: var(--font-weight-medium);
 }
 
 .case-card .case-action {
   margin-top: auto;
   color: var(--surface-brand-base);
-  font-size: 12px;
+  font-size: var(--type-meta);
   font-weight: var(--font-weight-emphasis);
 }
 
@@ -396,7 +400,7 @@
   display: grid;
   place-items: center;
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-size: var(--type-ui);
 }
 
 @media (max-width: 900px) {
@@ -421,9 +425,6 @@
   }
   .cases-nav nav a[aria-current="page"] {
     font-size: 0;
-  }
-  .cases-nav > p {
-    display: none;
   }
   .cases-header {
     gap: 24px;
@@ -459,7 +460,7 @@
     width: auto;
     gap: 7px;
     padding: 0 10px;
-    font-size: 12px;
+    font-size: var(--type-meta);
   }
   .cases-page {
     overflow: visible;
@@ -481,6 +482,10 @@
 }
 
 .case-replay {
+  /* The workbench measures the dock and writes the exact value inline. The
+     public entry has no session shell, so keep a safe reserve here: without it
+     the last lines scroll underneath the floating player controls. */
+  --workspace-composer-height: calc(76px + env(safe-area-inset-bottom));
   position: relative;
   flex: 1;
   min-width: 0;
@@ -521,12 +526,12 @@
   align-items: center;
   gap: 8px;
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--type-meta);
 }
 .case-replay-empty {
   margin: 24px 16px;
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--type-meta);
 }
 .case-player-dock {
   padding-top: 8px;
@@ -539,7 +544,8 @@
   border-radius: var(--radius-lg);
   background: var(--surface-raised-base);
   box-shadow: var(--shadow-xs);
-  font-family: var(--font-sans);
+  font-family: var(--font-family-sans);
+  font-size: var(--type-ui);
 }
 .case-player button,
 .case-replay-status button {
@@ -589,7 +595,8 @@
 }
 .case-player__position {
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--type-meta);
+  font-weight: var(--font-weight-medium);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

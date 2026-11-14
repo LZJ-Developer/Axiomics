@@ -172,7 +172,7 @@ describe("ProjectsWorkbench", () => {
     expect(host.querySelector("button.atlas-wordmark")).toBeNull()
     expect(host.querySelector('[role="img"][aria-label="Axiomics"]')).toBeTruthy()
     const wordmark = host.querySelector<HTMLElement>(".atlas-wordmark > span")
-    expect(wordmark?.style.fontSize).toBe("14.5px")
+    expect(wordmark?.style.fontSize).toBe("14px")
     expect(wordmark?.style.fontWeight).toBe("var(--font-weight-emphasis)")
   })
 
@@ -302,7 +302,7 @@ describe("ProjectsWorkbench", () => {
     expect(css).toContain("width: min(100%, 1040px)")
     expect(css).toContain("font-size: 29px")
     expect(css).toContain("min-height: 64px")
-    expect(css).toContain("font-size: 14.5px")
+    expect(css).toContain("font-size: var(--type-body)")
     expect(css).toContain("@media (max-width: 760px)")
     expect(css).toContain("@media (max-width: 520px)")
     expect(css).toContain("@media (pointer: coarse)")

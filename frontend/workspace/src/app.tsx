@@ -1,9 +1,5 @@
-import "@/index.css"
-import { ErrorBoundary, Show, Suspense, lazy, onCleanup, onMount, type ParentProps } from "solid-js"
+import { Show, Suspense, lazy, onCleanup, onMount, type ParentProps } from "solid-js"
 import { A, Router, Route, Navigate } from "@solidjs/router"
-import { MetaProvider } from "@solidjs/meta"
-import { I18nProvider } from "@axiomics/ui/context"
-import { ThemeProvider } from "@axiomics/ui/theme"
 import { GlobalSyncProvider } from "@/context/global-sync"
 import { PermissionProvider } from "@/context/permission"
 import { LayoutProvider } from "@/context/layout"
@@ -13,20 +9,21 @@ import { SettingsProvider } from "@/context/settings"
 import { CommentsProvider } from "@/context/comments"
 import { NotificationProvider } from "@/context/notification"
 import { ModelsProvider } from "@/context/models"
-import { DialogProvider } from "@axiomics/ui/context/dialog"
 import { CommandProvider } from "@/context/command"
-import { LanguageProvider, useLanguage } from "@/context/language"
+import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import Layout from "@/pages/layout"
 import DirectoryLayout from "@/pages/directory-layout"
-import { ErrorPage } from "./pages/error"
 import { resolveDefaultServerUrl } from "@/config/server-url"
 import { AsciiSpinner } from "@/atlas/shared/AsciiSpinner"
 import { DesktopOnboarding } from "@/atlas/DesktopOnboarding"
 import Home from "@/pages/home"
+import Projects from "@/pages/projects"
 import { Session } from "@/pages/session-loader"
 import { DEFAULT_PANEL, preloadPanel } from "@/components/settings/registry"
-import "./app.css"
+import { AppBaseProviders } from "./app-base"
+
+export { AppBaseProviders }
 
 const CasesGallery = lazy(() => import("@/pages/cases-gallery"))
 
@@ -44,38 +41,17 @@ const NotFound = () => (
     <span class="app-not-found__eyebrow">404</span>
     <h1 id="not-found-title">Page Not Found</h1>
     <p>This address does not match a project, session, or Axiomics workspace.</p>
-    <A class="app-not-found__action" href="/">
+    <A class="app-not-found__action" href="/projects">
       Back to Projects
     </A>
   </main>
 )
-
-function UiI18nBridge(props: ParentProps) {
-  const language = useLanguage()
-  return <I18nProvider value={{ locale: language.locale, t: language.t }}>{props.children}</I18nProvider>
-}
 
 declare global {
   interface Window {
     __AXIOMICS__?: { updaterEnabled?: boolean; deepLinks?: string[] }
     __AXIOMICS_BASE_URL__?: string
   }
-}
-
-export function AppBaseProviders(props: ParentProps) {
-  return (
-    <MetaProvider>
-      <ThemeProvider defaultTheme="axiomics">
-        <LanguageProvider>
-          <UiI18nBridge>
-            <ErrorBoundary fallback={(error) => <ErrorPage error={error} />}>
-              <DialogProvider>{props.children}</DialogProvider>
-            </ErrorBoundary>
-          </UiI18nBridge>
-        </LanguageProvider>
-      </ThemeProvider>
-    </MetaProvider>
-  )
 }
 
 function ServerKey(props: ParentProps) {
@@ -167,6 +143,14 @@ export function AppInterface(props: { defaultUrl?: string }) {
                   )}
                 />
                 <Route
+                  path="/projects"
+                  component={() => (
+                    <Suspense fallback={<Loading />}>
+                      <Projects />
+                    </Suspense>
+                  )}
+                />
+                <Route
                   path="/cases"
                   component={() => (
                     <Suspense fallback={<Loading />}>
@@ -174,6 +158,8 @@ export function AppInterface(props: { defaultUrl?: string }) {
                     </Suspense>
                   )}
                 />
+                {/* Declared before the project catch-all: `/projects` is a page,
+                    not a project segment. */}
                 <Route path="/:dir" component={DirectoryLayout}>
                   <Route path="/" component={() => <Navigate href="session" />} />
                   <Route

@@ -46,7 +46,7 @@ export function DisconnectedPanel(): JSX.Element {
           <div
             style={{
               "font-family": FONT_SANS,
-              "font-size": "12.5px",
+              "font-size": "var(--type-ui)",
               "font-weight": "var(--font-weight-medium)",
               color: "var(--color-text)",
             }}
@@ -56,7 +56,7 @@ export function DisconnectedPanel(): JSX.Element {
           <div
             style={{
               "font-family": FONT_SANS,
-              "font-size": "11.5px",
+              "font-size": "var(--type-meta)",
               color: "var(--color-text-muted)",
               overflow: "hidden",
               "text-overflow": "ellipsis",

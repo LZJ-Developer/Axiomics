@@ -365,8 +365,14 @@ class PythonKernel implements Kernel {
     })
     if (view) view.env = PathSpace.payloadEnv(view, env)
     const envOverlay = Sandbox.envOverlay(Instance.project.id)
+    // A named environment's interpreter lives under the project root. Inside
+    // the view that root is mounted only under its model spelling, and Python
+    // locates `pyvenv.cfg` next to the executable it was started as. Running
+    // the host spelling would fall back to the base interpreter with no
+    // venv site-packages, so execute the same file at the path the mount uses.
+    const spawnBinary = view ? PathSpace.toModel(view.roots, interpreter.binary) : interpreter.binary
     const sandboxed = Sandbox.wrapArgv({
-      file: interpreter.binary,
+      file: spawnBinary,
       args: ["-u", scriptPath],
       workspace,
       readable,
@@ -863,11 +869,13 @@ async function executePython(params: PythonInput, ctx: Tool.Context, compatibili
     await KernelRuntime.release(identity)
   } else {
     // Executes arbitrary code — same permission gate as bash.
+    // The classifier reads `shell.command`; an empty metadata object classifies
+    // as "unknown" and forces a prompt even in unattended sandbox mode.
     await ctx.ask({
       permission: "bash",
       patterns: ["python"],
       always: ["python*"],
-      metadata: {},
+      metadata: { shell: { command: "python" } },
     })
   }
 

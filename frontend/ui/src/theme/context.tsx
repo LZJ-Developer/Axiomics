@@ -75,11 +75,20 @@ function cacheThemeVariants(theme: DesktopTheme, themeId: string) {
 
 export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
   name: "Theme",
-  init: (props: { defaultTheme?: string; lockedTheme?: string; lockedScheme?: Exclude<ColorScheme, "system"> }) => {
+  init: (props: {
+    defaultTheme?: string
+    lockedTheme?: string
+    lockedScheme?: Exclude<ColorScheme, "system">
+    /** Display-only override: wins over the saved preference and is never
+     * written back. Used by surfaces that must not inherit a dark workbench
+     * preference (the public cases entry). */
+    initialScheme?: Exclude<ColorScheme, "system">
+  }) => {
     const lockedTheme = props.lockedTheme && DEFAULT_THEMES[props.lockedTheme] ? props.lockedTheme : undefined
     const lockedScheme = props.lockedScheme
-    // Start in light mode; preserve explicit saved display preferences.
-    const initialScheme = lockedScheme ?? getStoredColorScheme() ?? "light"
+    // Start in light mode; preserve explicit saved display preferences unless
+    // the surface explicitly overrides them for display only.
+    const initialScheme = lockedScheme ?? props.initialScheme ?? getStoredColorScheme() ?? "light"
     const [store, setStore] = createStore({
       themes: DEFAULT_THEMES as Record<string, DesktopTheme>,
       themeId: lockedTheme ?? props.defaultTheme ?? "axiomics",
@@ -113,7 +122,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         setStore("colorScheme", lockedScheme)
         setStore("mode", lockedScheme)
         localStorage.setItem(STORAGE_KEYS.COLOR_SCHEME, lockedScheme)
-      } else if (savedScheme) {
+      } else if (savedScheme && !props.initialScheme) {
         setStore("colorScheme", savedScheme)
         if (savedScheme !== "system") {
           setStore("mode", savedScheme)

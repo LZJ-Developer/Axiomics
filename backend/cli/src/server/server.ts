@@ -397,8 +397,9 @@ export namespace Server {
         )
         .use(validator("query", z.object({ directory: z.string().optional() })))
         // Deployment capabilities the client must honour before it renders a
-        // surface. Today only the terminal; a policy flag rather than a user
-        // preference, so a site sets it once for every session.
+        // surface. `user` is the identity the authenticating proxy copied onto
+        // the request (Remote-User); it is absent when the server is reached
+        // directly, so the client must treat it as optional.
         .get(
           "/capabilities",
           describeRoute({
@@ -410,14 +411,20 @@ export namespace Server {
                 description: "Enabled deployment capabilities",
                 content: {
                   "application/json": {
-                    schema: resolver(z.object({ terminal: z.boolean(), locale: z.string().nullable() })),
+                    schema: resolver(
+                      z.object({ terminal: z.boolean(), locale: z.string().nullable(), user: z.string().nullable() }),
+                    ),
                   },
                 },
               },
             },
           }),
           async (c) =>
-            c.json({ terminal: !Flag.AXIOMICS_DISABLE_TERMINAL, locale: Flag.AXIOMICS_UI_LOCALE ?? null }),
+            c.json({
+              terminal: !Flag.AXIOMICS_DISABLE_TERMINAL,
+              locale: Flag.AXIOMICS_UI_LOCALE ?? null,
+              user: c.req.header("Remote-User") ?? null,
+            }),
         )
         .route("/project", ProjectRoutes())
         .route("/pty", PtyRoutes())

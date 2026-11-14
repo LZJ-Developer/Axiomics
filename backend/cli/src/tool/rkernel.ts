@@ -291,8 +291,12 @@ class RKernel implements Kernel {
     })
     if (view) view.env = PathSpace.payloadEnv(view, env)
     const envOverlay = Sandbox.envOverlay(Instance.project.id)
+    // The same rule as the Python kernel: inside the view a project-local
+    // interpreter is reachable only under its model spelling, and R derives
+    // its home from the executable path it was started as.
+    const spawnBinary = view ? PathSpace.toModel(view.roots, interpreter.binary) : interpreter.binary
     const sandboxed = Sandbox.wrapArgv({
-      file: interpreter.binary,
+      file: spawnBinary,
       args: ["--vanilla", scriptPath],
       workspace,
       readable,
@@ -722,11 +726,13 @@ async function executeR(params: RInput, ctx: Tool.Context, compatibilityNamed: b
     })
     await KernelRuntime.release(identity)
   } else {
+    // The classifier reads `shell.command`; an empty metadata object classifies
+    // as "unknown" and forces a prompt even in unattended sandbox mode.
     await ctx.ask({
       permission: "bash",
       patterns: ["R"],
       always: ["Rscript*"],
-      metadata: {},
+      metadata: { shell: { command: "R" } },
     })
   }
 

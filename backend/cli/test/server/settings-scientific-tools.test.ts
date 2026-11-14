@@ -26,13 +26,13 @@ describe("scientific tools settings catalog", () => {
     }
 
     expect(body.schema_version).toBe(1)
-    expect(body.capabilities).toHaveLength(61)
+    expect(body.capabilities).toHaveLength(65)
     expect(body.counts).toEqual({
-      total: 61,
-      packaged: 12,
+      total: 65,
+      packaged: 16,
       hosted: 10,
       verified: 0,
-      experimental: 59,
+      experimental: 63,
       blocked: 2,
     })
     expect(body.connectors.map((entry) => entry.id)).toEqual([

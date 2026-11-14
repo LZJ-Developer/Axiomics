@@ -10,6 +10,7 @@ import { KernelRuntime } from "../../src/science/kernel/registry"
 import { KernelMetrics } from "../../src/science/kernel/metrics"
 import { Sandbox } from "../../src/sandbox/sandbox"
 import { SessionFilesystem } from "../../src/session/filesystem"
+import { PathSpace } from "../../src/session/path-space"
 import fs from "node:fs/promises"
 import path from "node:path"
 
@@ -626,8 +627,14 @@ describe("/notebook routes", () => {
         const app = NotebookRoutes()
         const session = await Session.create({})
         const workspace = await SessionFilesystem.workspace(session.id)
+        const roots = await PathSpace.roots(session.id)
         const firstRelease = path.join(workspace, ".release-first-cell")
         const secondRelease = path.join(workspace, ".release-second-cell")
+        // The kernel sees the workspace under its model spelling; the test
+        // releases the sentinel by writing the host file, which is the same
+        // directory through the mount.
+        const firstReleaseView = PathSpace.toModel(roots, firstRelease)
+        const secondReleaseView = PathSpace.toModel(roots, secondRelease)
         const execute = (code: string) =>
           app.request("/execute", {
             method: "POST",
@@ -669,7 +676,7 @@ describe("/notebook routes", () => {
         const pending: Array<ReturnType<typeof execute>> = []
 
         try {
-          const firstCode = `(${waitUntilExists(firstRelease)}, globals().__setitem__('queue_value', ['first']), 'first')[-1]`
+          const firstCode = `(${waitUntilExists(firstReleaseView)}, globals().__setitem__('queue_value', ['first']), 'first')[-1]`
           const first = execute(firstCode)
           pending.push(first)
           await waitForStatus(
@@ -681,7 +688,7 @@ describe("/notebook routes", () => {
               value.last_cell?.code === firstCode &&
               value.last_cell.execution_count === 1,
           )
-          const secondCode = `(${waitUntilExists(secondRelease)}, queue_value.append('second'), queue_value)[-1]`
+          const secondCode = `(${waitUntilExists(secondReleaseView)}, queue_value.append('second'), queue_value)[-1]`
           const second = execute(secondCode)
           pending.push(second)
           const queued = await waitForStatus(
@@ -1630,6 +1637,12 @@ describe("/notebook routes", () => {
         expect(plain.outputs.some((output) => output.text?.trim() === "True")).toBe(true)
         expect(isolated.ok).toBe(true)
         expect(isolated.outputs.some((output) => output.text?.trim() === "99")).toBe(true)
+        // A successful import can come from an inherited PYTHONPATH. Assert
+        // the interpreter identity too, so silently falling back to the base
+        // Python (no venv site-packages) cannot pass this test.
+        const identity = await execute("nbody", "import sys; print('PREFIX=' + sys.prefix)")
+        const identityText = identity.outputs.map((output) => output.text ?? "").join("")
+        expect(identityText).toMatch(/PREFIX=.*\.venv[\\/]nbody/)
 
         const [plainState, isolatedState, plainStatus, isolatedStatus] = await Promise.all([
           execute("python", "x + 1", "other.ipynb"),

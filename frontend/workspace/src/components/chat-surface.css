@@ -480,7 +480,7 @@
 
 .session-scroller [data-slot="session-turn-generated"] > header {
   color: var(--color-text-muted, var(--text-weak));
-  font-size: 11.5px;
+  font-size: var(--type-meta);
   font-weight: var(--font-weight-regular);
   letter-spacing: normal;
   text-transform: none;

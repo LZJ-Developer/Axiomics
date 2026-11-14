@@ -1,7 +1,7 @@
 {
   "$schema": "https://axiomics.ai/config.json",
-  "model": "deepseek/deepseek-v4-flash-vision-exp",
-  "small_model": "deepseek/deepseek-v4-flash-vision-exp",
+  "model": "deepseek/deepseek-flash",
+  "small_model": "deepseek/deepseek-flash",
   // "plugin": ["axiomics-openai-codex-auth"],
   "provider": {
     "axiomics": {
