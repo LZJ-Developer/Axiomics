@@ -135,5 +135,27 @@ done
   || bad "linger 未开 —— systemd --user 单元只在登录时跑"
 
 echo
+echo "6. 配置一致性"
+# 第 2 段是直连租户端口，绕过网关；map 与 gateway/*.caddy 的漂移必须在这里补上，
+# 否则会出现“直连 200、用户侧 404、自检全绿”的假阳性。
+CONSISTENCY="$AX_ROOT/bin/axiomics-user"
+if [ -x "$CONSISTENCY" ]; then
+  consistency_out=$("$CONSISTENCY" check --quiet 2>&1)
+  consistency_rc=$?
+  if [ "$consistency_rc" -eq 0 ]; then
+    ok "GPU 侧一致（tenants.map ↔ gateway ↔ 目录 ↔ token）"
+    # WARN/INFO 不阻断闸门，但仍是可行动的信息。
+    printf '%s\n' "$consistency_out" | grep -E '^(WARN|INFO) ' | sed 's/^/    /' || true
+  else
+    bad "GPU 侧配置漂移"
+    printf '%s\n' "$consistency_out" | sed 's/^/    /'
+  fi
+  # 边界说明：Casdoor 身份侧只能在 Web 上核对（GPU→Web 不通），不计入通过项。
+  printf '%s\n' "$consistency_out" | sed -n 's/^NOTE /    - /p'
+else
+  note "没有 axiomics-user，跳过配置一致性"
+fi
+
+echo
 printf '通过 %d  失败 %d  跳过 %d\n' "$pass" "$fail" "$skip"
 [ "$fail" -eq 0 ]

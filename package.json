@@ -19,6 +19,7 @@
     "format:check": "prettier --check .",
     "test:ui": "cd frontend/ui && bun run ../../tooling/repo/test.ts",
     "test:sdk": "cd tooling/sdk/js && bun run ../../../tooling/repo/test.ts",
+    "test:deploy": "bash tooling/multitenant/tests/run-all.sh",
     "check": "bun run format:check && bun run typecheck && bun run test && bun run test:ui && bun run test:sdk",
     "check:fast": "bun run format:check && turbo typecheck --filter=@axiomics/axiomics",
     "accept:multimodal": "bun ./tooling/acceptance-multimodal.ts",

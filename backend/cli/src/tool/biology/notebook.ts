@@ -389,12 +389,14 @@ export const NotebookTool = Tool.define("notebook", {
   async execute(params, ctx) {
     const timeout = Math.min(Math.max(params.timeout, 5_000), 600_000)
 
-    // Same permission as bash — this executes arbitrary code
+    // Same permission as bash — this executes arbitrary code.
+    // The classifier reads `shell.command`; an empty metadata object classifies
+    // as "unknown" and forces a prompt even in unattended sandbox mode.
     await ctx.ask({
       permission: "bash",
       patterns: ["python (notebook)"],
       always: ["python*"],
-      metadata: {},
+      metadata: { shell: { command: "python" } },
     })
 
     return serialize(ctx.sessionID, async () => {

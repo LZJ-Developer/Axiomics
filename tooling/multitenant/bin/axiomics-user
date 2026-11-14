@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+# 用户开通薄封装（Phase 8）：本期只做 dry-run 与一致性检查，不写任何状态。
+#
+# 为什么默认只读：身份在 Web（Casdoor），租户在 GPU（axiomics-tenant），两机之间
+# 没有管理通道（GPU→Web 不通）。把两步包成"一个原子动作"只会制造半开半关的账号。
+# 所以这里只负责两件事：
+#   1) 算清楚要做什么（add/del 预演，打印人工要执行的命令）；
+#   2) 检查 GPU 侧的映射是否漂移（map ↔ gateway ↔ 目录 ↔ token）。
+# 真正的写入仍由两个既有工具在各自机器上执行，顺序见输出。
+set -euo pipefail
+
+_self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -z "${AX_ROOT:-}" ]; then
+  if [ -d "$_self_root/bin" ] && { [ -f "$_self_root/tenants.map" ] || [ -d "$_self_root/logs" ]; }; then
+    AX_ROOT="$_self_root"
+  else
+    AX_ROOT=/srv/axiomics
+  fi
+fi
+TENANTS="$AX_ROOT/tenants"
+MAP="$AX_ROOT/tenants.map"
+GW="$AX_ROOT/gateway"
+RETIRED="$AX_ROOT/retired.log"
+PORT_BASE="${AX_PORT_BASE:-42101}"
+TENANT_CMD="$AX_ROOT/bin/axiomics-tenant"
+
+die() { echo "错误：$*" >&2; exit 2; }
+say() { printf '%s\n' "$*"; }
+
+usage() {
+  cat <<'EOF'
+用法：
+  axiomics-user add <用户名> [--gpu N]   # 预演开通（默认 dry-run）
+  axiomics-user del <用户名>             # 预演回收（默认 dry-run）
+  axiomics-user check [--quiet]          # 比对 tenants.map / gateway maps / 目录 / token
+
+本期只读：不会创建用户、租户，也不会修改任何文件。真实开通需按输出里的
+命令，分别在 Web 与 GPU 上执行。传入 --apply 会被拒绝。
+EOF
+}
+
+next_id() {
+  local max=0 id n from
+  from=$(awk '{print $2}' "$MAP" 2>/dev/null || true)
+  from+=$'\n'$(awk '{print $1}' "$RETIRED" 2>/dev/null || true)
+  while read -r id; do
+    [ -n "$id" ] || continue
+    n=${id#u}
+    # 10# 与 axiomics-tenant 保持一致：u0008 这类前导零不能按八进制解析。
+    [[ "$n" =~ ^[0-9]+$ ]] && [ "$((10#$n))" -gt "$max" ] && max=$((10#$n))
+  done <<<"$from"
+  printf 'u%04d' $((max + 1))
+}
+
+next_port() {
+  local p=$PORT_BASE
+  while :; do
+    ss -ltn 2>/dev/null | grep -q ":$p " && { p=$((p + 1)); continue; }
+    awk -v p="$p" '$3 == p { found = 1 } END { exit !found }' "$MAP" 2>/dev/null \
+      && { p=$((p + 1)); continue; }
+    break
+  done
+  echo "$p"
+}
+
+# ── check ────────────────────────────────────────────────────────────────
+gateway_has() { # <file> <awk-condition...> 由调用方给出完整匹配表达式
+  local f=$1; shift
+  [ -f "$f" ] || return 1
+  awk "$@" "$f"
+}
+
+cmd_check() {
+  local quiet=0
+  [ "${1:-}" = "--quiet" ] && quiet=1
+  [ -f "$MAP" ] || die "找不到 $MAP"
+
+  local errors=0 warns=0 line user tid port gpu
+  declare -A seen_user=() seen_tid=() seen_port=()
+  declare -A map_tid=() map_port=() map_user=()
+
+  while read -r user tid port gpu; do
+    [ -n "${user:-}" ] || continue
+    if [ -z "${tid:-}" ] || [ -z "${port:-}" ]; then
+      say "DRIFT map 行字段不足：$user"
+      errors=$((errors + 1)); continue
+    fi
+
+    # 重复项：map 是唯一事实源，重复即漂移。
+    [ -n "${seen_user[$user]:-}" ] && { say "DRIFT 用户重复：$user"; errors=$((errors + 1)); }
+    [ -n "${seen_tid[$tid]:-}" ]   && { say "DRIFT 租户号重复：$tid"; errors=$((errors + 1)); }
+    [ -n "${seen_port[$port]:-}" ] && { say "DRIFT 端口重复：$port"; errors=$((errors + 1)); }
+    seen_user[$user]=1; seen_tid[$tid]=1; seen_port[$port]=1
+    map_tid[$user]=$tid; map_port[$user]=$port; map_user[$tid]=$user
+
+    # 目录与 token
+    [ -d "$TENANTS/$tid" ] || { say "DRIFT 缺租户目录：$TENANTS/$tid"; errors=$((errors + 1)); }
+    if [ -f "$TENANTS/$tid/token" ]; then
+      local mode
+      mode=$(stat -c '%a' "$TENANTS/$tid/token" 2>/dev/null || echo '?')
+      [ "$mode" = "600" ] || { say "WARN token 权限 $mode（期望 600）：$tid"; warns=$((warns + 1)); }
+    else
+      say "DRIFT 缺 token：$TENANTS/$tid/token"; errors=$((errors + 1))
+    fi
+
+    # gateway 三张 map 必须逐行对得上
+    gateway_has "$GW/tenants.caddy" -v u="$user" -v t="$tid" \
+      '$1 == u && $2 == t { f = 1 } END { exit !f }' \
+      || { say "DRIFT gateway/tenants.caddy 缺：$user $tid"; errors=$((errors + 1)); }
+    gateway_has "$GW/upstreams.caddy" -v t="$tid" -v p="127.0.0.1:$port" \
+      '$1 == t && $2 == p { f = 1 } END { exit !f }' \
+      || { say "DRIFT gateway/upstreams.caddy 缺：$tid 127.0.0.1:$port"; errors=$((errors + 1)); }
+    gateway_has "$GW/tokens.caddy" -v t="$tid" -v pat="/tenants/$tid/token" \
+      'index($0, t " ") == 1 && index($0, pat) { f = 1 } END { exit !f }' \
+      || { say "DRIFT gateway/tokens.caddy 缺：$tid 的 token 引用"; errors=$((errors + 1)); }
+
+    # 容器状态：被回收（stopped）是设计内状态，由激活器唤醒；不存在才要人管。
+    if ! podman ps --filter "name=^ax-$tid$" --format '{{.Names}}' 2>/dev/null | grep -q .; then
+      if podman ps -a --filter "name=^ax-$tid$" --format '{{.Names}}' 2>/dev/null | grep -q .; then
+        [ "$quiet" -eq 1 ] || say "INFO $tid 已停止（可被 ensure 唤醒）"
+      else
+        say "WARN $tid 容器不存在（检查 axiomics-tenant start）"; warns=$((warns + 1))
+      fi
+    fi
+  done <"$MAP"
+
+  # 反向检查：gateway 里出现 map 没有的用户/租户（退役后漏删）。
+  local f
+  for f in "$GW/tenants.caddy" "$GW/upstreams.caddy" "$GW/tokens.caddy"; do
+    [ -f "$f" ] || { say "WARN 缺 $f"; warns=$((warns + 1)); continue; }
+    while read -r a b _; do
+      [ -n "${a:-}" ] || continue
+      case "$(basename "$f")" in
+        tenants.caddy) [ -n "${map_tid[$a]:-}" ] || { say "DRIFT gateway(tenants) 多余：$a $b"; errors=$((errors + 1)); } ;;
+        *)             [ -n "${map_user[$a]:-}" ] || { say "DRIFT $(basename "$f") 多余：$a"; errors=$((errors + 1)); } ;;
+      esac
+    done <"$f"
+  done
+
+  if [ "$errors" -eq 0 ]; then
+    [ "$quiet" -eq 1 ] || say "OK GPU 侧一致：$(wc -l <"$MAP") 个用户，$warns 条提醒"
+    say "NOTE Casdoor 身份侧只能在 Web 上核对（GPU→Web 不通）；本检查不覆盖。"
+    return 0
+  fi
+  say "FAIL $errors 处漂移，$warns 条提醒"
+  return 1
+}
+
+# ── add / del 预演 ───────────────────────────────────────────────────────
+valid_name() { [[ "$1" =~ ^[A-Za-z][A-Za-z0-9_-]{0,31}$ ]]; }
+
+cmd_add() {
+  local name="" gpu=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --gpu) gpu=${2:?--gpu 后缺编号}; shift 2 ;;
+      --dry-run) shift ;;
+      *) [ -z "$name" ] && name=$1 || gpu=$1; shift ;;
+    esac
+  done
+  [ -n "$name" ] || die "用法：axiomics-user add <用户名> [--gpu N]"
+  valid_name "$name" || die "用户名不合法（字母开头，字母/数字/_/-，最长 32）：$name"
+  case "$gpu" in ''|*[!0-9]*) die "GPU 编号必须是整数，收到：$gpu" ;; esac
+
+  awk -v n="$name" '$1 == n { f = 1 } END { exit !f }' "$MAP" 2>/dev/null \
+    && die "用户 $name 已在 tenants.map 中；改用 check 或先协商回收"
+  grep -q "^$name " "$RETIRED" 2>/dev/null \
+    && say "提醒：$name 在 retired.log 中（曾回收）。租户号不复用，恢复属于新租户。"
+
+  local tid port
+  tid=$(next_id); port=$(next_port)
+
+  say "DRY-RUN 开通预演：$name（不会执行任何命令）"
+  say "  预计分配：租户 $tid，端口 $port，GPU $gpu"
+  say "  预计落盘：$TENANTS/$tid/{token,config,data,state}，追加 tenants.map 与 gateway/*.caddy"
+  say ""
+  say "按顺序人工执行："
+  say "  1) [Web]  身份先建：~/.local/venv-axiomics/bin/python ~/.local/bin/ax_casdoor_provision.py user $name"
+  say "             初始口令写入 ~/.axiomics/ldap-test.env（0600），不要粘贴到聊天"
+  say "             注意：该文件已存在时脚本会复用其中口令；建新用户前先 mv 走它，避免多人同口令"
+  say "  2) [GPU]  再开租户：$TENANT_CMD add $name --gpu $gpu"
+  say "  3) [GPU]  一致性：$AX_ROOT/bin/axiomics-user check"
+  say ""
+  say "任一步失败即停手报告；不要自动回滚，避免半开半关的账号。"
+}
+
+cmd_del() {
+  local name=${1:?用法：axiomics-user del <用户名>}
+  local row tid
+  row=$(awk -v n="$name" '$1 == n { print; exit }' "$MAP" 2>/dev/null || true)
+  [ -n "$row" ] || die "tenants.map 中没有 $name"
+  tid=$(awk '{print $2}' <<<"$row")
+
+  say "DRY-RUN 回收预演：$name（租户 $tid；不会执行任何命令）"
+  say ""
+  say "按顺序人工执行："
+  say "  1) [Web]  先停身份：Casdoor 控制台停用 $name（LDAP bind 随即失效）"
+  say "  2) [GPU]  再回收：$TENANT_CMD retire $name"
+  say "             容器停止、数据归档、写 retired.log、更新 map 与 gateway"
+  say "  3) [GPU]  一致性：$AX_ROOT/bin/axiomics-user check"
+  say ""
+  say "租户号 $tid 永不复用；retire 不删除归档数据。"
+}
+
+# ── 入口 ─────────────────────────────────────────────────────────────────
+case " $* " in
+  *" --apply "*) die "本期薄封装只支持 dry-run/check；真实开通请按预演输出的命令人工执行" ;;
+esac
+
+cmd=${1:-}
+[ $# -gt 0 ] && shift || true
+case "$cmd" in
+  add)   cmd_add "$@" ;;
+  del)   cmd_del "$@" ;;
+  check) cmd_check "$@" ;;
+  ""|-h|--help|help) usage ;;
+  *) usage; exit 2 ;;
+esac

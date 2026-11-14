@@ -138,6 +138,7 @@ fi
 # ── 运行时文件 ───────────────────────────────────────────────────────
 say "安装运行时文件到 $AX_ROOT"
 install -m 0755 "$HERE/bin/axiomics-tenant" "$AX_ROOT/bin/axiomics-tenant"
+install -m 0755 "$HERE/bin/axiomics-user"   "$AX_ROOT/bin/axiomics-user"
 install -m 0755 "$HERE/bin/axiomics-usage"  "$AX_ROOT/bin/axiomics-usage"
 install -m 0755 "$HERE/bin/axiomics-audit"  "$AX_ROOT/bin/axiomics-audit"
 # axiomics-tenant 在**运行时**调它取 CORS 白名单，不是可选的：漏装的后果是
