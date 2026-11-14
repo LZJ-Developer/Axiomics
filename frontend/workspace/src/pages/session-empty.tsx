@@ -15,7 +15,13 @@ import "./session-empty.css"
  * PromptInput — draft attachments, the selected model, and the undo bar all
  * survive the transition.
  */
-export const SessionEmptyHero: Component<{ ref?: (element: HTMLDivElement) => void }> = (props) => {
+export const SessionEmptyHero: Component<{
+  ref?: (element: HTMLDivElement) => void
+  /** Shown when no identity is present. The public entry has no forward auth,
+   * so it passes the same greeting shape without a name; the workspace keeps
+   * its "start a study" fallback. */
+  anonymousGreeting?: string
+}> = (props) => {
   const language = useLanguage()
 
   // The authenticating proxy copies the signed-in name onto the request. A
@@ -24,7 +30,8 @@ export const SessionEmptyHero: Component<{ ref?: (element: HTMLDivElement) => vo
   // account is written in the directory.
   const greeting = () => {
     const name = deploymentCapabilities.user()
-    return name ? language.t("session.empty.greeting", { name: name.toUpperCase() }) : language.t("session.empty.title")
+    if (name) return language.t("session.empty.greeting", { name: name.toUpperCase() })
+    return props.anonymousGreeting ?? language.t("session.empty.title")
   }
 
   return (

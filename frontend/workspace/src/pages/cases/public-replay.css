@@ -96,6 +96,9 @@
 
 .public-replay__back {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-text-muted);
   font-size: var(--type-ui);
   font-weight: var(--font-weight-medium);
@@ -113,6 +116,15 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
+}
+
+/* The empty conversation shows the workspace's tab strip with one tab, so the
+   public and signed-in headers share the same shape. */
+.public-replay__tabs {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
 }
 
 .public-replay__heading span {
@@ -209,32 +221,22 @@
   padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
 }
 
-.public-new__composer {
+/* The composer is the workspace frame (`workspace-composer`); the dock only
+   supplies its width and bottom spacing. */
+.public-new .session-prompt-dock__inner {
   width: min(100%, 740px);
   margin-inline: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 12px 8px 14px;
-  border: 1px solid var(--border-weak-base);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-solid, var(--surface-raised-stronger-non-alpha));
-  transition: border-color 150ms var(--ease-standard);
-}
-
-.public-new__composer:focus-within {
-  border-color: var(--border-base);
-  box-shadow: var(--focus-lit);
 }
 
 .public-new__input {
   all: unset;
   box-sizing: border-box;
   width: 100%;
-  min-height: 44px;
+  min-height: 46px;
   max-height: 200px;
   resize: none;
-  color: var(--color-text);
+  color: var(--text-strong);
+  caret-color: var(--text-strong);
   font-family: var(--font-family-sans);
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-regular);
@@ -242,40 +244,28 @@
 }
 
 .public-new__input::placeholder {
-  color: var(--color-text-faint);
+  color: var(--text-weak);
 }
 
-.public-new__foot {
-  display: flex;
+.public-new__tools {
+  min-height: 32px;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.public-new__hint {
-  min-width: 0;
-  color: var(--color-text-muted);
-  font-size: var(--type-meta);
-  line-height: 1.4;
-}
-
-.public-new__send {
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
+  gap: 6px;
+  padding: 0 8px;
   border: 0;
-  border-radius: 999px;
-  background: var(--color-text);
-  color: var(--color-bg);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-weak);
+  font-family: var(--font-family-sans);
+  font-size: var(--type-ui);
   cursor: pointer;
-  transition: opacity 140ms var(--agent-ease);
 }
 
-.public-new__send:disabled {
-  opacity: 0.35;
-  cursor: default;
+.public-new__tools:hover,
+.public-new__tools:focus-visible {
+  background: var(--surface-base-hover);
+  color: var(--text-strong);
 }
 
 /* Inspector ---------------------------------------------------------------- */

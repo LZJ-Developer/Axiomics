@@ -224,11 +224,13 @@ describe("focused workspace shell", () => {
   test("keeps the composer calm and gives narrow screens non-overlapping controls", () => {
     const session = read("./session.tsx")
     const prompt = read("../components/prompt-input.tsx")
+    const shell = read("../components/composer-shell.tsx")
 
     expect(session).toContain('class="session-prompt-dock"')
     expect(session).toContain('class="session-prompt-dock__inner"')
     expect(session).not.toContain("bg-gradient-to-t")
-    expect(prompt).toContain('"workspace-composer": true')
+    expect(prompt).toContain("<ComposerShell")
+    expect(shell).toContain('"workspace-composer": true')
     expect(prompt).toContain('class="workspace-composer__footer"')
     expect(prompt).toContain('class="workspace-composer__controls')
     expect(prompt).toContain('class="workspace-composer__actions')

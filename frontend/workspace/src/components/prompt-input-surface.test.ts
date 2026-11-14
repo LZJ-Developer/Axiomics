@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 const source = await Bun.file(new URL("./prompt-input.tsx", import.meta.url)).text()
+const shell = await Bun.file(new URL("./composer-shell.tsx", import.meta.url)).text()
 const css = await Bun.file(new URL("../styles/atlas.css", import.meta.url)).text()
 const componentCss = await Bun.file(new URL("./prompt-input.css", import.meta.url)).text()
 const chatCss = await Bun.file(new URL("./chat-surface.css", import.meta.url)).text()
@@ -10,7 +11,8 @@ const modelFast = await Bun.file(new URL("./model-fast.ts", import.meta.url)).te
 
 describe("floating prompt surface", () => {
   test("uses one floating surface without the retired compact outline utilities", () => {
-    expect(source).toContain('"workspace-composer": true')
+    expect(source).toContain("<ComposerShell")
+    expect(shell).toContain('"workspace-composer": true')
     expect(source).not.toContain("bg-surface-raised-stronger-non-alpha shadow-xs-border relative")
     expect(source).not.toContain('"rounded-[14px] overflow-clip focus-within:shadow-xs-border"')
     expect(css).not.toContain("\n.workspace-composer {")

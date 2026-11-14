@@ -54,6 +54,7 @@ import { showToast } from "@axiomics/ui/toast"
 import { uiStore } from "@/atlas/store/ui"
 import { confirmDialog } from "@/atlas/dialogs"
 import { projectHref, projectPathname } from "@/utils/project-route"
+import { ComposerShell } from "./composer-shell"
 import { ModelSettingsPopover } from "./model-settings-popover"
 import {
   loadedSkillNamesThisTurn,
@@ -2647,16 +2648,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           </button>
         </div>
       </Show>
-      <form
-        onSubmit={handleSubmit}
-        classList={{
-          "group/prompt-input": true,
-          "workspace-composer": true,
-          "relative overflow-visible": true,
-          "border-icon-info-active border-dashed": store.dragging,
-          [props.class ?? ""]: !!props.class,
-        }}
-      >
+      <ComposerShell onSubmit={handleSubmit} class={props.class} dragging={store.dragging}>
         <Show when={store.dragging}>
           <div class="workspace-composer__dropzone absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
             <div class="workspace-composer__dropzone-copy">
@@ -3038,7 +3030,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             </Tooltip>
           </div>
         </div>
-      </form>
+      </ComposerShell>
     </div>
   )
 }

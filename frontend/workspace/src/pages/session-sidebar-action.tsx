@@ -118,8 +118,13 @@ export function SessionSidebarActions(props: {
   contextOpen: boolean
   onContext: (context: SessionContext) => void
   copy?: SidebarCopy
+  /** Overrides the deployment capability. The public entry has no capability
+   * endpoint, and the terminal is not exposed there, so it passes false
+   * instead of inheriting the fail-open default. */
+  terminal?: boolean
 }): JSX.Element {
   const copy = () => props.copy ?? fallback
+  const showTerminal = () => props.terminal ?? deploymentCapabilities.terminal()
   return (
     <div class="session-sidebar__context-actions">
       <div class="session-sidebar__group-label" aria-hidden="true">
@@ -135,7 +140,7 @@ export function SessionSidebarActions(props: {
         >
           <IconFolder size={16} strokeWidth={1.5} />
         </SidebarAction>
-        <Show when={deploymentCapabilities.terminal()}>
+        <Show when={showTerminal()}>
           <SidebarAction
             label={copy().terminal}
             detail={copy().projectShell}

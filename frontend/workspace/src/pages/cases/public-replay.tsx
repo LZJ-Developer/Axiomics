@@ -1,7 +1,25 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js"
 import type { Session } from "@axiomics/sdk/v2"
-import { IconArrowUp, IconBookOpen, IconResearch } from "@/atlas/shared/Icon"
+import { Button } from "@axiomics/ui/button"
+import { Icon } from "@axiomics/ui/icon"
+import { IconButton } from "@axiomics/ui/icon-button"
+import {
+  IconBookOpen,
+  IconChevronDown,
+  IconChevronLeft,
+  IconHome,
+  IconMessageSquare,
+  IconPlus,
+  IconResearch,
+  IconSearch,
+  IconSettings,
+} from "@/atlas/shared/Icon"
+import { ComposerShell } from "@/components/composer-shell"
 import { SessionEmptyHero, SessionStarterCards } from "@/pages/session-empty"
+import { SessionSidebarActions, SidebarAction } from "@/pages/session-sidebar-action"
+import { SessionTabStrip } from "@/pages/session-tabs"
+import "@/components/model-settings-popover.css"
+import "@/components/prompt-input.css"
 import { useLanguage } from "@/context/language"
 import { cases } from "./catalog"
 import { saveDraft } from "./draft"
@@ -52,8 +70,14 @@ export default function PublicReplay(props: { caseID?: string }) {
       return (await response.json()) as Fixture
     },
   )
+  // A resource that failed throws its error into the nearest error boundary
+  // the moment its value is read, which on this public entry replaces the whole
+  // page with the workspace recovery screen. A case id that does not exist is
+  // an ordinary dead link, so the value is read only after the request settled
+  // without an error; the error branch below owns that state.
+  const loaded = () => (fixture.loading || fixture.error ? undefined : fixture())
   const frames = createMemo(() => {
-    const value = fixture()
+    const value = loaded()
     if (!value) return []
     return timeline(value.recording, value.session.revert?.messageID)
   })
@@ -119,7 +143,7 @@ export default function PublicReplay(props: { caseID?: string }) {
     const gone =
       value.kind === "artifact"
         ? !replayArtifacts(visibleFrames()).some((item) => item.id === value.id)
-        : !replayFiles(visibleFrames(), fixture()?.session.directory).some((item) => item.path === value.path)
+        : !replayFiles(visibleFrames(), loaded()?.session.directory).some((item) => item.path === value.path)
     if (gone) setSelection(undefined)
   })
   const begin = () => {
@@ -149,48 +173,124 @@ export default function PublicReplay(props: { caseID?: string }) {
           if ((event.target as Element).closest("a")) setRailOpen(false)
         }}
       >
-        <div class="session-sidebar__top">
-          <a class="session-sidebar__project" href="#/" aria-label={language.t("cases.title")}>
-            <IconBookOpen size={15} strokeWidth={1.5} />
-            <strong>{language.t("cases.title")}</strong>
-          </a>
-        </div>
-
-        <nav class="session-sidebar__actions" aria-label={language.t("cases.navigation")}>
-          <div class="session-sidebar__action-list session-sidebar__primary-actions">
-            <a
-              class="session-sidebar__action session-sidebar__new"
-              href="#/new"
-              data-selected={props.caseID ? undefined : "true"}
-            >
-              <span class="session-sidebar__action-icon">
-                <IconResearch size={15} strokeWidth={1.5} />
-              </span>
-              <span class="session-sidebar__action-copy">
-                <strong>{language.t("cases.new")}</strong>
-              </span>
-            </a>
-          </div>
-        </nav>
-
-        <div class="session-sidebar__label" id="public-replay-cases">
-          {language.t("cases.rail.cases")}
-        </div>
-        <nav class="session-sidebar__list" aria-labelledby="public-replay-cases">
-          <For each={cases}>
-            {(entry) => (
-              <div class="session-sidebar__session" data-active={entry.id === props.caseID ? "true" : undefined}>
-                <a
-                  class="session-sidebar__session-main"
-                  href={`#/replay/${encodeURIComponent(entry.id)}`}
-                  aria-current={entry.id === props.caseID ? "page" : undefined}
-                >
-                  <span class="session-sidebar__session-title">{entry.title}</span>
+        <Show
+          when={!props.caseID}
+          fallback={
+            <>
+              <div class="session-sidebar__top">
+                <a class="session-sidebar__project" href="#/" aria-label={language.t("cases.title")}>
+                  <IconBookOpen size={15} strokeWidth={1.5} />
+                  <strong>{language.t("cases.title")}</strong>
                 </a>
               </div>
-            )}
-          </For>
-        </nav>
+
+              <nav class="session-sidebar__actions" aria-label={language.t("cases.navigation")}>
+                <div class="session-sidebar__action-list session-sidebar__primary-actions">
+                  <a
+                    class="session-sidebar__action session-sidebar__new"
+                    href="#/new"
+                    data-selected={props.caseID ? undefined : "true"}
+                  >
+                    <span class="session-sidebar__action-icon">
+                      <IconResearch size={15} strokeWidth={1.5} />
+                    </span>
+                    <span class="session-sidebar__action-copy">
+                      <strong>{language.t("cases.new")}</strong>
+                    </span>
+                  </a>
+                </div>
+              </nav>
+
+              <div class="session-sidebar__label" id="public-replay-cases">
+                {language.t("cases.rail.cases")}
+              </div>
+              <nav class="session-sidebar__list" aria-labelledby="public-replay-cases">
+                <For each={cases}>
+                  {(entry) => (
+                    <div
+                      class="session-sidebar__session"
+                      data-active={entry.id === props.caseID ? "true" : undefined}
+                    >
+                      <a
+                        class="session-sidebar__session-main"
+                        href={`#/replay/${encodeURIComponent(entry.id)}`}
+                        aria-current={entry.id === props.caseID ? "page" : undefined}
+                      >
+                        <span class="session-sidebar__session-title">{entry.title}</span>
+                      </a>
+                    </div>
+                  )}
+                </For>
+              </nav>
+            </>
+          }
+        >
+          <div class="session-sidebar__top">
+            <a class="session-sidebar__project" href="#/" aria-label={language.t("cases.title")}>
+              <IconHome size={15} strokeWidth={1.5} />
+              <strong>{language.t("cases.title")}</strong>
+              <IconChevronDown class="session-sidebar__project-chevron" size={12} strokeWidth={1.5} />
+            </a>
+          </div>
+
+          <nav class="session-sidebar__actions" aria-label={language.t("workspace.sidebar.navigation")}>
+            <div class="session-sidebar__action-list session-sidebar__primary-actions">
+              <SidebarAction
+                class="session-sidebar__new"
+                label={language.t("workspace.sidebar.new")}
+                detail={language.t("workspace.sidebar.newDetail")}
+                ariaLabel={language.t("workspace.sidebar.newAria")}
+                shortcut="⌘N"
+                onClick={() => setLoginOpen(true)}
+              >
+                <IconPlus size={15} strokeWidth={1.7} />
+              </SidebarAction>
+              <SidebarAction
+                label={language.t("workspace.sidebar.search")}
+                detail={language.t("workspace.sidebar.searchDetail")}
+                ariaLabel={language.t("workspace.sidebar.searchAria")}
+                shortcut="⌘K"
+                onClick={() => setLoginOpen(true)}
+              >
+                <IconSearch size={15} strokeWidth={1.5} />
+              </SidebarAction>
+              <SidebarAction
+                label={language.t("workspace.sidebar.customize")}
+                detail={language.t("workspace.sidebar.customizeDetail")}
+                ariaLabel={language.t("workspace.sidebar.customizeAria")}
+                onClick={() => setLoginOpen(true)}
+              >
+                <IconSettings size={15} strokeWidth={1.5} />
+              </SidebarAction>
+            </div>
+
+            <SessionSidebarActions
+              context="files"
+              contextOpen={false}
+              terminal={false}
+              onContext={() => setLoginOpen(true)}
+              copy={{
+                workspace: language.t("workspace.sidebar.workspace"),
+                files: language.t("workspace.sidebar.files"),
+                projectFiles: language.t("workspace.sidebar.projectFiles"),
+                openFiles: language.t("workspace.sidebar.openFiles"),
+                terminal: language.t("workspace.sidebar.terminal"),
+                projectShell: language.t("workspace.sidebar.projectShell"),
+                openTerminal: language.t("workspace.sidebar.openTerminal"),
+                compute: language.t("workspace.sidebar.compute"),
+                computeDetail: language.t("workspace.sidebar.computeDetail"),
+                openCompute: language.t("workspace.sidebar.openCompute"),
+              }}
+            />
+          </nav>
+
+          <div class="session-sidebar__label" id="public-replay-sessions">
+            {language.t("workspace.sidebar.sessions")}
+          </div>
+          <nav class="session-sidebar__list" aria-labelledby="public-replay-sessions">
+            <div class="session-sidebar__empty">{language.t("workspace.sidebar.empty")}</div>
+          </nav>
+        </Show>
 
         <button type="button" class="public-replay__login" onClick={() => setLoginOpen(true)}>
           {language.t("cases.rail.login")}
@@ -205,15 +305,49 @@ export default function PublicReplay(props: { caseID?: string }) {
             aria-label={language.t("cases.rail.open")}
             onClick={() => setRailOpen(true)}
           >
-            <IconBookOpen size={14} strokeWidth={1.5} />
+            <IconMessageSquare size={14} strokeWidth={1.5} />
           </button>
-          <a class="public-replay__back" href="#/">
-            ← {language.t("cases.title")}
-          </a>
-          <div class="public-replay__heading">
-            <strong>{item()?.title ?? language.t("cases.new.title")}</strong>
-          </div>
-          <Show when={props.caseID}>
+          <Show
+            when={props.caseID}
+            fallback={
+              <>
+                <a class="public-replay__back" href="#/" aria-label={language.t("cases.title")}>
+                  <IconChevronLeft size={14} strokeWidth={1.6} />
+                </a>
+                <div class="public-replay__tabs">
+                  <SessionTabStrip
+                    t={language.t}
+                    tabs={[
+                      {
+                        id: "new",
+                        title: language.t("session.new.title"),
+                        working: false,
+                        dirty: false,
+                        unread: false,
+                        editable: false,
+                        closable: false,
+                        reorderable: false,
+                      },
+                    ]}
+                    active="new"
+                    onSelect={() => undefined}
+                    onClose={() => undefined}
+                    onReorder={() => undefined}
+                    onRename={async () => false}
+                  />
+                </div>
+              </>
+            }
+          >
+            <a class="public-replay__back" href="#/">
+              ← {language.t("cases.title")}
+            </a>
+            <div class="public-replay__heading">
+              {/* A dead case link has no catalog entry: "untitled session" reads
+                  with the load-failed body below, where "start a new research"
+                  would describe a page the visitor never asked for. */}
+              <strong>{item()?.title ?? language.t("cases.untitled")}</strong>
+            </div>
             <button
               type="button"
               class="public-replay__action"
@@ -222,8 +356,6 @@ export default function PublicReplay(props: { caseID?: string }) {
             >
               {language.t("cases.inspector.results")}
             </button>
-          </Show>
-          <Show when={props.caseID}>
             <span class="public-replay__bar-progress" aria-hidden="true" style={{ width: `${progress() * 100}%` }} />
           </Show>
         </header>
@@ -237,38 +369,87 @@ export default function PublicReplay(props: { caseID?: string }) {
               class="public-new"
               aria-label={language.t("cases.new.label")}
             >
-              <SessionEmptyHero />
+              <SessionEmptyHero anonymousGreeting="Hi" />
               <div class="session-prompt-dock public-new__dock">
-                <form
-                  class="session-prompt-dock__inner public-new__composer"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    begin()
-                  }}
-                >
-                  <textarea
-                    ref={composerInput}
-                    class="public-new__input"
-                    rows={2}
-                    value={text()}
-                    placeholder={language.t("cases.new.placeholder")}
-                    aria-label={language.t("cases.new.placeholder")}
-                    autofocus
-                    onInput={(event) => setText(event.currentTarget.value)}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" || event.shiftKey || event.isComposing) return
+                <div class="session-prompt-dock__inner">
+                  <ComposerShell
+                    onSubmit={(event) => {
                       event.preventDefault()
                       begin()
                     }}
+                    editor={
+                      <textarea
+                        ref={composerInput}
+                        data-component="prompt-input"
+                        class="public-new__input"
+                        rows={2}
+                        value={text()}
+                        placeholder={language.t("cases.new.placeholder")}
+                        aria-label={language.t("cases.new.placeholder")}
+                        autofocus
+                        onInput={(event) => setText(event.currentTarget.value)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" || event.shiftKey || event.isComposing) return
+                          event.preventDefault()
+                          begin()
+                        }}
+                      />
+                    }
+                    footer={
+                      <>
+                        <div
+                          class="workspace-composer__controls"
+                          role="group"
+                          aria-label={language.t("prompt.aria.composerTools")}
+                        >
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            class="workspace-composer__attach shrink-0"
+                            onClick={() => setLoginOpen(true)}
+                            aria-label={language.t("prompt.action.attachFile")}
+                          >
+                            <Icon name="paperclip" class="size-4" />
+                          </Button>
+                          <button
+                            type="button"
+                            class="public-new__tools"
+                            onClick={() => setLoginOpen(true)}
+                            aria-label={language.t("prompt.tools")}
+                          >
+                            <span>{language.t("prompt.tools")}</span>
+                            <Icon name="chevron-down" size="small" />
+                          </button>
+                        </div>
+                        <div
+                          class="workspace-composer__actions"
+                          role="group"
+                          aria-label={language.t("prompt.aria.modelEffortSend")}
+                        >
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            data-model-settings-trigger
+                            data-model-settings-trigger-style="label"
+                            class="min-w-0"
+                            onClick={() => setLoginOpen(true)}
+                          >
+                            <span class="truncate">{language.t("prompt.setup.title")}</span>
+                            <Icon name="chevron-down" size="small" class="shrink-0 text-text-weak" />
+                          </Button>
+                          <IconButton
+                            type="submit"
+                            disabled={!text().trim()}
+                            icon="arrow-up"
+                            variant="primary"
+                            class="workspace-composer__send rounded-full"
+                            aria-label={language.t("prompt.action.send")}
+                          />
+                        </div>
+                      </>
+                    }
                   />
-                  <div class="public-new__foot">
-                    <span class="public-new__hint">{language.t("cases.new.hint")}</span>
-                    <button type="submit" class="public-new__send" disabled={!text().trim()}>
-                      <IconArrowUp size={14} strokeWidth={1.6} />
-                      <span class="sr-only">{language.t("cases.new.submit")}</span>
-                    </button>
-                  </div>
-                </form>
+                </div>
               </div>
               <SessionStarterCards
                 onPick={(item) => {
@@ -290,7 +471,7 @@ export default function PublicReplay(props: { caseID?: string }) {
               <a href="#/">{language.t("cases.retry")}</a>
             </div>
           </Show>
-          <Show when={fixture()} keyed>
+          <Show when={loaded()} keyed>
             {(value) => (
               <ReplayPlayer
                 session={value.session}
@@ -309,7 +490,7 @@ export default function PublicReplay(props: { caseID?: string }) {
       <Show when={props.caseID}>
         <ReplayInspector
           frames={visibleFrames()}
-          directory={fixture()?.session.directory}
+          directory={loaded()?.session.directory}
           selection={selection()}
           open={inspectorOpen()}
           onSelect={(value) => {
