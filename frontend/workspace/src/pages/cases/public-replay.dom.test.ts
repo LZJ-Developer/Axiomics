@@ -334,3 +334,25 @@ test("the public replay renders the recorded transcript from one static fixture 
   expect(host.querySelector(".public-inspector")?.getAttribute("data-open")).toBe("false")
   expect(host.querySelector(".public-replay__switch")).toBeNull()
 })
+
+test("a case id with no recording stays on the public page instead of the workspace recovery screen", async () => {
+  // A resource that failed throws on read, so reading it from the page would
+  // hand the error to the app-wide boundary and replace this public surface
+  // with "Axiomics hit a problem". A dead case link must show the replay
+  // error state with a way back to the gallery instead.
+  globalThis.fetch = (async (input: Parameters<typeof fetch>[0]) => {
+    calls.push(typeof input === "string" ? input : input instanceof URL ? input.href : input.url)
+    return { ok: false, status: 404, statusText: "Not Found", json: async () => ({}) } as unknown as Response
+  }) as typeof fetch
+  calls = []
+
+  const host = mount(() => publicReplay.default({ caseID: "does-not-exist" }), true)
+
+  await ready(() => host.querySelector('.case-replay-status[role="alert"]') !== null)
+  expect(host.textContent).not.toContain("Axiomics hit a problem")
+  expect(host.textContent).not.toContain("Workspace recovery")
+  expect(host.querySelector(".public-replay__rail")).not.toBeNull()
+  // happy-dom normalises a bare `#/` to `#`; both return to the gallery.
+  expect(host.querySelector<HTMLAnchorElement>(".case-replay-status a")?.getAttribute("href")).toMatch(/^#\/?$/)
+  expect(calls).toEqual(["/cases/replay/does-not-exist.json"])
+})

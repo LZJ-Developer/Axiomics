@@ -13,6 +13,7 @@ ts-dist
 .turbo
 **/.serena
 .serena/
+/.impeccable/
 /result
 refs
 Session.vim

@@ -53,6 +53,24 @@ function parts(messageID: string) {
 
 mkdirSync(out, { recursive: true })
 
+// These fixtures are served to anonymous visitors. Tool output in the
+// transcripts names the machine that ran the work — absolute paths, the
+// account's home, the owner column of `ls -l` — so the export rewrites that
+// identity to one neutral home. The transcript stays real; it just stops
+// naming whose machine ran it. `recordings.test.ts` enforces the same rule.
+const hostScrub: Array<[RegExp, string]> = [
+  // Longest prefix first: `/disk1/dabiao` must not fall through to `/disk1/`.
+  [/\/disk1\/dabiao/g, "/home/example-user-3588bb"],
+  [/\/home\/dabiao/g, "/home/example-user-3588bb"],
+  [/\/disk1\//g, "/home/example-user-3588bb/"],
+  [/\/disk1 /g, "/data "],
+  [/dabiao/g, "researcher"],
+]
+
+function sanitize(json: string) {
+  return hostScrub.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), json)
+}
+
 for (const item of cases) {
   const found = findSession(item.sessionID)
   const session = read(found.file)
@@ -62,7 +80,7 @@ for (const item of cases) {
     .sort((a, b) => (a.time?.created ?? 0) - (b.time?.created ?? 0) || String(a.id).localeCompare(String(b.id)))
   const recording = messages.map((message) => ({ info: message, parts: parts(message.id) }))
   const file = join(out, `${item.id}.json`)
-  writeFileSync(file, JSON.stringify({ session, recording }), "utf8")
+  writeFileSync(file, sanitize(JSON.stringify({ session, recording })), "utf8")
   const bytes = readFileSync(file).byteLength
   console.log(
     `${item.id.padEnd(24)} project=${found.project} messages=${messages.length} parts=${recording.reduce(
