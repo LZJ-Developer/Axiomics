@@ -58,6 +58,7 @@ export const dict = {
   "cases.all": "All",
   "cases.results": "Results",
   "cases.showing": "Showing {{count}} curated cases",
+  "cases.showingOne": "Showing {{count}} curated case",
   "cases.noResults": "No cases match the current filters.",
   "cases.question": "Question",
   "cases.data": "Data",

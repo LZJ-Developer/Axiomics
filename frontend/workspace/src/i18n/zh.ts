@@ -59,6 +59,7 @@ export const dict = {
   "cases.all": "全部",
   "cases.results": "搜索结果",
   "cases.showing": "显示 {{count}} 个精选案例",
+  "cases.showingOne": "显示 {{count}} 个精选案例",
   "cases.noResults": "没有符合当前条件的案例。",
   "cases.question": "问题",
   "cases.data": "数据",

@@ -8,7 +8,7 @@ import {
 } from "@/atlas/shared/Icon"
 import { Wordmark } from "@/atlas/Wordmark"
 import { useLanguage } from "@/context/language"
-import { cases, replay, select } from "./cases/catalog"
+import { cases, cover, replay, select } from "./cases/catalog"
 import { LoginDialog } from "./cases/login-dialog"
 import "./cases/cases.css"
 
@@ -159,7 +159,11 @@ export default function CasesGallery(props: { public?: boolean } = {}) {
         <div class="cases-results">
           <div>
             <h2>{language.t("cases.results")}</h2>
-            <span>{language.t("cases.showing", { count: shown().length })}</span>
+            <span>
+              {language.t(shown().length === 1 ? "cases.showingOne" : "cases.showing", {
+                count: shown().length,
+              })}
+            </span>
           </div>
         </div>
 
@@ -176,9 +180,9 @@ export default function CasesGallery(props: { public?: boolean } = {}) {
                   id={item.id}
                 >
                   <span class="case-cover" data-fit={"imageFit" in item ? item.imageFit : undefined} aria-hidden="true">
-                    <img src={item.images[0]} alt="" />
-                    <img src={item.images[1]} alt="" />
-                    <img src={item.images[2]} alt="" />
+                    <img src={cover(item.images[0])} alt="" loading="lazy" decoding="async" />
+                    <img src={cover(item.images[1])} alt="" loading="lazy" decoding="async" />
+                    <img src={cover(item.images[2])} alt="" loading="lazy" decoding="async" />
                     <b>▶</b>
                   </span>
                   <span class="case-meta">

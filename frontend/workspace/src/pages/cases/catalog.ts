@@ -144,6 +144,20 @@ export function replay(caseID: ShowcaseCase) {
   return `/cases/${encodeURIComponent(caseID.id)}`
 }
 
+/**
+ * 封面取缩略图而不是原图。
+ *
+ * 三个封面挤在约 380×300 的格子里，原图八张卡片加起来 9.6MB，最重一张
+ * 2.7MB；缩略图（`script/case-thumbs.py` 生成，760px WebP）合计 0.9MB。
+ * 缩略图按同名规则落在 `/cases/thumbs/`，`thumbs.test.ts` 会检查每个封面
+ * 都有对应文件，所以这里不做运行期兜底。
+ */
+export function cover(src: string) {
+  if (!src.startsWith("/cases/")) return src
+  const name = src.slice("/cases/".length).replace(/\.[^.]+$/, "")
+  return `/cases/thumbs/${name}.webp`
+}
+
 export function select(query: string, filter: string) {
   const term = query.trim().toLocaleLowerCase()
   return cases.filter((item) => {
