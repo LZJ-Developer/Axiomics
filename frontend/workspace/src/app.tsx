@@ -29,7 +29,10 @@ const CasesGallery = lazy(() => import("@/pages/cases-gallery"))
 // The showcase replay plays an exported recording. It is the same surface the
 // public entry mounts, in its embedded form: no tenant project or session is
 // involved, which is what lets a fresh account start with an empty workspace.
-const CaseReplay = lazy(() => import("@/pages/cases/public-replay"))
+// Mounted through the shell rather than bare: the player renders a compaction
+// component that needs the diff/markdown/code providers, and without them the
+// route throws into the top-level error boundary.
+const CaseReplay = lazy(() => import("@/pages/cases/public-replay-shell"))
 
 const Loading = () => {
   const language = useLanguage()
