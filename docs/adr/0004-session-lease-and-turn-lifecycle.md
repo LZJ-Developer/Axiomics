@@ -314,3 +314,32 @@ E4  崩溃后直接 loop()     新 assistant 生成，但 provider 400
 - 按批准删除 u0003/u0004 两条死锁，两个 `session-loop/` 目录已为空。
 - `scientific_capability` 的 `doctor` 允许不带 id，返回全量能力与 `writable_packages`；提示词与工具描述同步为"list or doctor"。
 - 单步/多步两档提示词与身份句已改（见工作区未提交改动）。
+
+## 附录 F 实施与发布记录（2026-11-15）
+
+**代码**
+
+| 决策 | 落点 |
+|---|---|
+| D1/D2 | `util/file-lease.ts`：owner 增加 `identity`，`abandoned()` 先比对进程身份，旧锁退回 pid |
+| D3/D4 | 无 TTL；`session/prompt.ts` 的 `LOOP_LEASE_TIMEOUT` 改为 120 秒，超时错误带持有者与持锁时长 |
+| D5/D6/D7 | `message-v2.ts` 跳过无 `completed` 的 assistant；`routes/session.ts` 新增 `POST /:sessionID/resume`（忙 409、无中断回合 400） |
+| D8 | `ui/session-turn.tsx` 派生"运行中断"卡片；`workspace/pages/session.tsx` 接 `session.resume`；SDK 重新生成 |
+| D9 | 租户模板与 u0002–u0005 的 `axiomics.json` 注入 `idleTimeout: 300000` |
+| 附件 | `hasSavedAttachment` 同时供预算与载荷使用；二进制附件提示改为"用 python 读" |
+
+**测试**：租约、载荷、路由、watchdog、附件、提示词、doctor 共 11 个套件 **242 passed / 0 failed**；`typecheck` 三包全绿。
+全量套件未跑完：`test/cli/github-attachment.test.ts` 会建立真实外网连接并长时间挂起（下载约 2.5 MB 后空闲 127 秒），与本改动无关，记为环境缺口。
+
+**发布**：镜像 `localhost/axiomics-tenant:latest`（`2ee90029`），回滚标签 `rollback-pre-lease-20261115`；`axiomics-tenant recreate u0003`。u0004/u0005 当前未运行，下次 `start` 自动使用新镜像。
+
+**生产验证（u0003）**
+
+| 检查 | 结果 |
+|---|---|
+| 植入 `identity` 不匹配的锁后发消息 | **0 秒返回**（旧代码会等到预算耗尽） |
+| 回合期间读取锁文件 | `{pid:2, token, created, identity:"b94b510e…"}` |
+| 干净会话 `POST /resume` | `400 No interrupted turn to resume` |
+| 镜像内 UI 资源 | 含"运行中断" |
+
+**阻塞项**：上游返回 `402 Insufficient Balance (request_id 8a066854-…)`，模型调用无法完成。该错误由网关上游账号而非本次代码产生（代理源码无此文案），验收前需充值或更换上游账号。
