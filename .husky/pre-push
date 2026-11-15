@@ -1,19 +1,21 @@
 #!/bin/sh
 set -e
-# Only `main` is public. Two local branches must never be published, and one
-# `git push --all` would do it:
-#   internal — this deployment's live record (host addresses, disk, roster)
-#   axiomics — the pre-rewrite history, kept as a local backup
-# Refuse here instead of relying on whoever is pushing to notice which branch
-# they are on.
-while read -r _local_ref _local_sha remote_ref _remote_sha; do
+# The remote carries `main` and release tags, nothing else.
+#
+# This used to be a deny-list for `internal` and `axiomics`. With the deployment
+# notes out of git entirely (internal/ is ignored, never committed) and only one
+# branch published, an allow-list states the rule instead of trying to keep up
+# with the branches we do not want: whatever else is local — an experiment, a
+# branch kept for a merge, the next working branch — has no way out by accident.
+while read -r local_ref _local_sha remote_ref _remote_sha; do
+  # Deleting a remote ref is the cleanup path for leftovers (a merged branch, a
+  # snapshot branch that outlived the model). Only creating or moving a ref is
+  # restricted, so deletions pass.
+  [ "$local_ref" = "(delete)" ] && continue
   case "$remote_ref" in
-    refs/heads/internal)
-      echo "拒绝推送 internal：该分支只应存在于本地（含现场地址与租户名单）。" >&2
-      exit 1
-      ;;
-    refs/heads/axiomics)
-      echo "拒绝推送 axiomics：重写前的历史，仅作本地备份，远程只保留 main。" >&2
+    refs/heads/main | refs/tags/*) ;;
+    *)
+      echo "拒绝推送 $remote_ref：远程只接受 main 和发布标签。" >&2
       exit 1
       ;;
   esac

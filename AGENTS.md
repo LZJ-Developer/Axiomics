@@ -1,6 +1,7 @@
 - To regenerate the JavaScript SDK, run `./tooling/repo/generate.ts` from the repo root.
 - ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
-- The default branch in this repo is `main`.
+- The default branch in this repo is `main`. It is the only branch the remote accepts (plus release tags); the pre-push hook refuses everything else.
+- Deployment notes (`internal/`) are never committed. They live in the working tree, are ignored by git, and the history holds no trace of them — so `main` clones to the same tree on any machine.
 - Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
 
 ## Style Guide

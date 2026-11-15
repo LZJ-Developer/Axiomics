@@ -71,9 +71,9 @@ tooling/acceptance-cases/cases/*/tracer/result.json
 frontend/workspace/public/cases/replay/
 
 # Internal deployment record (real addresses, host paths, tenant roster).
-# Tracked on the local `internal` branch only, force-added there; see its
-# internal/README.md. Kept out of `main` so the public tree stays reproducible
-# on any machine.
+# Never committed: these files exist in this working tree only. The history was
+# rewritten to drop the commits that used to carry them, so `main` — the only
+# branch the remote accepts — is reproducible on any machine.
 /internal/
 
 # Unpublished SCENIC case study (280 MB of raw input and dist tarballs; stays local)
