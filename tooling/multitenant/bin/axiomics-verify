@@ -118,8 +118,37 @@ fi
 
 echo
 echo "4. 模型网关"
-code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' http://127.0.0.1:43002/health)
+# 一次取回 body + status，因为余额也在 /health 里。
+resp=$("${CURL[@]}" -w '\n%{http_code}' http://127.0.0.1:43002/health)
+code=${resp##*$'\n'}
+body=${resp%$'\n'*}
 [ "$code" = "200" ] && ok "模型代理进程健康" || bad "模型代理 /health → $code"
+
+# 余额是**账本里看不见**的故障：耗尽的调用没有 usage，一行账都不写，
+# 于是"没有新账"与"没人用"在账本上长得一样（实测因此漏了 0.38 元）。
+# 进程健康 ≠ 账户健康，所以单列一项。
+balance=$(printf '%s' "$body" | python3 -c '
+import json, os, sys
+low = float(os.environ.get("AX_LOW_BALANCE_CNY", "5"))
+try:
+    b = json.load(sys.stdin).get("balance")
+except Exception:
+    b = None
+if not isinstance(b, dict):
+    print("UNKNOWN 代理未上报余额（旧版本？）"); raise SystemExit
+if "error" in b:
+    print("UNKNOWN 查询失败 %s" % b["error"]); raise SystemExit
+if not b.get("is_available") or float(b.get("total_balance") or 0) < low:
+    print("LOW %s %s" % (b.get("total_balance"), b.get("currency", "")))
+else:
+    print("OK %s %s" % (b.get("total_balance"), b.get("currency", "")))
+' 2>/dev/null)
+case "$balance" in
+  OK\ *)      ok "模型余额 ${balance#OK }" ;;
+  LOW\ *)     bad "模型余额不足 ${balance#LOW } —— 所有租户的模型调用都会 402，且账本里不留痕" ;;
+  UNKNOWN\ *) note "余额未知（${balance#UNKNOWN }）" ;;
+  *)          note "余额未知（代理未上报，可能是旧版本）" ;;
+esac
 if [ "$DEEP" = "1" ]; then
   code=$("${CURL[@]}" -k -o /dev/null -w '%{http_code}' -X POST https://127.0.0.1:43001/model/v1/chat/completions \
     -H 'Content-Type: application/json' \

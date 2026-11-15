@@ -223,12 +223,18 @@ export function sessionErrorText(value: unknown): string {
   const data = record(error?.data)
   const message = typeof data?.message === "string" ? data.message : "Request failed"
   const body = typeof data?.responseBody === "string" ? data.responseBody : ""
-  if (!body.includes('"error":"insufficient_balance"')) return message
-
-  const required = body.match(/"required_cents":\s*(\d+)/)?.[1]
-  const available = body.match(/"available_cents":\s*(\d+)/)?.[1]
-  if (!required || !available) return "The connected provider account has insufficient balance for this step."
-  return `The connected provider account needs $${(Number(required) / 100).toFixed(2)} for this step; $${(Number(available) / 100).toFixed(2)} is available.`
+  if (body.includes('"error":"insufficient_balance"')) {
+    const required = body.match(/"required_cents":\s*(\d+)/)?.[1]
+    const available = body.match(/"available_cents":\s*(\d+)/)?.[1]
+    if (!required || !available) return "The connected provider account has insufficient balance for this step."
+    return `The connected provider account needs $${(Number(required) / 100).toFixed(2)} for this step; $${(Number(available) / 100).toFixed(2)} is available.`
+  }
+  // 直连上游（DeepSeek 及兼容 OpenAI 的厂商）把欠费写成
+  // {"error":{"message":"Insufficient Balance"}}，与 Atlas 托管格式无关。
+  // 原样透出时用户只看到一句英文，分不清是自己写错了还是账户没钱了。
+  if (/insufficient[\s_-]?balance|exceeded your current quota/i.test(body) || /insufficient[\s_-]?balance/i.test(message))
+    return "The model account is out of balance. Ask an administrator to top it up before retrying."
+  return message
 }
 
 export function sessionErrorDisplay(value: unknown): {

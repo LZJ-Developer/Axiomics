@@ -62,6 +62,17 @@ describe("sessionErrorText", () => {
     expect(sessionErrorText({ data: { message: "Provider is overloaded" } })).toBe("Provider is overloaded")
   })
 
+  test("turns a direct upstream balance failure into an actionable sentence", () => {
+    expect(
+      sessionErrorText({
+        data: {
+          message: "Insufficient Balance",
+          responseBody: '{"error":{"message":"Insufficient Balance","type":"unknown_error"}}',
+        },
+      }),
+    ).toBe("The model account is out of balance. Ask an administrator to top it up before retrying.")
+  })
+
   test("presents a recoverable provider interruption as paused", () => {
     expect(
       sessionErrorDisplay({

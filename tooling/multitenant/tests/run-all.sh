@@ -29,6 +29,8 @@ tier "integration: ledger workflow" \
   "$PY" -m unittest discover -s "$HERE/integration" -p 'test_*.py' -v
 tier "integration: user CLI" \
   bash "$HERE/integration/test_user_cli.sh"
+tier "integration: model proxy balance" \
+  bash "$HERE/integration/test_proxy_balance.sh"
 tier "e2e: acceptance (skips without AX_ROOT)" \
   bash "$HERE/e2e/acceptance.sh"
 

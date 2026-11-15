@@ -46,6 +46,50 @@ async function apiKey(): Promise<string> {
   return t.trim()
 }
 
+// ---- 余额可观测 ----
+// 为什么要单独做：余额耗尽的调用**没有 usage**，账本里一行都不会留。于是"账本不动"
+// 既能读成"没人用"，也能读成"账户没钱了" —— 实测就是这么错过 0.38 元的。
+// /user/balance 只读、不消耗 token，缓存 60s，避免健康检查每次都打上游。
+const BALANCE_TTL_MS = Number(process.env.AX_BALANCE_TTL_MS ?? 60_000)
+const LOW_BALANCE = Number(process.env.AX_LOW_BALANCE_CNY ?? 5)
+
+type Balance =
+  | { is_available: boolean; total_balance: string; currency: string; low: boolean; checked_at: string }
+  | { error: string; checked_at: string }
+
+let balanceCache: { at: number; value: Balance } | undefined
+
+function cached(value: Balance): Balance {
+  balanceCache = { at: Date.now(), value }
+  return value
+}
+
+async function balance(): Promise<Balance> {
+  if (balanceCache && Date.now() - balanceCache.at < BALANCE_TTL_MS) return balanceCache.value
+  const checked_at = new Date().toISOString()
+  const res = await fetch(`${UPSTREAM.replace(/\/+$/, "")}/user/balance`, {
+    headers: { authorization: `Bearer ${await apiKey()}` },
+    signal: AbortSignal.timeout(2_000),
+  }).catch(() => undefined)
+  // 查不到 ≠ 余额耗尽：分开表达，否则监控会在网络抖动时误报。
+  if (!res) return cached({ error: "upstream unreachable", checked_at })
+  if (!res.ok) return cached({ error: `http ${res.status}`, checked_at })
+  const info = await res
+    .json()
+    .catch(() => undefined)
+  const infos: { currency?: string; total_balance?: string }[] = info?.balance_infos ?? []
+  // 多币种账户优先取 CNY；没有就取第一条，并在 currency 字段里如实返回。
+  const cny = infos.find((b) => b.currency === "CNY") ?? infos[0]
+  const total = Number(cny?.total_balance ?? 0)
+  return cached({
+    is_available: info?.is_available === true,
+    total_balance: String(cny?.total_balance ?? "0"),
+    currency: String(cny?.currency ?? "CNY"),
+    low: !Number.isFinite(total) || total < LOW_BALANCE,
+    checked_at,
+  })
+}
+
 function tenantOf(auth: string | null): string | null {
   // 租户容器发的占位符形如 Bearer tenant-u0001
   const m = /^Bearer\s+tenant-(u\d+)$/i.exec(auth ?? "")
@@ -91,7 +135,9 @@ Bun.serve({
   async fetch(req) {
     const url = new URL(req.url)
     console.log(`REQ ${req.method} ${url.pathname} auth=${req.headers.get("authorization")?.slice(0, 24) ?? "none"}`)
-    if (url.pathname === "/health") return Response.json({ ok: true })
+    // ok 只表示"代理进程活着"，余额单独一个字段 —— 账户没钱时服务是健康的，
+    // 只是答不了。混在一起会让健康检查报错到错误的方向上。
+    if (url.pathname === "/health") return Response.json({ ok: true, balance: await balance() })
     if (!url.pathname.startsWith("/model/")) return new Response("not found", { status: 404 })
 
     const tenant = tenantOf(req.headers.get("authorization"))
@@ -155,6 +201,14 @@ Bun.serve({
             cost_cny: Number(cost.toFixed(6)),
             status: upstream.status,
           }) + "\n",
+        )
+      }
+      // 鉴权/额度/限流失败在账本里不可见（没有 usage）。留一行可 grep 的日志，
+      // 并丢掉余额缓存，让下一次 /health 立刻把真相报出来。
+      if (!usage && [401, 402, 403, 429].includes(upstream.status)) {
+        balanceCache = undefined
+        console.warn(
+          `UPSTREAM ${upstream.status} tenant=${tenant} ${url.pathname} ${text.slice(0, 160).replace(/\s+/g, " ")}`,
         )
       }
       return new Response(text, { status: upstream.status, headers: { "content-type": ctype } })
