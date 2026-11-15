@@ -73,6 +73,20 @@ describe("sessionErrorText", () => {
     ).toBe("The model account is out of balance. Ask an administrator to top it up before retrying.")
   })
 
+  test("keeps the upstream request id when rewriting a balance failure", () => {
+    expect(
+      sessionErrorText({
+        data: {
+          message: "Insufficient Balance (request_id: e396ea5e)",
+          responseBody:
+            '{"error":{"message":"Insufficient Balance (request_id: e396ea5e)","type":"insufficient_balance_error"}}',
+        },
+      }),
+    ).toBe(
+      "The model account is out of balance. Ask an administrator to top it up before retrying. (request e396ea5e)",
+    )
+  })
+
   test("presents a recoverable provider interruption as paused", () => {
     expect(
       sessionErrorDisplay({

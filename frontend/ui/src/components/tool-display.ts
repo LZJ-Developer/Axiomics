@@ -232,8 +232,13 @@ export function sessionErrorText(value: unknown): string {
   // 直连上游（DeepSeek 及兼容 OpenAI 的厂商）把欠费写成
   // {"error":{"message":"Insufficient Balance"}}，与 Atlas 托管格式无关。
   // 原样透出时用户只看到一句英文，分不清是自己写错了还是账户没钱了。
-  if (/insufficient[\s_-]?balance|exceeded your current quota/i.test(body) || /insufficient[\s_-]?balance/i.test(message))
-    return "The model account is out of balance. Ask an administrator to top it up before retrying."
+  if (/insufficient[\s_-]?balance|exceeded your current quota/i.test(body) || /insufficient[\s_-]?balance/i.test(message)) {
+    // request_id 是找上游核对这笔调用的唯一凭据，别在改写时丢掉。
+    // 它可能以 JSON 字段出现，也可能只是塞在 message 文本里（DeepSeek 是后者）。
+    const id = body.match(/request_id["\s:]*([0-9a-f-]{8,})/i)?.[1] ?? message.match(/request_id[\s:]*([0-9a-f-]{8,})/i)?.[1]
+    const suffix = id ? ` (request ${id})` : ""
+    return `The model account is out of balance. Ask an administrator to top it up before retrying.${suffix}`
+  }
   return message
 }
 
