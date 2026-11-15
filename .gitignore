@@ -70,12 +70,6 @@ tooling/acceptance-cases/cases/*/tracer/result.json
 # keep them out of the source tree and regenerate from the deployment.
 frontend/workspace/public/cases/replay/
 
-# Internal deployment record (real addresses, host paths, tenant roster).
-# Never committed: these files exist in this working tree only. The history was
-# rewritten to drop the commits that used to carry them, so `main` — the only
-# branch the remote accepts — is reproducible on any machine.
-/internal/
-
 # Unpublished SCENIC case study (280 MB of raw input and dist tarballs; stays local)
 /Agent_CaseStudy_SCENIC/
 软件著作权申请资料/
