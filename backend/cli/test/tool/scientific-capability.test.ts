@@ -47,6 +47,9 @@ describe("scientific_capability tool", () => {
       "release",
     ])
     expect(ScientificCapabilityParameters.safeParse({ action: "describe" }).success).toBe(false)
+    // The prose says "list/doctor"; a caller with no capability chosen yet must
+    // be able to ask doctor without inventing an id.
+    expect(ScientificCapabilityParameters.safeParse({ action: "doctor" }).success).toBe(true)
     expect(ScientificCapabilityParameters.safeParse({ action: "describe", name: "snapatac2" }).success).toBe(true)
     expect(ScientificCapabilityParameters.safeParse({ action: "describe", name: "unknown" }).success).toBe(false)
     expect(
@@ -132,6 +135,18 @@ describe("scientific_capability tool", () => {
         expect(health.local).not.toHaveProperty("manifest")
         expect(health.next).toContain("scientific_capability plan and start")
         expect(health.next).toContain("do not locate, activate, or invoke")
+
+        // doctor with no id answers the catalog-wide question rather than
+        // rejecting the call the prompt asked for.
+        const overview = JSON.parse((await tool.execute({ action: "doctor" }, context)).output) as {
+          capabilities: Array<{ id: string }>
+          writable_packages: Array<{ language: string; mechanism: string }>
+          next: string
+        }
+        expect(overview.capabilities).toHaveLength(65)
+        expect(overview.writable_packages.map((item) => item.language)).toEqual(["python", "r"])
+        expect(overview.writable_packages[0]?.mechanism).toBe("PIP_TARGET + PYTHONPATH")
+        expect(overview.next).toContain("doctor with a capability id")
       },
     })
   })

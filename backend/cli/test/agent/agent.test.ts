@@ -102,7 +102,7 @@ test("Research is the only built-in user-facing primary", async () => {
         .map((agent) => agent.name)
       expect(visiblePrimary).toEqual(["research"])
       const research = await Agent.get("research")
-      expect(research?.prompt).toContain("collaborative research agent")
+      expect(research?.prompt).toContain("analysis agent of a bioinformatics center")
       expect(evalPerm(research!, "research_contract")).toBe("deny")
       expect((await Agent.get("plan"))?.hidden).toBe(true)
     },
@@ -126,7 +126,7 @@ test("thin research profile is absent unless the explicit dev flag is enabled", 
       fn: async () => {
         const thin = await Agent.get("researchagent-test")
         expect(thin).toMatchObject({ name: "researchagent-test", mode: "primary", native: true })
-        expect(thin?.prompt).toContain("collaborative research agent")
+        expect(thin?.prompt).toContain("analysis agent of a bioinformatics center")
         expect(evalPerm(thin, "research_contract")).toBe("deny")
       },
     })
@@ -262,7 +262,7 @@ test("untrusted project agent configuration stays inert", async () => {
       await ProjectTrust.update(Instance.project, { trusted: false })
       expect(await Agent.get("repo-agent")).toBeUndefined()
       const research = await Agent.get("research")
-      expect(research?.prompt).toContain("collaborative research agent")
+      expect(research?.prompt).toContain("analysis agent of a bioinformatics center")
       expect(research?.prompt).not.toContain("repository-controlled")
       expect(research?.color).toBe("#d48765")
       expect(evalPerm(research, "bash")).toBe("ask")

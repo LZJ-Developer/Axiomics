@@ -91,7 +91,7 @@ describe("session.llm.responseStructure", () => {
         expect(codex.system).toEqual(standard.system)
         expect(codex.instructions).toBe(research!.prompt)
         const prompt = research!.prompt!.replace(/\s+/g, " ")
-        expect(prompt).toContain("collaborative research agent")
+        expect(prompt).toContain("analysis agent of a bioinformatics center")
         expect(prompt.match(/## Response structure/g)).toHaveLength(1)
         expect(prompt).toContain("These are writing defaults, not length limits.")
         expect(prompt).toContain("Follow the user's requested format and depth")

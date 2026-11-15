@@ -95,7 +95,10 @@ export const ScientificCapabilityParameters = z
   .strict()
   .superRefine((value, ctx) => {
     const alias = value.name ? CapabilityRegistry.describe(value.name) : undefined
-    if (needsID.has(value.action) && !value.id && !alias)
+    // doctor without an id is the catalog-wide check the prose names
+    // ("list/doctor"): a caller that has not chosen a capability yet has no id
+    // to send, and rejecting it costs a whole model step for nothing.
+    if (needsID.has(value.action) && value.action !== "doctor" && !value.id && !alias)
       ctx.addIssue({ code: "custom", path: ["id"], message: `${value.action} requires a capability id` })
     if (needsJob.has(value.action) && !value.job_id)
       ctx.addIssue({ code: "custom", path: ["job_id"], message: `${value.action} requires a compute job id` })
@@ -218,8 +221,8 @@ export const ScientificCapabilityTool = Tool.define<typeof ScientificCapabilityP
   {
     description: [
       "One governed gateway for the versioned scientific capability catalog.",
-      "For scRNA, spatial transcriptomics, scATAC, Hi-C, or imaging/spatial proteomics, call this before the first Bash, Python, or R environment probe. The default mappings are scanpy, squidpy, snapatac2, open2c, and mcmicro; choose ArchR only when the task specifically needs it.",
-      "Use list/describe/doctor before setup or spend. For catalog-managed omics tools, use start instead of installing or activating an environment in Bash: the platform injects the registered runtime. plan never dispatches. setup may create an exact pinned Python pack; managed toolchains are provisioned only by infrastructure and setup merely verifies them. start dispatches a packaged workload or sends a strict BYOK NVIDIA NIM request. smoke dispatches a bounded canonical local/Modal check, and verify validates its captured artifacts before recording evidence.",
+      "For a multi-step analysis in scRNA, spatial transcriptomics, scATAC, Hi-C, or imaging/spatial proteomics, call this before the first environment probe. A single plot, statistic, or conversion on a supplied table does not need the catalog — run it in the ready runtime. The default mappings are scanpy, squidpy, snapatac2, open2c, and mcmicro; choose ArchR only when the task specifically needs it.",
+      "Use list or doctor for the catalog-wide state; describe and doctor with an id add runtime integrity and hosted checks. Do this before setup or spend. For catalog-managed omics tools, use start instead of installing or activating an environment in Bash: the platform injects the registered runtime. plan never dispatches. setup may create an exact pinned Python pack; managed toolchains are provisioned only by infrastructure and setup merely verifies them. start dispatches a packaged workload or sends a strict BYOK NVIDIA NIM request. smoke dispatches a bounded canonical local/Modal check, and verify validates its captured artifacts before recording evidence.",
       "describe includes the hosted request_schema. Build payload from that schema, then plan validates all cross-field requirements without sending data or spending credits.",
       "doctor reports writable_packages: the project-scoped Python site-packages and R library the platform already exports as PIP_TARGET/PYTHONPATH and R_LIBS_USER. When the catalog has no tool for a long-tail need, install into them with a plain `pip install <package>` (or `install.packages`) in Bash — do not invent a directory, and do not pass --target or set PYTHONPATH yourself; the next command and kernel import it without extra wiring.",
       "status/wait/logs/artifacts/cancel/retry_delivery/release accept only jobs created by scientific_capability and may report stale_binding when the catalog changed. Callers cannot override pinned packages, images, GPU, or secrets.",
@@ -294,6 +297,30 @@ export const ScientificCapabilityTool = Tool.define<typeof ScientificCapabilityP
             },
             ...computeMetadata(result),
           },
+        }
+      }
+
+      // Catalog-wide doctor: the answer to "is anything ready, and where do
+      // packages go" before a capability has been chosen. Per-capability
+      // integrity checks stay behind an id.
+      if (args.action === "doctor" && !args.id && !args.name) {
+        const capabilities = await Promise.all(
+          CapabilityRegistry.listDetailed().map(async (item) => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            maturity: item.maturity,
+            availability: await CapabilityRuntime.availability(item, { verification: "status" }),
+          })),
+        )
+        return {
+          title: "Scientific capability doctor",
+          output: json({
+            capabilities,
+            writable_packages: await writablePackages(),
+            next: "Call doctor with a capability id for runtime integrity and hosted checks, then plan/start with target=local.",
+          }),
+          metadata: { scientific_capability: { action: args.action, dispatched: false } },
         }
       }
 

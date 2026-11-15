@@ -42,9 +42,12 @@ test("every provider receives one compact product operating contract", async () 
   // separately bounded response-structure defaults. The cap is a compactness
   // guard, not a byte target: it grew by the artifact and environment guidance
   // that the product now states once instead of repeating per agent.
+  // response.txt carries the answer-shape defaults only; it grew by the
+  // identity-answer rule (two or three sentences, no step menu) that keeps the
+  // first expert turn from turning into a capability catalog.
   expect((await read("session/prompt/core.txt")).length).toBeLessThan(4_100)
-  expect((await read("session/prompt/response.txt")).length).toBeLessThan(1_600)
-  expect(instructions.length).toBeLessThan(5_600)
+  expect((await read("session/prompt/response.txt")).length).toBeLessThan(1_900)
+  expect(instructions.length).toBeLessThan(6_100)
   expect(instructions).toContain("Keep simple work simple")
   expect(instructions).toContain("Optional graph tools may help")
   expect(instructions).toContain("Default to no children")
@@ -91,11 +94,20 @@ test("the primary, domain, and specialist prompts stay adaptive instead of proce
     read("agent/prompt/write.txt"),
     read("agent/prompt/explore.txt"),
   ])
-  for (const prompt of [research, ml, biology, physics, write, explore]) {
+  for (const [name, prompt] of [
+    ["research", research],
+    ["ml", ml],
+    ["biology", biology],
+    ["physics", physics],
+    ["write", write],
+    ["explore", explore],
+  ] as const) {
     // Research carries the full evidence, compute, and download contract; the
     // compatibility profiles stay far below. Keep the guard wide enough for
-    // that contract without turning it into a second product manual.
-    expect(prompt.length).toBeLessThan(4_600)
+    // that contract without turning it into a second product manual. Research
+    // gets the larger ceiling because it now carries the single-step/multi-step
+    // split that keeps ordinary analysis out of the workflow machinery.
+    expect(prompt.length).toBeLessThan(name === "research" ? 5_200 : 4_600)
     expect(prompt).not.toContain("literature-review.md")
     expect(prompt).not.toContain("reasoning.md")
     expect(prompt).not.toContain("methodology.md")
@@ -112,10 +124,16 @@ test("the primary, domain, and specialist prompts stay adaptive instead of proce
   expect(research).toContain("preflights every file and rolls back on failure")
   expect(research).toContain("qpdf or Tectonic")
   expect(research).toContain("optional binaries as capabilities")
-  expect(research).toContain("first environment action must call `scientific_capability` list/doctor")
+  // Two tiers, not one: a single computation must not open the catalog, while a
+  // multi-step domain analysis still must. Collapsing them either way is the
+  // regression this pair of assertions guards.
+  expect(research).toContain("Scale the method to the request")
+  expect(research).toContain("do not open the capability catalog")
+  expect(research).toContain("For a multi-step domain analysis")
+  expect(research).toContain("call `scientific_capability` list or doctor before the first environment probe")
   expect(research).toContain("scATAC=snapatac2")
-  expect(research).toContain("Do not probe Bash/Python/R first")
   expect(research).toContain("never recreate it")
+  expect(research).toContain("Interpretation is not a report")
   expect(research).toContain("never\n  convert failed candidates to NaN")
   expect(research).toContain("without a filtering pipeline")
   expect(direct.length).toBeLessThan(300)
