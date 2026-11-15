@@ -296,6 +296,40 @@ function SessionErrorNotice(props: { error: unknown }) {
   )
 }
 
+function SessionInterruptedNotice(props: { onResume?: () => void | Promise<void> }) {
+  const i18n = useI18n()
+  const [state, setState] = createSignal<"idle" | "running" | "failed">("idle")
+  return (
+    <Card variant="warning" class="session-state-card" data-state="paused" role="status" aria-live="polite">
+      <Icon name="alert-circle" size="small" />
+      <div data-slot="session-state-copy">
+        <strong>{i18n.t("ui.sessionTurn.interrupted.title")}</strong>
+        <span data-slot="session-state-message">{i18n.t("ui.sessionTurn.interrupted.detail")}</span>
+      </div>
+      <Show when={props.onResume}>
+        <Button
+          size="small"
+          variant="ghost"
+          disabled={state() === "running"}
+          onClick={() => {
+            setState("running")
+            Promise.resolve(props.onResume?.())
+              .then(() => setState("idle"))
+              .catch(() => setState("failed"))
+          }}
+        >
+          {state() === "running"
+            ? `${i18n.t("ui.sessionTurn.interrupted.resume")}…`
+            : i18n.t("ui.sessionTurn.interrupted.resume")}
+        </Button>
+      </Show>
+      <Show when={state() === "failed"}>
+        <span data-slot="session-state-message">{i18n.t("ui.sessionTurn.interrupted.resumeFailed")}</span>
+      </Show>
+    </Card>
+  )
+}
+
 export function SessionTurn(
   props: ParentProps<{
     sessionID: string
@@ -304,6 +338,8 @@ export function SessionTurn(
     lastUserMessageID?: string
     stepsExpanded?: boolean
     onStepsExpandedToggle?: () => void
+    /** Resume the turn a dead process left unfinished. Rendered only when set. */
+    onResume?: () => void | Promise<void>
     onUserInteracted?: () => void
     disclosure?: TurnDisclosure
     classes?: {
@@ -522,6 +558,15 @@ export function SessionTurn(
 
   const status = createMemo(() => data.store.session_status[props.sessionID] ?? idle)
   const working = createMemo(() => status().type !== "idle" && isLastUserMessage())
+  // A turn whose newest assistant never completed and never failed: the process
+  // that owned it is gone. Only the newest turn can be resumed, and only while
+  // nothing else is running for this session.
+  const interrupted = createMemo(() => {
+    if (!isLastUserMessage()) return false
+    const last = lastAssistantMessage()
+    if (!last || last.time.completed !== undefined || last.error) return false
+    return status().type === "idle"
+  })
   const retry = createMemo(() => {
     const s = status()
     if (s.type !== "retry") return
@@ -1136,6 +1181,9 @@ export function SessionTurn(
                     </Show>
                   </Match>
                 </Switch>
+                <Show when={interrupted()}>
+                  <SessionInterruptedNotice onResume={props.onResume} />
+                </Show>
               </div>
             )}
           </Show>

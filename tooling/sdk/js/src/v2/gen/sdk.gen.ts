@@ -19,6 +19,7 @@ import type {
   AgentPartInput,
   ApiAuth,
   AppAgentsResponses,
+  AppCapabilitiesResponses,
   AppLogErrors,
   AppLogResponses,
   AppSkillDeleteResponses,
@@ -280,6 +281,8 @@ import type {
   SessionPromptAsyncResponses,
   SessionPromptErrors,
   SessionPromptResponses,
+  SessionResumeErrors,
+  SessionResumeResponses,
   SessionRevertErrors,
   SessionRevertResponses,
   SessionShellErrors,
@@ -1423,7 +1426,7 @@ export class Jobs extends HeyApiClient {
         runtime_digest: string
       }
       capability_execution?: {
-        network: "none"
+        network: "none" | "unrestricted"
         lock_digest: string
         software_manifest?: string
         pip_requirements?: string
@@ -1432,6 +1435,7 @@ export class Jobs extends HeyApiClient {
         runtime_path?: Array<string>
         runtime_env?: {
           CONDA_PREFIX?: string
+          LD_LIBRARY_PATH?: string
           JAVA_HOME?: string
           R_HOME?: string
           MCMICRO_HOME?: string
@@ -1540,7 +1544,7 @@ export class Jobs extends HeyApiClient {
         runtime_digest: string
       }
       capability_execution?: {
-        network: "none"
+        network: "none" | "unrestricted"
         lock_digest: string
         software_manifest?: string
         pip_requirements?: string
@@ -1549,6 +1553,7 @@ export class Jobs extends HeyApiClient {
         runtime_path?: Array<string>
         runtime_env?: {
           CONDA_PREFIX?: string
+          LD_LIBRARY_PATH?: string
           JAVA_HOME?: string
           R_HOME?: string
           MCMICRO_HOME?: string
@@ -2588,6 +2593,182 @@ export class Project2 extends HeyApiClient {
   }
 }
 
+export class Skill extends HeyApiClient {
+  /**
+   * Delete user skill
+   *
+   * Delete a local user-authored skill.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "name" },
+            { in: "query", key: "directory" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<AppSkillDeleteResponses, unknown, ThrowOnError>({
+      url: "/skill/{name}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Write user skill
+   *
+   * Create or update a local user-authored skill.
+   */
+  public write<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string
+      directory?: string
+      content: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "name" },
+            { in: "query", key: "directory" },
+            { in: "body", key: "content" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).put<AppSkillWriteResponses, unknown, ThrowOnError>({
+      url: "/skill/{name}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class App extends HeyApiClient {
+  /**
+   * Deployment capabilities
+   *
+   * Server-wide switches a client must apply to its UI, such as whether a terminal is available.
+   */
+  public capabilities<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<AppCapabilitiesResponses, unknown, ThrowOnError>({
+      url: "/capabilities",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Write log
+   *
+   * Write a log entry to the server logs with specified level and metadata.
+   */
+  public log<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      service: string
+      level: "debug" | "info" | "error" | "warn"
+      message: string
+      extra?: {
+        [key: string]: unknown
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "body", key: "service" },
+            { in: "body", key: "level" },
+            { in: "body", key: "message" },
+            { in: "body", key: "extra" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<AppLogResponses, AppLogErrors, ThrowOnError>({
+      url: "/log",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * List agents
+   *
+   * Get a list of all available AI agents in the Axiomics system.
+   */
+  public agents<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<AppAgentsResponses, unknown, ThrowOnError>({
+      url: "/agent",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List skills
+   *
+   * Get a list of all available skills in the Axiomics system.
+   */
+  public skills<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<AppSkillsResponses, unknown, ThrowOnError>({
+      url: "/skill",
+      ...options,
+      ...params,
+    })
+  }
+
+  private _skill?: Skill
+  get skill(): Skill {
+    return (this._skill ??= new Skill({ client: this.client }))
+  }
+}
+
 export class Pty extends HeyApiClient {
   /**
    * List PTY sessions
@@ -3569,6 +3750,36 @@ export class Session extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<SessionAbortResponses, SessionAbortErrors, ThrowOnError>({
       url: "/session/{sessionID}/abort",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Resume an interrupted turn
+   *
+   * Continue the assistant turn a dead process left unfinished. The partial turn is not replayed to the provider. Returns 409 while another loop owns the session.
+   */
+  public resume<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionResumeResponses, SessionResumeErrors, ThrowOnError>({
+      url: "/session/{sessionID}/resume",
       ...options,
       ...params,
     })
@@ -7648,163 +7859,6 @@ export class Command3 extends HeyApiClient {
   }
 }
 
-export class Skill extends HeyApiClient {
-  /**
-   * Delete user skill
-   *
-   * Delete a local user-authored skill.
-   */
-  public delete<ThrowOnError extends boolean = false>(
-    parameters: {
-      name: string
-      directory?: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "path", key: "name" },
-            { in: "query", key: "directory" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).delete<AppSkillDeleteResponses, unknown, ThrowOnError>({
-      url: "/skill/{name}",
-      ...options,
-      ...params,
-    })
-  }
-
-  /**
-   * Write user skill
-   *
-   * Create or update a local user-authored skill.
-   */
-  public write<ThrowOnError extends boolean = false>(
-    parameters: {
-      name: string
-      directory?: string
-      content: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "path", key: "name" },
-            { in: "query", key: "directory" },
-            { in: "body", key: "content" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).put<AppSkillWriteResponses, unknown, ThrowOnError>({
-      url: "/skill/{name}",
-      ...options,
-      ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
-    })
-  }
-}
-
-export class App extends HeyApiClient {
-  /**
-   * Write log
-   *
-   * Write a log entry to the server logs with specified level and metadata.
-   */
-  public log<ThrowOnError extends boolean = false>(
-    parameters: {
-      directory?: string
-      service: string
-      level: "debug" | "info" | "error" | "warn"
-      message: string
-      extra?: {
-        [key: string]: unknown
-      }
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "query", key: "directory" },
-            { in: "body", key: "service" },
-            { in: "body", key: "level" },
-            { in: "body", key: "message" },
-            { in: "body", key: "extra" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).post<AppLogResponses, AppLogErrors, ThrowOnError>({
-      url: "/log",
-      ...options,
-      ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
-    })
-  }
-
-  /**
-   * List agents
-   *
-   * Get a list of all available AI agents in the Axiomics system.
-   */
-  public agents<ThrowOnError extends boolean = false>(
-    parameters?: {
-      directory?: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
-    return (options?.client ?? this.client).get<AppAgentsResponses, unknown, ThrowOnError>({
-      url: "/agent",
-      ...options,
-      ...params,
-    })
-  }
-
-  /**
-   * List skills
-   *
-   * Get a list of all available skills in the Axiomics system.
-   */
-  public skills<ThrowOnError extends boolean = false>(
-    parameters?: {
-      directory?: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
-    return (options?.client ?? this.client).get<AppSkillsResponses, unknown, ThrowOnError>({
-      url: "/skill",
-      ...options,
-      ...params,
-    })
-  }
-
-  private _skill?: Skill
-  get skill(): Skill {
-    return (this._skill ??= new Skill({ client: this.client }))
-  }
-}
-
 export class Lsp extends HeyApiClient {
   /**
    * Get LSP status
@@ -8102,6 +8156,11 @@ export class AxiomicsClient extends HeyApiClient {
     return (this._project ??= new Project2({ client: this.client }))
   }
 
+  private _app?: App
+  get app(): App {
+    return (this._app ??= new App({ client: this.client }))
+  }
+
   private _pty?: Pty
   get pty(): Pty {
     return (this._pty ??= new Pty({ client: this.client }))
@@ -8215,11 +8274,6 @@ export class AxiomicsClient extends HeyApiClient {
   private _command?: Command3
   get command(): Command3 {
     return (this._command ??= new Command3({ client: this.client }))
-  }
-
-  private _app?: App
-  get app(): App {
-    return (this._app ??= new App({ client: this.client }))
   }
 
   private _lsp?: Lsp

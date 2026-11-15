@@ -624,6 +624,18 @@ export namespace MessageV2 {
     })
   }
 
+  /** Whether this message carries a materialised attachment.
+   *
+   * A chat attachment is written into the session workspace and described to the
+   * model by a synthetic "is saved at <path>" part; the original data-URL part
+   * stays behind for the composer's own rendering and is skipped on the wire.
+   * Anything that decides what the model pays for must ask this same question —
+   * the context budget used to charge the full base64 of a file the provider
+   * never receives, and rejected requests the model could have handled. */
+  export function hasSavedAttachment(message: WithParts) {
+    return message.parts.some((part) => part.type === "text" && part.synthetic && part.text.includes(" is saved at "))
+  }
+
   export function toModelMessages(
     input: WithParts[],
     model: Provider.Model,
@@ -749,9 +761,8 @@ export namespace MessageV2 {
         // 提示）。原 file part 保留是为了界面显示；模型侧只应该看到路径，所以下面
         // 把对应的 data: 附件跳过 —— 否则 transform 会把它内联成最多 64,000 字符。
         // 用"本条消息里有没有那条提示"来判定；老消息（没有提示）保持原行为。
-        const savedAttachment = msg.parts.some(
-          (part) => part.type === "text" && part.synthetic && part.text.includes(" is saved at "),
-        )
+        // 同一个判定也供 fileTokens 计费使用（hasSavedAttachment），两边必须同源。
+        const savedAttachment = hasSavedAttachment(msg)
         result.push(userMessage)
         for (const part of msg.parts) {
           if (part.type === "text" && !part.ignored)
@@ -807,6 +818,13 @@ export namespace MessageV2 {
 
       if (msg.info.role === "assistant") {
         const differentModel = `${model.providerID}/${model.id}` !== `${msg.info.providerID}/${msg.info.modelID}`
+
+        // A turn that never completed is not replayable history: the process
+        // that owned it died mid-request. Replaying its partial reasoning is
+        // rejected by thinking-mode providers (DeepSeek 400s on reasoning
+        // without its tool call), and the resumed loop rebuilds the answer.
+        // Keep error-carrying turns on the existing path below.
+        if (msg.info.time.completed === undefined && !msg.info.error) continue
 
         if (
           msg.info.error &&

@@ -70,6 +70,7 @@ import "./prompt-input.css"
 import {
   ATTACHMENT_ACCEPT,
   MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_TOTAL_BYTES,
   attachmentFormat,
   attachmentMime,
   attachmentSize,
@@ -647,6 +648,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           name: file.name,
           size: attachmentSize(file.size),
           limit: attachmentSize(MAX_ATTACHMENT_BYTES),
+        }),
+      })
+      return
+    }
+    // The server materialises every attachment of one message under a single
+    // cap, so a second file can exceed it even when each file is under its own
+    // limit. Refuse here, where the message still names the total.
+    const used = prompt.current().reduce((total, part) => total + (part.type === "image" ? (part.size ?? 0) : 0), 0)
+    if (used + file.size > MAX_ATTACHMENT_TOTAL_BYTES) {
+      showToast({
+        variant: "error",
+        title: language.t("prompt.attachment.unsupported.title"),
+        description: language.t("prompt.attachment.totalTooLarge.description", {
+          name: file.name,
+          size: attachmentSize(used + file.size),
+          limit: attachmentSize(MAX_ATTACHMENT_TOTAL_BYTES),
         }),
       })
       return

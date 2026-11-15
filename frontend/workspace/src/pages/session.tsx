@@ -1466,6 +1466,9 @@ export default function Page(): JSX.Element {
                                         (working() && message.id === lastUserMessage()?.id)
                                       }
                                       onStepsExpandedToggle={() => toggleSteps(message.id)}
+                                      onResume={() =>
+                                        sdk.client.session.resume({ sessionID: params.id! }).then(() => undefined)
+                                      }
                                       classes={{
                                         root: "min-w-0 w-full relative",
                                         content: "flex flex-col justify-between !overflow-visible",

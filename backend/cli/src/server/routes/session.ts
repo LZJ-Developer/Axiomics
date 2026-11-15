@@ -525,6 +525,53 @@ export const SessionRoutes = lazy(() =>
         return c.json(true)
       },
     )
+    .post(
+      "/:sessionID/resume",
+      describeRoute({
+        summary: "Resume an interrupted turn",
+        description:
+          "Continue the assistant turn a dead process left unfinished. The partial turn is not replayed to the provider. Returns 409 while another loop owns the session.",
+        operationId: "session.resume",
+        responses: {
+          200: {
+            description: "Resumed message",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    info: MessageV2.Assistant,
+                    parts: MessageV2.Part.array(),
+                  }),
+                ),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          sessionID: z.string(),
+        }),
+      ),
+      async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        await Session.assertDirectory(sessionID)
+        const messages = await MessageV2.filterCompacted(MessageV2.stream(sessionID))
+        const last = messages.at(-1)
+        if (!last || last.info.role !== "assistant" || last.info.time.completed !== undefined || last.info.error)
+          throw new HTTPException(400, { message: "No interrupted turn to resume" })
+        try {
+          SessionPrompt.assertNotBusy(sessionID)
+        } catch (error) {
+          if (error instanceof Session.BusyError)
+            throw new HTTPException(409, { message: "Another turn is already running for this session" })
+          throw error
+        }
+        return c.json(await SessionPrompt.loop(sessionID))
+      },
+    )
     .get(
       "/:sessionID/diff",
       describeRoute({

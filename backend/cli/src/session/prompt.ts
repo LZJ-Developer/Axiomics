@@ -95,7 +95,10 @@ export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
   export const OUTPUT_TOKEN_MAX = Flag.AXIOMICS_EXPERIMENTAL_OUTPUT_TOKEN_MAX || 32_000
   export const CONTEXT_PREFLIGHT_MARGIN = 0.9
-  const LOOP_LEASE_TIMEOUT = 24 * 60 * 60 * 1_000
+  // A stale lock is now reclaimed by exact process identity, so this is only
+  // the ceiling for a genuinely live-but-wedged owner. Two minutes turns any
+  // residual wait into a visible error instead of a silent day-long queue.
+  const LOOP_LEASE_TIMEOUT = 2 * 60 * 1_000
   const ATTACHMENT_LIMIT = 32 * 1024 * 1024
   // Interactive shell output retained in memory and published to the part
   // store: keep the newest tail, and coalesce part updates while streaming.
@@ -155,16 +158,23 @@ export namespace SessionPrompt {
 
   function fileTokens(messages: MessageV2.WithParts[]) {
     const superseded = MessageV2.supersededOutputs(messages)
-    return messages
-      .flatMap((message) => message.parts)
-      .reduce((sum, part) => {
+    // An attachment materialised into the workspace reaches the model as a path,
+    // never as bytes (see MessageV2.hasSavedAttachment). Charging its base64 here
+    // made a 3 MB CSV look like a million tokens and failed the turn before any
+    // provider request — for content the provider never receives. The predicate
+    // is the wire's own, so the budget and the payload cannot disagree.
+    const tokens = (message: MessageV2.WithParts) => {
+      const saved = MessageV2.hasSavedAttachment(message)
+      return message.parts.reduce((sum, part) => {
         if (
           part.type === "file" &&
           !part.mime.startsWith("image/") &&
           part.mime !== "text/plain" &&
           part.mime !== "application/x-directory"
-        )
+        ) {
+          if (saved && part.url.startsWith("data:")) return sum
           return sum + Token.estimate(part.url)
+        }
         if (
           part.type !== "tool" ||
           part.state.status !== "completed" ||
@@ -180,6 +190,8 @@ export namespace SessionPrompt {
           )
         )
       }, 0)
+    }
+    return messages.reduce((sum, message) => sum + tokens(message), 0)
   }
 
   /** Estimate the complete provider input assembled for this turn. The hard
@@ -2531,22 +2543,33 @@ export namespace SessionPrompt {
                 new AbortController().signal,
                 "attachment",
               )
-                .then(([saved]) => [
-                  {
-                    id: Identifier.ascending("part"),
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text" as const,
-                    synthetic: true,
-                    text: `The attached file ${part.filename ? `"${part.filename}"` : `(${part.mime})`} is saved at ${fileURLToPath(saved!.url)}. Read it with the read tool when its contents are needed; do not ask the user for a path.`,
-                  },
-                  {
-                    ...part,
-                    id: part.id ?? Identifier.ascending("part"),
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                  },
-                ])
+                .then(([saved]) => {
+                  const name = part.filename ? `"${part.filename}"` : `(${part.mime})`
+                  // Binary handoffs (.npz, .npy, .xlsx …) are unreadable as text;
+                  // pointing the model at the read tool would feed it mojibake.
+                  const binary =
+                    part.mime === "application/octet-stream" ||
+                    /\.(npz|npy|xlsx|xls|parquet|h5ad|h5|bam|cram|mat|rds)$/i.test(part.filename ?? "")
+                  const how = binary
+                    ? "It is binary: load it with the python tool (for example numpy.load for .npz/.npy) instead of reading it as text."
+                    : "Read it with the read tool when its contents are needed; do not ask the user for a path."
+                  return [
+                    {
+                      id: Identifier.ascending("part"),
+                      messageID: info.id,
+                      sessionID: input.sessionID,
+                      type: "text" as const,
+                      synthetic: true,
+                      text: `The attached file ${name} is saved at ${fileURLToPath(saved!.url)}. ${how}`,
+                    },
+                    {
+                      ...part,
+                      id: part.id ?? Identifier.ascending("part"),
+                      messageID: info.id,
+                      sessionID: input.sessionID,
+                    },
+                  ]
+                })
                 .catch((error: unknown) => {
                   log.warn("attachment not saved", { error })
                   return [

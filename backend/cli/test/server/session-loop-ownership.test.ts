@@ -185,3 +185,73 @@ describe("session loop ownership routes", () => {
     })
   })
 })
+
+describe("session resume route", () => {
+  async function sessionWithAssistant(tmp: string, time: { created: number; completed?: number }, error?: unknown) {
+    const session = await Session.create({})
+    const userID = await MessageV2.nextMessageID(session.id)
+    await Session.updateMessage({
+      id: userID,
+      sessionID: session.id,
+      role: "user",
+      time: { created: time.created },
+      agent: "research",
+      model: { providerID: "test", modelID: "test" },
+      effort: "normal",
+      internal: SessionLoopState.prompt(userID),
+    })
+    const assistantID = await MessageV2.nextMessageID(session.id)
+    await Session.updateMessage({
+      id: assistantID,
+      sessionID: session.id,
+      parentID: userID,
+      role: "assistant",
+      time,
+      mode: "",
+      agent: "research",
+      path: { cwd: tmp, root: tmp },
+      cost: 0,
+      tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+      modelID: "test",
+      providerID: "test",
+      internal: { step: 1 },
+      ...(error ? { error: error as never } : {}),
+    })
+    return session
+  }
+
+  test("refuses a session with no interrupted turn", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const empty = await Session.create({})
+        await using cleanupEmpty = { [Symbol.asyncDispose]: () => Session.remove(empty.id) }
+        const none = await SessionRoutes().request(`/${empty.id}/resume`, { method: "POST" })
+        expect(none.status).toBe(400)
+
+        const done = await sessionWithAssistant(tmp.path, { created: Date.now(), completed: Date.now() })
+        await using cleanupDone = { [Symbol.asyncDispose]: () => Session.remove(done.id) }
+        const completed = await SessionRoutes().request(`/${done.id}/resume`, { method: "POST" })
+        expect(completed.status).toBe(400)
+      },
+    })
+  })
+
+  test("refuses a turn that ended with an error, because only a dead process is resumable", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const aborted = await sessionWithAssistant(
+          tmp.path,
+          { created: Date.now(), completed: Date.now() },
+          new MessageV2.AbortedError({ message: "stopped by the user" }).toObject(),
+        )
+        await using cleanup = { [Symbol.asyncDispose]: () => Session.remove(aborted.id) }
+        const response = await SessionRoutes().request(`/${aborted.id}/resume`, { method: "POST" })
+        expect(response.status).toBe(400)
+      },
+    })
+  })
+})

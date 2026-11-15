@@ -1,5 +1,13 @@
 export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
 
+/** One message may carry more than one file, and the server materialises the
+ * whole set under a single cap (`SubtaskAttachments.LIMIT` in
+ * backend/cli/src/session/subtask-attachments.ts). Without the total check the
+ * composer accepts two 20 MB files and the send fails after upload with
+ * "Attachments exceed the 32 MiB byte limit" — an error the user cannot act on.
+ * Keep this number equal to the server's LIMIT. */
+export const MAX_ATTACHMENT_TOTAL_BYTES = 32 * 1024 * 1024
+
 const images = ["image/png", "image/jpeg", "image/gif", "image/webp"]
 const direct = new Set([
   ...images,
@@ -25,6 +33,11 @@ const extensions: Record<string, string> = {
   jl: "text/x-julia",
   ipynb: "application/x-ipynb+json",
   tex: "application/x-tex",
+  // NumPy archives are the usual handoff for an array an expert wants plotted.
+  // Browsers give them no MIME, so the extension is the only signal; the honest
+  // type keeps the server from treating the bytes as text.
+  npz: "application/octet-stream",
+  npy: "application/octet-stream",
   fasta: "text/x-fasta",
   fa: "text/x-fasta",
   fna: "text/x-fasta",

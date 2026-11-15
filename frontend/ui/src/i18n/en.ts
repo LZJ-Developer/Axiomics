@@ -15,6 +15,11 @@ export const dict = {
   "ui.sessionTurn.response.actions": "Response actions",
   "ui.sessionTurn.response.copy": "Copy response",
   "ui.sessionTurn.response.copyFailed": "Could not copy. Select the response text and copy it manually.",
+  "ui.sessionTurn.interrupted.title": "Run interrupted",
+  "ui.sessionTurn.interrupted.detail":
+    "The process stopped before this turn finished. Continue to resume it from here.",
+  "ui.sessionTurn.interrupted.resume": "Continue",
+  "ui.sessionTurn.interrupted.resumeFailed": "Could not continue this turn. Refresh and try again.",
   "ui.sessionTurn.generated.label": "{{count}} generated artifacts",
   "ui.sessionTurn.generated.title": "Generated",
   "ui.sessionTurn.generated.open": "Open {{name}} in Files",

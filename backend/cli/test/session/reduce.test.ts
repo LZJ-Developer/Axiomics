@@ -42,7 +42,7 @@ function assistantInfo(id: string, parentID: string): MessageV2.Assistant {
     id,
     sessionID,
     role: "assistant",
-    time: { created: 0 },
+    time: { created: 0, completed: 0 },
     parentID,
     modelID: "test-model",
     providerID: "test",
@@ -443,5 +443,33 @@ describe("session.message-v2.composition — stays in sync with compacted render
     expect(c.images).toBe(0) // not counted as a shipped image
     expect(c.image).toBe(0)
     expect(c.text).toBe(Token.estimate(MessageV2.oversizedImageNudge(bigUrl, "huge.png")!))
+  })
+})
+
+describe("session.message-v2.toModelMessages — interrupted turns are not replayed", () => {
+  const textPart = (messageID: string, id: string, text: string): MessageV2.Part =>
+    ({ id, sessionID, messageID, type: "text", text }) as MessageV2.Part
+
+  test("an assistant without a completion time is left out of the provider payload", () => {
+    const unfinished = { ...assistantInfo("a1", "u1"), time: { created: 0 } }
+    const input: MessageV2.WithParts[] = [
+      { info: userInfo("u1"), parts: [textPart("u1", "p1", "draw a plot")] },
+      { info: unfinished, parts: [textPart("a1", "p2", "partial answer")] },
+      { info: userInfo("u2"), parts: [textPart("u2", "p3", "continue")] },
+    ]
+    const s = JSON.stringify(MessageV2.toModelMessages(input, model))
+    expect(s).not.toContain("partial answer")
+    expect(s).toContain("draw a plot")
+    expect(s).toContain("continue")
+  })
+
+  test("a completed assistant is still replayed", () => {
+    const done = { ...assistantInfo("a1", "u1"), time: { created: 0, completed: 1 } }
+    const input: MessageV2.WithParts[] = [
+      { info: userInfo("u1"), parts: [textPart("u1", "p1", "draw a plot")] },
+      { info: done, parts: [textPart("a1", "p2", "finished answer")] },
+    ]
+    const s = JSON.stringify(MessageV2.toModelMessages(input, model))
+    expect(s).toContain("finished answer")
   })
 })

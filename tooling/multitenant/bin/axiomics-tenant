@@ -250,7 +250,8 @@ cmd_add() {
   "model": "deepseek/deepseek-flash",
   "provider": { "deepseek": { "options": {
     "baseURL": "https://host.containers.internal:43001/model/v1",
-    "apiKey": "tenant-$tid"
+    "apiKey": "tenant-$tid",
+    "idleTimeout": 300000
   }}},
   "sandbox": { "enabled": true, "network": "allow" }
 }

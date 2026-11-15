@@ -2,6 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { DataRootBarrier } from "@/global/data-root-barrier"
 import { LockCoordination } from "@/util/lock-coordination"
+import { ProcessIdentity } from "@/process/process-identity"
 
 export namespace FileLease {
   const timeout = 10_000
@@ -11,6 +12,12 @@ export namespace FileLease {
     pid: number
     token: string
     created: number
+    /**
+     * Exact process-start identity. A container restart reuses the same pid
+     * (the app is pid 2 there), so pid liveness alone would keep a dead
+     * owner's lock alive. Older locks omit this and fall back to pid liveness.
+     */
+    identity?: string
   }
 
   export interface Lease extends AsyncDisposable {
@@ -43,7 +50,8 @@ export namespace FileLease {
       "token" in value &&
       typeof value.token === "string" &&
       "created" in value &&
-      typeof value.created === "number"
+      typeof value.created === "number" &&
+      (!("identity" in value) || (typeof value.identity === "string" && value.identity.length > 0))
     )
   }
 
@@ -57,6 +65,10 @@ export namespace FileLease {
       Number.isSafeInteger(owner.pid) &&
       owner.pid > 0
     ) {
+      // Exact identity first: it answers "is this still the process that took
+      // the lease", which pid liveness cannot once a restart reuses the pid.
+      if ("identity" in owner && typeof owner.identity === "string" && owner.identity.length > 0)
+        return !(await ProcessIdentity.owns(owner.pid, owner.identity))
       return !running(owner.pid)
     }
     const stat = await fs.stat(filepath).catch(() => undefined)
@@ -92,7 +104,7 @@ export namespace FileLease {
     const operation = await DataRootBarrier.enter(filepath, timeoutMs)
     try {
       cancelled(signal)
-      const blocked: { at: number; owner?: string } = { at: Date.now() }
+      const blocked: { at: number; owner?: string; pid?: number; since?: number } = { at: Date.now() }
       const token = crypto.randomUUID()
       const parent = path.dirname(filepath)
       await fs.mkdir(parent, { recursive: true })
@@ -105,7 +117,10 @@ export namespace FileLease {
       const open = async (): Promise<Awaited<ReturnType<typeof fs.open>>> => {
         const expired = () => {
           if (Date.now() - blocked.at < timeoutMs) return
-          throw new Error(`Timed out waiting for another Axiomics process to release ${filepath}`)
+          const held = blocked.pid
+            ? ` (held by process ${blocked.pid} for ${Math.max(0, Math.round((Date.now() - (blocked.since ?? blocked.at)) / 1000))}s)`
+            : ""
+          throw new Error(`Timed out waiting for another Axiomics process to release ${filepath}${held}`)
         }
         while (true) {
           cancelled(signal)
@@ -145,6 +160,8 @@ export namespace FileLease {
             const signature = `${recovery.current.pid}\0${recovery.current.token}\0${recovery.current.created}`
             if (signature !== blocked.owner) {
               blocked.owner = signature
+              blocked.pid = recovery.current.pid
+              blocked.since = recovery.current.created
               blocked.at = Date.now()
             }
           }
@@ -154,8 +171,16 @@ export namespace FileLease {
       }
 
       const handle = await open()
+      const identity = await ProcessIdentity.capture(process.pid).catch(() => undefined)
       await handle
-        .writeFile(JSON.stringify({ pid: process.pid, token, created: Date.now() }))
+        .writeFile(
+          JSON.stringify({
+            pid: process.pid,
+            token,
+            created: Date.now(),
+            ...(identity ? { identity } : {}),
+          }),
+        )
         .then(() => cancelled(signal))
         .then(() => handle.sync())
         .catch(async (error) => {

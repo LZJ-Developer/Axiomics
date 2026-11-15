@@ -4,6 +4,7 @@ import path from "node:path"
 import { DataRoot } from "../../src/global/data-root"
 import { DataRootBarrier } from "../../src/global/data-root-barrier"
 import { FileLease } from "../../src/util/file-lease"
+import { ProcessIdentity } from "../../src/process/process-identity"
 import { tmpdir } from "../fixture/fixture"
 
 async function waitForFile(filepath: string) {
@@ -174,3 +175,48 @@ test("disposing a lease keeps its lock published until the active callback settl
     await peer?.[Symbol.asyncDispose]()
   }
 })
+
+test("a live pid under a different process identity is reclaimed", async () => {
+  await using tmp = await tmpdir()
+  const filepath = path.join(tmp.path, "recycled.lock")
+  // Simulates the container case: the pid still exists, but it is a different
+  // process than the one that took the lease.
+  await fs.writeFile(
+    filepath,
+    JSON.stringify({ pid: process.pid, token: "dead-owner", created: Date.now(), identity: "0".repeat(64) }),
+  )
+
+  await using lease = await FileLease.acquire(filepath, 500)
+  const current = await ProcessIdentity.capture(process.pid)
+  expect(current).toBeTruthy()
+  expect(await Bun.file(filepath).json()).toMatchObject({ pid: process.pid, identity: current })
+  void lease
+}, 5_000)
+
+test("a live pid under the matching process identity still holds the lease", async () => {
+  await using tmp = await tmpdir()
+  const filepath = path.join(tmp.path, "same-process.lock")
+  const identity = await ProcessIdentity.capture(process.pid)
+  expect(identity).toBeTruthy()
+  await fs.writeFile(filepath, JSON.stringify({ pid: process.pid, token: "same-owner", created: Date.now(), identity }))
+
+  await expect(FileLease.acquire(filepath, 75)).rejects.toThrow(
+    "Timed out waiting for another Axiomics process to release",
+  )
+  expect(await Bun.file(filepath).json()).toMatchObject({ token: "same-owner" })
+}, 5_000)
+
+test("a legacy lock without identity still uses pid liveness", async () => {
+  await using tmp = await tmpdir()
+  const live = path.join(tmp.path, "legacy-live.lock")
+  const dead = path.join(tmp.path, "legacy-dead.lock")
+  await fs.writeFile(live, JSON.stringify({ pid: process.pid, token: "legacy", created: Date.now() }))
+  await expect(FileLease.acquire(live, 75)).rejects.toThrow("Timed out waiting for another Axiomics process to release")
+
+  const child = Bun.spawn({ cmd: ["true"], stdout: "ignore", stderr: "ignore" })
+  await child.exited
+  await fs.writeFile(dead, JSON.stringify({ pid: child.pid, token: "gone", created: Date.now() }))
+  await using lease = await FileLease.acquire(dead, 500)
+  expect(await Bun.file(dead).json()).toMatchObject({ pid: process.pid })
+  void lease
+}, 5_000)

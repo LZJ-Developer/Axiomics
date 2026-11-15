@@ -43,8 +43,7 @@ export const dict = {
   "cases.pending.title": "Account created — awaiting administrator approval",
   "cases.pending.description":
     "Your workspace opens automatically once an administrator approves it. You usually don't need to do anything.",
-  "cases.pending.hint":
-    "If nothing changes after a while, contact your administrator to confirm the account status.",
+  "cases.pending.hint": "If nothing changes after a while, contact your administrator to confirm the account status.",
   "cases.pending.back": "Back to cases",
   "cases.pending.other": "Sign in with another account",
   "cases.projects": "Projects",
@@ -101,11 +100,13 @@ export const dict = {
   "cases.inspector.preview": "Result preview",
   "cases.inspector.emptyResults": "No results have been saved by this point.",
   "cases.inspector.emptyFiles": "No files have been recorded by this point.",
-  "cases.inspector.missingPreview": "This result's content was not exported with the replay; only its name and path remain.",
+  "cases.inspector.missingPreview":
+    "This result's content was not exported with the replay; only its name and path remain.",
   "cases.inspector.missingContent": "This file's content was not exported with the replay; only its path remains.",
   "cases.new.title": "Start a new study",
   "cases.new.label": "New research",
-  "cases.new.placeholder": "Describe your research question, e.g. compare two cell-annotation methods on spatial transcriptomics",
+  "cases.new.placeholder":
+    "Describe your research question, e.g. compare two cell-annotation methods on spatial transcriptomics",
   "cases.new.hint": "Press Enter to start. You'll sign in then; your question is kept.",
   "cases.new.submit": "Start research",
   "session.header.showSessions": "Show sessions",
@@ -328,6 +329,8 @@ export const dict = {
   "prompt.attachment.unsupported.description":
     "{{name}} is not a supported image, PDF, text, code, or scientific data file.",
   "prompt.attachment.tooLarge.description": "{{name}} is {{size}}; attachments are limited to {{limit}}.",
+  "prompt.attachment.totalTooLarge.description":
+    "Adding {{name}} brings this message to {{size}}; all files together are limited to {{limit}}.",
   "prompt.conversation.untitled": "Untitled conversation",
 
   "dialog.mcp.title": "MCPs",
@@ -1275,8 +1278,10 @@ export const dict = {
   "settings.storage.description": "Manage local data and review its disk usage.",
   "settings.storage.retry": "Retry",
   "settings.storage.tryAgain": "Try again",
-  "settings.storage.scanError": "Disk usage could not be refreshed. Any figures shown are from the last successful scan.",
-  "settings.storage.skipped": "{{count}} folders could not be read (usually sandbox overlay work dirs), so these totals may be low.",
+  "settings.storage.scanError":
+    "Disk usage could not be refreshed. Any figures shown are from the last successful scan.",
+  "settings.storage.skipped":
+    "{{count}} folders could not be read (usually sandbox overlay work dirs), so these totals may be low.",
   "settings.storage.unavailable": "Unavailable",
   "settings.storage.resume": "Resume safely",
   "settings.storage.loading": "Loading storage settings",
@@ -1408,17 +1413,22 @@ export const dict = {
   "settings.network.group.package-management.label": "Package management",
   "settings.network.group.package-management.description": "Python, R, JS, Rust package indexes and source hosting.",
   "settings.network.group.ncbi-nih.label": "NCBI and NIH",
-  "settings.network.group.ncbi-nih.description": "PubMed, Entrez E-utilities, GEO, dbSNP, ClinVar, and NIH data services.",
+  "settings.network.group.ncbi-nih.description":
+    "PubMed, Entrez E-utilities, GEO, dbSNP, ClinVar, and NIH data services.",
   "settings.network.group.genomics-biology.label": "Genomics and biology",
-  "settings.network.group.genomics-biology.description": "Ensembl, UCSC, EBI, gnomAD, MyGene, MyVariant, and pathway resources.",
+  "settings.network.group.genomics-biology.description":
+    "Ensembl, UCSC, EBI, gnomAD, MyGene, MyVariant, and pathway resources.",
   "settings.network.group.proteomics.label": "Proteins and structures",
   "settings.network.group.proteomics.description": "UniProt, RCSB PDB, PDBe, InterPro, SIFTS, and AlphaFold services.",
   "settings.network.group.literature-citations.label": "Literature and citations",
-  "settings.network.group.literature-citations.description": "Preprint servers, OpenAlex, Semantic Scholar, Crossref, Europe PMC, and DOI resolution.",
+  "settings.network.group.literature-citations.description":
+    "Preprint servers, OpenAlex, Semantic Scholar, Crossref, Europe PMC, and DOI resolution.",
   "settings.network.group.chemistry-pharma.label": "Chemistry and pharmacology",
-  "settings.network.group.chemistry-pharma.description": "PubChem, ChEMBL, ChEBI, BindingDB, SureChEMBL, and pharmacology databases.",
+  "settings.network.group.chemistry-pharma.description":
+    "PubChem, ChEMBL, ChEBI, BindingDB, SureChEMBL, and pharmacology databases.",
   "settings.network.group.omics-atlases.label": "Omics and atlases",
-  "settings.network.group.omics-atlases.description": "Expression Atlas, Human Protein Atlas, GTEx, DepMap, ArrayExpress, and cell atlases.",
+  "settings.network.group.omics-atlases.description":
+    "Expression Atlas, Human Protein Atlas, GTEx, DepMap, ArrayExpress, and cell atlases.",
   "settings.network.group.clinical-regulatory.label": "Clinical and regulatory",
   "settings.network.group.clinical-regulatory.description": "Clinical trials and public regulatory services.",
   "settings.network.groups.description": "Use maintained domain sets for common research services.",
@@ -1463,7 +1473,8 @@ export const dict = {
   "session.toast.unavailable": "Session is no longer available",
   "session.toast.deleted": "Session deleted",
   "session.deleteDialog.title": "Delete this session?",
-  "session.deleteDialog.message": "This removes the conversation and its session workspace. Saved Results stay available.",
+  "session.deleteDialog.message":
+    "This removes the conversation and its session workspace. Saved Results stay available.",
   "session.deleteDialog.action": "Delete session",
   "session.toast.deleteFailed": "Could not delete session",
   "session.toast.renameFailed": "Could not rename session",
@@ -1609,7 +1620,7 @@ export const dict = {
   "skills.toast.enabledMany": "{{count}} skills activated.",
   "skills.toast.disabledOne": "Skill turned off.",
   "skills.toast.disabledMany": "{{count}} skills turned off.",
-  "skills.toast.created": "Skill \"{{name}}\" created",
+  "skills.toast.created": 'Skill "{{name}}" created',
   "skills.toast.createFailed": "Could not create skill",
   "skills.toast.installedOne": "Installed {{count}} skill",
   "skills.toast.installedMany": "Installed {{count}} skills",

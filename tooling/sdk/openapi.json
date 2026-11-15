@@ -1853,6 +1853,9 @@
                         }
                       ]
                     },
+                    "skipped_entries": {
+                      "type": "number"
+                    },
                     "relocation": {
                       "anyOf": [
                         {
@@ -1943,6 +1946,7 @@
                     "scanning",
                     "updated_at",
                     "scan_error",
+                    "skipped_entries",
                     "relocation",
                     "entries"
                   ]
@@ -6909,7 +6913,10 @@
                         "properties": {
                           "network": {
                             "type": "string",
-                            "const": "none"
+                            "enum": [
+                              "none",
+                              "unrestricted"
+                            ]
                           },
                           "lock_digest": {
                             "type": "string",
@@ -6947,6 +6954,10 @@
                             "type": "object",
                             "properties": {
                               "CONDA_PREFIX": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "LD_LIBRARY_PATH": {
                                 "type": "string",
                                 "minLength": 1
                               },
@@ -8816,7 +8827,10 @@
                               },
                               "execution_network": {
                                 "type": "string",
-                                "const": "none"
+                                "enum": [
+                                  "none",
+                                  "unrestricted"
+                                ]
                               },
                               "lock_digest": {
                                 "type": "string",
@@ -9561,7 +9575,10 @@
                       "properties": {
                         "network": {
                           "type": "string",
-                          "const": "none"
+                          "enum": [
+                            "none",
+                            "unrestricted"
+                          ]
                         },
                         "lock_digest": {
                           "type": "string",
@@ -9599,6 +9616,10 @@
                           "type": "object",
                           "properties": {
                             "CONDA_PREFIX": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "LD_LIBRARY_PATH": {
                               "type": "string",
                               "minLength": 1
                             },
@@ -11468,7 +11489,10 @@
                             },
                             "execution_network": {
                               "type": "string",
-                              "const": "none"
+                              "enum": [
+                                "none",
+                                "unrestricted"
+                              ]
                             },
                             "lock_digest": {
                               "type": "string",
@@ -12372,7 +12396,10 @@
                     "properties": {
                       "network": {
                         "type": "string",
-                        "const": "none"
+                        "enum": [
+                          "none",
+                          "unrestricted"
+                        ]
                       },
                       "lock_digest": {
                         "type": "string",
@@ -12410,6 +12437,10 @@
                         "type": "object",
                         "properties": {
                           "CONDA_PREFIX": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "LD_LIBRARY_PATH": {
                             "type": "string",
                             "minLength": 1
                           },
@@ -12562,7 +12593,10 @@
                         },
                         "network": {
                           "type": "string",
-                          "const": "deny"
+                          "enum": [
+                            "allow",
+                            "deny"
+                          ]
                         },
                         "warning": {
                           "type": "string"
@@ -13156,7 +13190,10 @@
                     "properties": {
                       "network": {
                         "type": "string",
-                        "const": "none"
+                        "enum": [
+                          "none",
+                          "unrestricted"
+                        ]
                       },
                       "lock_digest": {
                         "type": "string",
@@ -13194,6 +13231,10 @@
                         "type": "object",
                         "properties": {
                           "CONDA_PREFIX": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "LD_LIBRARY_PATH": {
                             "type": "string",
                             "minLength": 1
                           },
@@ -13491,7 +13532,10 @@
                       "properties": {
                         "network": {
                           "type": "string",
-                          "const": "none"
+                          "enum": [
+                            "none",
+                            "unrestricted"
+                          ]
                         },
                         "lock_digest": {
                           "type": "string",
@@ -13529,6 +13573,10 @@
                           "type": "object",
                           "properties": {
                             "CONDA_PREFIX": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "LD_LIBRARY_PATH": {
                               "type": "string",
                               "minLength": 1
                             },
@@ -15398,7 +15446,10 @@
                             },
                             "execution_network": {
                               "type": "string",
-                              "const": "none"
+                              "enum": [
+                                "none",
+                                "unrestricted"
+                              ]
                             },
                             "lock_digest": {
                               "type": "string",
@@ -16172,7 +16223,10 @@
                       "properties": {
                         "network": {
                           "type": "string",
-                          "const": "none"
+                          "enum": [
+                            "none",
+                            "unrestricted"
+                          ]
                         },
                         "lock_digest": {
                           "type": "string",
@@ -16210,6 +16264,10 @@
                           "type": "object",
                           "properties": {
                             "CONDA_PREFIX": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "LD_LIBRARY_PATH": {
                               "type": "string",
                               "minLength": 1
                             },
@@ -18079,7 +18137,10 @@
                             },
                             "execution_network": {
                               "type": "string",
-                              "const": "none"
+                              "enum": [
+                                "none",
+                                "unrestricted"
+                              ]
                             },
                             "lock_digest": {
                               "type": "string",
@@ -18853,7 +18914,10 @@
                       "properties": {
                         "network": {
                           "type": "string",
-                          "const": "none"
+                          "enum": [
+                            "none",
+                            "unrestricted"
+                          ]
                         },
                         "lock_digest": {
                           "type": "string",
@@ -18891,6 +18955,10 @@
                           "type": "object",
                           "properties": {
                             "CONDA_PREFIX": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "LD_LIBRARY_PATH": {
                               "type": "string",
                               "minLength": 1
                             },
@@ -20760,7 +20828,10 @@
                             },
                             "execution_network": {
                               "type": "string",
-                              "const": "none"
+                              "enum": [
+                                "none",
+                                "unrestricted"
+                              ]
                             },
                             "lock_digest": {
                               "type": "string",
@@ -22534,7 +22605,10 @@
                                       },
                                       "execution": {
                                         "type": "string",
-                                        "const": "none"
+                                        "enum": [
+                                          "none",
+                                          "unrestricted"
+                                        ]
                                       }
                                     },
                                     "required": [
@@ -22623,6 +22697,11 @@
                                     "type": "object",
                                     "properties": {
                                       "CONDA_PREFIX": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 240
+                                      },
+                                      "LD_LIBRARY_PATH": {
                                         "type": "string",
                                         "minLength": 1,
                                         "maxLength": 240
@@ -22729,7 +22808,10 @@
                                       },
                                       "gpu": {
                                         "type": "string",
-                                        "const": "none"
+                                        "enum": [
+                                          "none",
+                                          "local"
+                                        ]
                                       }
                                     },
                                     "required": [
@@ -22749,7 +22831,10 @@
                                       },
                                       "execution": {
                                         "type": "string",
-                                        "const": "none"
+                                        "enum": [
+                                          "none",
+                                          "unrestricted"
+                                        ]
                                       }
                                     },
                                     "required": [
@@ -23994,6 +24079,70 @@
           {
             "lang": "js",
             "source": "import { createAxiomicsClient } from \"@axiomics/sdk\"\n\nconst client = createAxiomicsClient()\nawait client.project.list({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/capabilities": {
+      "get": {
+        "operationId": "app.capabilities",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "Deployment capabilities",
+        "description": "Server-wide switches a client must apply to its UI, such as whether a terminal is available.",
+        "responses": {
+          "200": {
+            "description": "Enabled deployment capabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "terminal": {
+                      "type": "boolean"
+                    },
+                    "locale": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "user": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "terminal",
+                    "locale",
+                    "user"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createAxiomicsClient } from \"@axiomics/sdk\"\n\nconst client = createAxiomicsClient()\nawait client.app.capabilities({\n  ...\n})"
           }
         ]
       }
@@ -29570,6 +29719,83 @@
           {
             "lang": "js",
             "source": "import { createAxiomicsClient } from \"@axiomics/sdk\"\n\nconst client = createAxiomicsClient()\nawait client.session.abort({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/session/{sessionID}/resume": {
+      "post": {
+        "operationId": "session.resume",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionID",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "summary": "Resume an interrupted turn",
+        "description": "Continue the assistant turn a dead process left unfinished. The partial turn is not replayed to the provider. Returns 409 while another loop owns the session.",
+        "responses": {
+          "200": {
+            "description": "Resumed message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "info": {
+                      "$ref": "#/components/schemas/AssistantMessage"
+                    },
+                    "parts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Part"
+                      }
+                    }
+                  },
+                  "required": [
+                    "info",
+                    "parts"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createAxiomicsClient } from \"@axiomics/sdk\"\n\nconst client = createAxiomicsClient()\nawait client.session.resume({\n  ...\n})"
           }
         ]
       }

@@ -3273,6 +3273,7 @@ export type SettingsStorageUsageResponses = {
     scanning: boolean
     updated_at: string | null
     scan_error: string | null
+    skipped_entries: number
     relocation: {
       id?: string
       phase: "copying" | "ready" | "publishing" | "published" | "switched" | "recovery_required"
@@ -4591,7 +4592,7 @@ export type SettingsComputeJobsListResponses = {
       runtime_digest: string
     }
     capability_execution?: {
-      network: "none"
+      network: "none" | "unrestricted"
       lock_digest: string
       software_manifest?: string
       pip_requirements?: string
@@ -4600,6 +4601,7 @@ export type SettingsComputeJobsListResponses = {
       runtime_path?: Array<string>
       runtime_env?: {
         CONDA_PREFIX?: string
+        LD_LIBRARY_PATH?: string
         JAVA_HOME?: string
         R_HOME?: string
         MCMICRO_HOME?: string
@@ -5160,7 +5162,7 @@ export type SettingsComputeJobsListResponses = {
         manifest_sha256: string
         profile: "task" | "smoke"
         runtime_digest: string
-        execution_network?: "none"
+        execution_network?: "none" | "unrestricted"
         lock_digest?: string
       }
     }
@@ -5370,7 +5372,7 @@ export type SettingsComputeJobsStartData = {
       runtime_digest: string
     }
     capability_execution?: {
-      network: "none"
+      network: "none" | "unrestricted"
       lock_digest: string
       software_manifest?: string
       pip_requirements?: string
@@ -5379,6 +5381,7 @@ export type SettingsComputeJobsStartData = {
       runtime_path?: Array<string>
       runtime_env?: {
         CONDA_PREFIX?: string
+        LD_LIBRARY_PATH?: string
         JAVA_HOME?: string
         R_HOME?: string
         MCMICRO_HOME?: string
@@ -5423,7 +5426,7 @@ export type SettingsComputeJobsStartResponses = {
       runtime_digest: string
     }
     capability_execution?: {
-      network: "none"
+      network: "none" | "unrestricted"
       lock_digest: string
       software_manifest?: string
       pip_requirements?: string
@@ -5432,6 +5435,7 @@ export type SettingsComputeJobsStartResponses = {
       runtime_path?: Array<string>
       runtime_env?: {
         CONDA_PREFIX?: string
+        LD_LIBRARY_PATH?: string
         JAVA_HOME?: string
         R_HOME?: string
         MCMICRO_HOME?: string
@@ -5992,7 +5996,7 @@ export type SettingsComputeJobsStartResponses = {
         manifest_sha256: string
         profile: "task" | "smoke"
         runtime_digest: string
-        execution_network?: "none"
+        execution_network?: "none" | "unrestricted"
         lock_digest?: string
       }
     }
@@ -6203,7 +6207,7 @@ export type SettingsComputeJobsPlanData = {
       runtime_digest: string
     }
     capability_execution?: {
-      network: "none"
+      network: "none" | "unrestricted"
       lock_digest: string
       software_manifest?: string
       pip_requirements?: string
@@ -6212,6 +6216,7 @@ export type SettingsComputeJobsPlanData = {
       runtime_path?: Array<string>
       runtime_env?: {
         CONDA_PREFIX?: string
+        LD_LIBRARY_PATH?: string
         JAVA_HOME?: string
         R_HOME?: string
         MCMICRO_HOME?: string
@@ -6262,7 +6267,7 @@ export type SettingsComputeJobsPlanResponses = {
         artifact_patterns: Array<string>
         checkpoint?: string
         capability_runtime_digest?: string
-        network?: "deny"
+        network?: "allow" | "deny"
         warning: string
       }
     | {
@@ -6464,7 +6469,7 @@ export type SettingsComputeJobsRetryResponses = {
       runtime_digest: string
     }
     capability_execution?: {
-      network: "none"
+      network: "none" | "unrestricted"
       lock_digest: string
       software_manifest?: string
       pip_requirements?: string
@@ -6473,6 +6478,7 @@ export type SettingsComputeJobsRetryResponses = {
       runtime_path?: Array<string>
       runtime_env?: {
         CONDA_PREFIX?: string
+        LD_LIBRARY_PATH?: string
         JAVA_HOME?: string
         R_HOME?: string
         MCMICRO_HOME?: string
@@ -7033,7 +7039,7 @@ export type SettingsComputeJobsRetryResponses = {
         manifest_sha256: string
         profile: "task" | "smoke"
         runtime_digest: string
-        execution_network?: "none"
+        execution_network?: "none" | "unrestricted"
         lock_digest?: string
       }
     }
@@ -7237,7 +7243,7 @@ export type SettingsComputeJobsReleaseResponses = {
       runtime_digest: string
     }
     capability_execution?: {
-      network: "none"
+      network: "none" | "unrestricted"
       lock_digest: string
       software_manifest?: string
       pip_requirements?: string
@@ -7246,6 +7252,7 @@ export type SettingsComputeJobsReleaseResponses = {
       runtime_path?: Array<string>
       runtime_env?: {
         CONDA_PREFIX?: string
+        LD_LIBRARY_PATH?: string
         JAVA_HOME?: string
         R_HOME?: string
         MCMICRO_HOME?: string
@@ -7806,7 +7813,7 @@ export type SettingsComputeJobsReleaseResponses = {
         manifest_sha256: string
         profile: "task" | "smoke"
         runtime_digest: string
-        execution_network?: "none"
+        execution_network?: "none" | "unrestricted"
         lock_digest?: string
       }
     }
@@ -8006,7 +8013,7 @@ export type SettingsComputeJobsCancelResponses = {
       runtime_digest: string
     }
     capability_execution?: {
-      network: "none"
+      network: "none" | "unrestricted"
       lock_digest: string
       software_manifest?: string
       pip_requirements?: string
@@ -8015,6 +8022,7 @@ export type SettingsComputeJobsCancelResponses = {
       runtime_path?: Array<string>
       runtime_env?: {
         CONDA_PREFIX?: string
+        LD_LIBRARY_PATH?: string
         JAVA_HOME?: string
         R_HOME?: string
         MCMICRO_HOME?: string
@@ -8575,7 +8583,7 @@ export type SettingsComputeJobsCancelResponses = {
         manifest_sha256: string
         profile: "task" | "smoke"
         runtime_digest: string
-        execution_network?: "none"
+        execution_network?: "none" | "unrestricted"
         lock_digest?: string
       }
     }
@@ -9062,7 +9070,7 @@ export type SettingsScientificToolsResponses = {
             }
             network: {
               build: "package_index_only"
-              execution: "none"
+              execution: "none" | "unrestricted"
             }
           }
         | {
@@ -9075,6 +9083,7 @@ export type SettingsScientificToolsResponses = {
             path_entries: Array<string>
             environment?: {
               CONDA_PREFIX?: string
+              LD_LIBRARY_PATH?: string
               JAVA_HOME?: string
               R_HOME?: string
               MCMICRO_HOME?: string
@@ -9096,11 +9105,11 @@ export type SettingsScientificToolsResponses = {
               cpus: number
               memory_gb: number
               time_minutes: number
-              gpu: "none"
+              gpu: "none" | "local"
             }
             network: {
               build: "administrator"
-              execution: "none"
+              execution: "none" | "unrestricted"
             }
           }
       smoke?: {
@@ -9462,6 +9471,28 @@ export type ProjectListResponses = {
 }
 
 export type ProjectListResponse = ProjectListResponses[keyof ProjectListResponses]
+
+export type AppCapabilitiesData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/capabilities"
+}
+
+export type AppCapabilitiesResponses = {
+  /**
+   * Enabled deployment capabilities
+   */
+  200: {
+    terminal: boolean
+    locale: string | null
+    user: string | null
+  }
+}
+
+export type AppCapabilitiesResponse = AppCapabilitiesResponses[keyof AppCapabilitiesResponses]
 
 export type ProjectCurrentData = {
   body?: never
@@ -11303,6 +11334,42 @@ export type SessionAbortResponses = {
 }
 
 export type SessionAbortResponse = SessionAbortResponses[keyof SessionAbortResponses]
+
+export type SessionResumeData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/resume"
+}
+
+export type SessionResumeErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionResumeError = SessionResumeErrors[keyof SessionResumeErrors]
+
+export type SessionResumeResponses = {
+  /**
+   * Resumed message
+   */
+  200: {
+    info: AssistantMessage
+    parts: Array<Part>
+  }
+}
+
+export type SessionResumeResponse = SessionResumeResponses[keyof SessionResumeResponses]
 
 export type SessionDiffData = {
   body?: never

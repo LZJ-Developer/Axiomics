@@ -15,7 +15,11 @@ describe("prompt attachments", () => {
       "application/x-ipynb+json",
     )
     expect(attachmentMime({ name: "weights.bin", type: "application/octet-stream" })).toBeUndefined()
+    // An expert's array handoff has no browser MIME at all; the extension decides.
+    expect(attachmentMime({ name: "counts.npz", type: "" })).toBe("application/octet-stream")
+    expect(attachmentMime({ name: "embedding.npy", type: "" })).toBe("application/octet-stream")
     expect(ATTACHMENT_ACCEPT).toContain(".csv")
+    expect(ATTACHMENT_ACCEPT).toContain(".npz")
     expect(MAX_ATTACHMENT_BYTES).toBe(20 * 1024 * 1024)
   })
 

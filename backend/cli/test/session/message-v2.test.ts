@@ -81,7 +81,7 @@ function assistantInfo(
     id,
     sessionID,
     role: "assistant",
-    time: { created: 0 },
+    time: { created: 0, completed: 0 },
     error,
     parentID,
     modelID: infoModel.modelID,

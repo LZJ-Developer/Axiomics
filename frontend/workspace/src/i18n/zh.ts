@@ -1054,6 +1054,8 @@ export const dict = {
   "prompt.attachment.unsupported.title": "文件未附加",
   "prompt.attachment.unsupported.description": "{{name}} 不是受支持的图片、PDF、文本、代码或科学数据文件。",
   "prompt.attachment.tooLarge.description": "{{name}} 为 {{size}}；附件上限为 {{limit}}。",
+  "prompt.attachment.totalTooLarge.description":
+    "加上 {{name}} 后本条消息合计 {{size}}；所有附件合计上限为 {{limit}}。",
   "prompt.conversation.untitled": "未命名会话",
   "settings.general.context.threshold.description":
     "触发自动压缩的模型上下文占比。项目 axiomics.json 中的 compaction.threshold 在该项目内优先。",
@@ -1382,11 +1384,13 @@ export const dict = {
   "settings.network.group.proteomics.label": "蛋白与结构",
   "settings.network.group.proteomics.description": "UniProt、RCSB PDB、PDBe、InterPro、SIFTS 与 AlphaFold 服务。",
   "settings.network.group.literature-citations.label": "文献与引文",
-  "settings.network.group.literature-citations.description": "预印本服务器、OpenAlex、Semantic Scholar、Crossref、Europe PMC 与 DOI 解析。",
+  "settings.network.group.literature-citations.description":
+    "预印本服务器、OpenAlex、Semantic Scholar、Crossref、Europe PMC 与 DOI 解析。",
   "settings.network.group.chemistry-pharma.label": "化学与药理",
   "settings.network.group.chemistry-pharma.description": "PubChem、ChEMBL、ChEBI、BindingDB、SureChEMBL 等药理数据库。",
   "settings.network.group.omics-atlases.label": "组学与图谱",
-  "settings.network.group.omics-atlases.description": "Expression Atlas、Human Protein Atlas、GTEx、DepMap、ArrayExpress 与细胞图谱。",
+  "settings.network.group.omics-atlases.description":
+    "Expression Atlas、Human Protein Atlas、GTEx、DepMap、ArrayExpress 与细胞图谱。",
   "settings.network.group.clinical-regulatory.label": "临床与监管",
   "settings.network.group.clinical-regulatory.description": "临床试验与公开监管数据服务。",
   "settings.network.groups.description": "使用为常用科研服务维护的域名集合。",
@@ -1683,8 +1687,7 @@ export const dict = {
   "settings.scientificTools.local.title": "本地科学工具",
   "settings.scientificTools.local.description": "这些工具在此设备上由同一个精确的 Python 环境提供支持，只需安装一次。",
   "settings.scientificTools.connected.title": "已连接的科学工具",
-  "settings.scientificTools.connected.description":
-    "NVIDIA 工具使用本设备上配置的账户，运行消耗的是你的 NVIDIA 账户。",
+  "settings.scientificTools.connected.description": "NVIDIA 工具使用本设备上配置的账户，运行消耗的是你的 NVIDIA 账户。",
   "settings.scientificTools.footnote": "仅列出可执行的适配器。运行使用此设备或你直接连接的服务。",
   "settings.scientificTools.state.unavailable": "不可用",
   "settings.scientificTools.state.needsAttention": "需要处理",
