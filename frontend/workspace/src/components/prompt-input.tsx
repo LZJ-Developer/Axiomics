@@ -87,6 +87,7 @@ import {
   publishCapabilityPreferences,
 } from "./prompt-capabilities"
 import { canRestoreFailedSubmission } from "./prompt-submission"
+import { imeOwnsKey, staleComposition } from "./ime"
 import { requestFailure, requestStatus } from "@/utils/request-error"
 import {
   slashGroup,
@@ -626,7 +627,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const isFocused = createFocusSignal(() => editorRef)
 
   const [composing, setComposing] = createSignal(false)
-  const isImeComposing = (event: KeyboardEvent) => event.isComposing || composing() || event.keyCode === 229
+  const isImeComposing = (event: KeyboardEvent) => imeOwnsKey(event, composing())
 
   const addAttachment = async (file: File) => {
     const mime = attachmentMime(file)
@@ -1710,6 +1711,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       event.preventDefault()
       return
     }
+
+    // A composition whose `compositionend` never arrived keeps Enter dead until
+    // the composer loses focus (see the focus reset above). A keydown that is
+    // not composing proves the composition is over, so trust the event over the
+    // stale flag instead of asking the user to click away and back.
+    if (staleComposition(event, composing())) setComposing(false)
 
     if (event.key === "Enter" && isImeComposing(event)) {
       return

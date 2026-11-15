@@ -3,6 +3,7 @@ import { createSimpleContext } from "@axiomics/ui/context"
 import { batch, createEffect, createMemo, createRoot, createSignal, onCleanup, untrack } from "solid-js"
 import { useParams } from "@solidjs/router"
 import { useSDK } from "./sdk"
+import { deploymentCapabilities } from "./capabilities"
 import { Persist, persisted } from "@/utils/persist"
 
 export type LocalPTY = {
@@ -100,6 +101,13 @@ function createProjectTerminalSession(
 
   createEffect(() => {
     if (!persistenceReady()) return
+    // A deployment can run without a terminal; it then refuses every /pty call
+    // with 403. Listing anyway puts a red error in the console on every load
+    // for a surface the UI already hides, so skip the round trip entirely.
+    // The wait on `resolved()` is load-bearing: `terminal()` is a fail-open
+    // default, so without it the request goes out before the capability answer
+    // arrives and the disabled deployment still sees one 403 per page load.
+    if (!deploymentCapabilities.resolved() || !deploymentCapabilities.terminal()) return
     void refresh()
   })
 
