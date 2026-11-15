@@ -47,33 +47,32 @@ async function apiKey(): Promise<string> {
 }
 
 // ---- 余额可观测 ----
-// 为什么要单独做：余额耗尽的调用**没有 usage**，账本里一行都不会留。于是"账本不动"
-// 既能读成"没人用"，也能读成"账户没钱了" —— 实测就是这么错过 0.38 元的。
-// /user/balance 只读、不消耗 token，缓存 60s，避免健康检查每次都打上游。
-const BALANCE_TTL_MS = Number(process.env.AX_BALANCE_TTL_MS ?? 60_000)
+// 为什么不在 /health 里现查：健康检查不该有副作用，也不该依赖外部服务。
+// 一个每分钟被问一次的探针如果顺带打上游，就把"本机活着"和"上游可达"绑在
+// 一起：上游抖动会拖慢探针，调用方一多还会放大请求。改成后台刷新 + 只读快照：
+//   · 启动时查一次，之后每 AX_BALANCE_REFRESH_MS（默认 5 分钟）一次
+//   · 上游 402 时补查一次（并发调用合并成一次在飞请求）
+//   · /health 只读内存快照：零 I/O、零等待、无副作用
+// 代价是快照可能滞后一个周期，所以 checked_at 随值返回，消费方自己判断新旧。
+const BALANCE_REFRESH_MS = Number(process.env.AX_BALANCE_REFRESH_MS ?? 5 * 60_000)
 const LOW_BALANCE = Number(process.env.AX_LOW_BALANCE_CNY ?? 5)
 
 type Balance =
   | { is_available: boolean; total_balance: string; currency: string; low: boolean; checked_at: string }
   | { error: string; checked_at: string }
 
-let balanceCache: { at: number; value: Balance } | undefined
+let balanceSnapshot: Balance | undefined
+let balanceInflight: Promise<void> | undefined
 
-function cached(value: Balance): Balance {
-  balanceCache = { at: Date.now(), value }
-  return value
-}
-
-async function balance(): Promise<Balance> {
-  if (balanceCache && Date.now() - balanceCache.at < BALANCE_TTL_MS) return balanceCache.value
+async function probeBalance(): Promise<Balance> {
   const checked_at = new Date().toISOString()
   const res = await fetch(`${UPSTREAM.replace(/\/+$/, "")}/user/balance`, {
     headers: { authorization: `Bearer ${await apiKey()}` },
     signal: AbortSignal.timeout(2_000),
   }).catch(() => undefined)
   // 查不到 ≠ 余额耗尽：分开表达，否则监控会在网络抖动时误报。
-  if (!res) return cached({ error: "upstream unreachable", checked_at })
-  if (!res.ok) return cached({ error: `http ${res.status}`, checked_at })
+  if (!res) return { error: "upstream unreachable", checked_at }
+  if (!res.ok) return { error: `http ${res.status}`, checked_at }
   const info = await res
     .json()
     .catch(() => undefined)
@@ -81,14 +80,33 @@ async function balance(): Promise<Balance> {
   // 多币种账户优先取 CNY；没有就取第一条，并在 currency 字段里如实返回。
   const cny = infos.find((b) => b.currency === "CNY") ?? infos[0]
   const total = Number(cny?.total_balance ?? 0)
-  return cached({
+  return {
     is_available: info?.is_available === true,
     total_balance: String(cny?.total_balance ?? "0"),
     currency: String(cny?.currency ?? "CNY"),
     low: !Number.isFinite(total) || total < LOW_BALANCE,
     checked_at,
-  })
+  }
 }
+
+/** 刷新余额快照；并发调用合并成一次在飞请求。 */
+function refreshBalance(): Promise<void> {
+  if (balanceInflight) return balanceInflight
+  balanceInflight = probeBalance()
+    .then((value) => {
+      balanceSnapshot = value
+      // 启动时上游可能还没就绪；错误快照 30 秒后再试，别让一次失败钉住整个刷新周期。
+      if ("error" in value) setTimeout(() => void refreshBalance(), 30_000).unref?.()
+    })
+    .catch(() => {})
+    .finally(() => {
+      balanceInflight = undefined
+    })
+  return balanceInflight
+}
+
+void refreshBalance()
+setInterval(() => void refreshBalance(), BALANCE_REFRESH_MS).unref?.()
 
 function tenantOf(auth: string | null): string | null {
   // 租户容器发的占位符形如 Bearer tenant-u0001
@@ -135,9 +153,10 @@ Bun.serve({
   async fetch(req) {
     const url = new URL(req.url)
     console.log(`REQ ${req.method} ${url.pathname} auth=${req.headers.get("authorization")?.slice(0, 24) ?? "none"}`)
-    // ok 只表示"代理进程活着"，余额单独一个字段 —— 账户没钱时服务是健康的，
-    // 只是答不了。混在一起会让健康检查报错到错误的方向上。
-    if (url.pathname === "/health") return Response.json({ ok: true, balance: await balance() })
+    // ok 只表示"代理进程活着"；balance 是后台刷新的只读快照，不在这里发起任何请求。
+    // 账户没钱时服务是健康的，只是答不了 —— 两者混在一个字段里，监控会报错方向。
+    if (url.pathname === "/health")
+      return Response.json({ ok: true, balance: balanceSnapshot ?? { error: "probing", checked_at: new Date().toISOString() } })
     if (!url.pathname.startsWith("/model/")) return new Response("not found", { status: 404 })
 
     const tenant = tenantOf(req.headers.get("authorization"))
@@ -204,9 +223,9 @@ Bun.serve({
         )
       }
       // 鉴权/额度/限流失败在账本里不可见（没有 usage）。留一行可 grep 的日志，
-      // 并丢掉余额缓存，让下一次 /health 立刻把真相报出来。
+      // 并触发一次余额补查（不阻塞响应），让下一个 /health 反映真相。
       if (!usage && [401, 402, 403, 429].includes(upstream.status)) {
-        balanceCache = undefined
+        void refreshBalance()
         console.warn(
           `UPSTREAM ${upstream.status} tenant=${tenant} ${url.pathname} ${text.slice(0, 160).replace(/\s+/g, " ")}`,
         )

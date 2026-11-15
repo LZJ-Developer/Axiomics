@@ -64,6 +64,11 @@ NOPROXY=(env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_pr
 
 "${NOPROXY[@]}" UP_PORT=$UP_PORT "$BUN" run "$TMP/upstream.ts" >"$TMP/upstream.log" 2>&1 &
 PIDS+=($!)
+# 先在假上游就绪后再起代理：代理启动即探一次余额，早于上游会导致首个快照是错误。
+for _ in $(seq 1 50); do
+  curl -s --noproxy '*' -m 2 "http://127.0.0.1:$UP_PORT/calls" >/dev/null 2>&1 && break
+  sleep 0.1
+done
 "${NOPROXY[@]}" AX_ROOT="$TMP" \
 AX_MODEL_PORT="$PX_PORT" \
 AX_MAP="$TMP/tenants.map" \
@@ -89,15 +94,21 @@ check() { # <描述> <期望子串> <实际>
   fi
 }
 
-health1=$("${CURL[@]}" "http://127.0.0.1:$PX_PORT/health")
+health1=""
+for _ in $(seq 1 50); do
+  health1=$("${CURL[@]}" "http://127.0.0.1:$PX_PORT/health")
+  [[ "$health1" == *'"total_balance"'* ]] && break
+  sleep 0.1
+done
 check "健康探针仍报 ok（进程健康与余额解耦）" '"ok":true' "$health1"
 check "健康探针报出余额 -0.38" '"total_balance":"-0.38"' "$health1"
 check "健康探针标记账户不可用" '"is_available":false' "$health1"
 check "健康探针标记低余额" '"low":true' "$health1"
 
-"${CURL[@]}" "http://127.0.0.1:$PX_PORT/health" >/dev/null
-calls_cached=$("${CURL[@]}" "http://127.0.0.1:$UP_PORT/calls")
-check "60s 内重复探针不重复查询上游" "1" "$calls_cached"
+# 关键不变量：/health 只读快照，不触发任何上游查询。
+for _ in 1 2 3 4 5; do "${CURL[@]}" "http://127.0.0.1:$PX_PORT/health" >/dev/null; done
+calls_repeat=$("${CURL[@]}" "http://127.0.0.1:$UP_PORT/calls")
+check "重复探针不触发上游查询（健康检查无副作用）" "1" "$calls_repeat"
 
 status=$("${CURL[@]}" -o "$TMP/msg.json" -w '%{http_code}' \
   -H 'Authorization: Bearer tenant-u0003' -H 'Content-Type: application/json' \
@@ -112,9 +123,14 @@ else
 fi
 check "日志里有可 grep 的上游失败" "UPSTREAM 402 tenant=u0003" "$(cat "$TMP/proxy.log")"
 
-"${CURL[@]}" "http://127.0.0.1:$PX_PORT/health" >/dev/null
-calls_after=$("${CURL[@]}" "http://127.0.0.1:$UP_PORT/calls")
-check "402 之后余额缓存失效并重新查询" "2" "$calls_after"
+# 402 之后应补查一次余额；不给响应增加等待，所以这里轮询等它落地。
+calls_after=$calls_repeat
+for _ in $(seq 1 50); do
+  calls_after=$("${CURL[@]}" "http://127.0.0.1:$UP_PORT/calls")
+  [ "$calls_after" -ge 2 ] && break
+  sleep 0.1
+done
+check "402 之后补查余额（响应不等它）" "2" "$calls_after"
 
 if [ "$fail" -eq 0 ]; then
   echo "  全部通过"
