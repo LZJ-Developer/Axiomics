@@ -7,7 +7,7 @@ import { cors } from "hono/cors"
 import { streamSSE } from "hono/streaming"
 import { serveWebAsset, wantsJson } from "../web/serve"
 import { webAssetContentSecurityPolicy } from "../web/csp"
-import { isAllowedHost, isAllowedOrigin, isCorsPreflight, isCrossOrigin, isDeploymentAuthorized } from "./host-guard"
+import { isAllowedHost, isAllowedOrigin, isCorsPreflight, isCrossOrigin, isDeploymentAuthorized, isTopLevelNavigation } from "./host-guard"
 import { timingSafeEqual } from "../util/timing-safe"
 import { FolderResolveRoutes } from "./routes/folder-resolve"
 import { RepoRoutes } from "./routes/repo"
@@ -188,8 +188,11 @@ export namespace Server {
 
           // 2. Cross-origin defense (covers WebSocket upgrades, which CORS does
           //    not). A foreign Origin — or a cross-site fetch that omits Origin
-          //    (e.g. a no-cors GET) — is rejected. See isCrossOrigin.
-          if (isCrossOrigin(c.req.header("origin"), c.req.header("sec-fetch-site"), _corsWhitelist)) {
+          //    (e.g. a no-cors GET) — is rejected. A cross-site GET/HEAD
+          //    navigation is exempt: it carries no Origin, cannot read this
+          //    response, and changes nothing. See isCrossOrigin.
+          const navigation = isTopLevelNavigation(c.req.header("sec-fetch-mode"), c.req.method)
+          if (isCrossOrigin(c.req.header("origin"), c.req.header("sec-fetch-site"), _corsWhitelist, navigation)) {
             return c.json({ error: "Forbidden origin" }, 403)
           }
 

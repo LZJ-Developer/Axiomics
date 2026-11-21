@@ -55,18 +55,37 @@ export function isAllowedOrigin(origin: string, extraWhitelist: string[] = []): 
   return extraWhitelist.includes(origin)
 }
 
+// A top-level navigation is the one request shape a browser sends without an
+// Origin header. Restricting the exemption to safe methods keeps it honest:
+// a cross-site form POST is also `mode=navigate` but arrives with
+// `Origin: <attacker>`, so the allow-list above still judges it.
+export function isTopLevelNavigation(secFetchMode: string | undefined, method: string | undefined): boolean {
+  if (secFetchMode !== "navigate") return false
+  return method === "GET" || method === "HEAD"
+}
+
 // Decide whether a NETWORK request is cross-origin and must be rejected. An
 // Origin header (always present on cross-origin fetch and WebSocket upgrades)
 // is checked against the allow-list; when it is absent (same-origin requests
 // and same-/cross-site GET navigations omit it) we fall back to Sec-Fetch-Site
-// and reject only explicit cross-site contexts. Non-browser clients send
-// neither header and are allowed (the loopback bind already gates them).
+// and reject only explicit cross-site contexts.
+//
+// A cross-site GET navigation is not cross-origin in the sense this guard
+// cares about: the initiator cannot read the response (same-origin policy) and
+// the request mutates nothing, so a link, bookmark or notification from any
+// other site may land in the workspace. Without the `navigation` exemption a
+// top-level navigation from another site is answered with the 403 JSON *as the
+// page*, which is what users see as a blank "Forbidden origin" document.
+// Non-browser clients send neither header and are allowed (the loopback bind
+// already gates them).
 export function isCrossOrigin(
   origin: string | undefined,
   secFetchSite: string | undefined,
   extraWhitelist: string[] = [],
+  navigation = false,
 ): boolean {
   if (origin !== undefined) return !isAllowedOrigin(origin, extraWhitelist)
+  if (navigation) return false
   return secFetchSite === "cross-site"
 }
 
