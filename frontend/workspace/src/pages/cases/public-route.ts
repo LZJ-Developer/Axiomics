@@ -24,6 +24,9 @@ export function parseReplayHash(hash: string): string | undefined {
  */
 export type PublicView = { kind: "gallery" } | { kind: "new" } | { kind: "replay"; id: string }
 
+/** Where a completed login lands: the authenticated application entry. */
+const APP_ENTRY = "/axiomics"
+
 export function parsePublicHash(hash: string): PublicView {
   if (hash === "#/new") return { kind: "new" }
   const id = parseReplayHash(hash)
@@ -39,8 +42,12 @@ export function parsePublicHash(hash: string): PublicView {
  *
  * `rd` points at the authenticated application entry rather than the page the
  * visitor came from: returning to `cases.html` after login would hit the app
- * with no such route. Malformed input yields `undefined` so callers can fall
- * back instead of emitting a broken link.
+ * with no such route. It is a **local path**, not an absolute URL, because the
+ * SSO shim only accepts paths — an absolute one is dropped as a potential open
+ * redirect and replaced by the shim's own default. The two agreeing matters:
+ * the default happening to be `/axiomics` today is luck, not a contract.
+ * Malformed input yields `undefined` so callers can fall back instead of
+ * emitting a broken link.
  */
 export function portalLoginHref(input: string): string | undefined {
   let origin: URL
@@ -53,6 +60,5 @@ export function portalLoginHref(input: string): string | undefined {
   // `new URL("/auth", ...)` rejects. Callers fall back to a local link.
   if (origin.protocol !== "http:" && origin.protocol !== "https:") return
   const portal = new URL("/auth", origin.origin).href
-  const app = new URL("/axiomics", origin.origin).href
-  return `${portal}?rd=${encodeURIComponent(app)}`
+  return `${portal}?rd=${encodeURIComponent(APP_ENTRY)}`
 }

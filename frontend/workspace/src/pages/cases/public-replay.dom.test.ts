@@ -33,9 +33,6 @@ const gallery = (await vite.ssrLoadModule("@/pages/cases-gallery")) as typeof im
 const publicReplay = (await vite.ssrLoadModule("@/pages/cases/public-replay")) as typeof import(
   "@/pages/cases/public-replay"
 )
-const loginDialog = (await vite.ssrLoadModule("@/pages/cases/login-dialog")) as typeof import(
-  "@/pages/cases/login-dialog"
-)
 const timeline = (await vite.ssrLoadModule("@/pages/cases/timeline")) as typeof import("./timeline")
 const catalog = (await vite.ssrLoadModule("@/pages/cases/catalog")) as typeof import("./catalog")
 
@@ -153,145 +150,77 @@ test("new research leaves the gallery for the anonymous conversation, not for lo
   expect(start).toBeDefined()
   start!.click()
 
-  // A hash change is a navigation inside the static shell: no fetch, no dialog,
-  // and no redirect to the portal before the visitor has typed anything.
+  // A hash change is a navigation inside the static shell: no fetch and no
+  // redirect to the portal before the visitor has typed anything.
   await Promise.resolve()
-  expect(host.querySelector(".login-dialog__panel")).toBeNull()
+  expect(host.querySelector(".case-card")).not.toBeNull()
   expect(calls).toEqual([])
 })
 
-test("the login dialog posts to the Authelia API and only leaves on success", async () => {
-  let status = 401
-  let body: unknown
-  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
-    body = JSON.parse(String(init?.body))
-    return { ok: status === 200, status, redirected: false } as unknown as Response
-  }) as typeof fetch
-
-  let authenticated = 0
-  const host = mount(() =>
-    loginDialog.LoginDialog({
-      open: true,
-      onClose() {},
-      onAuthenticated() {
-        authenticated++
-      },
-    }),
-  )
-
-  const signup = host.querySelector<HTMLButtonElement>(".login-dialog__switch")
-  expect(signup).not.toBeNull()
-  expect(signup!.textContent).toContain("Create one")
-
-  const user = host.querySelector<HTMLInputElement>('input[name="username"]')!
-  const password = host.querySelector<HTMLInputElement>('input[name="password"]')!
-  user.value = "lzj"
-  user.dispatchEvent(new Event("input", { bubbles: true }))
-  password.value = "secret"
-  password.dispatchEvent(new Event("input", { bubbles: true }))
-
-  const submit = () => host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
-
-  submit()
-  await ready(() => host.querySelector(".login-dialog__error") !== null)
-  // The test mounts without a stored locale, so the English dictionary is active.
-  expect(host.querySelector(".login-dialog__error")?.textContent).toContain("Incorrect username or password.")
-  expect(authenticated).toBe(0)
-  expect(body).toEqual({ username: "lzj", password: "secret", keepMeLoggedIn: true })
-
-  status = 200
-  submit()
-  await ready(() => authenticated === 1)
-  expect(host.querySelector(".login-dialog__error")).toBeNull()
-})
-
-test("registration stays in the dialog and posts to the product signup route", async () => {
-  const requests: Array<{ url: string; body?: any }> = []
-  globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
-    requests.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined })
-    return {
-      ok: true,
-      status: 200,
-      statusText: "OK",
-      json: async () => ({ status: "ok", data: "axiomics/probe_signup" }),
-    } as unknown as Response
-  }) as typeof fetch
-
-  const host = mount(() =>
-    loginDialog.LoginDialog({
-      open: true,
-      onClose() {},
-    }),
-  )
-
-  host.querySelector<HTMLButtonElement>(".login-dialog__switch")!.click()
-  await ready(() => host.querySelector('input[name="signup-username"]') !== null)
-
-  const set = (name: string, value: string) => {
-    const input = host.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
-    input.value = value
-    input.dispatchEvent(new Event("input", { bubbles: true }))
-  }
-  set("signup-username", "probe_signup")
-  set("signup-password", "secret-1")
-  set("signup-confirm", "secret-1")
-
-  host
-    .querySelector("form")!
-    .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
-
-  await ready(() =>
-    (host.querySelector(".login-dialog__title")?.textContent ?? "").includes("Registration submitted"),
-  )
-
-  const signup = requests.find((request) => request.url === "/signup/api")
-  expect(signup?.body).toMatchObject({
-    application: "app-axiomics-web",
-    organization: "axiomics",
-    username: "probe_signup",
-    password: "secret-1",
-  })
-  // The product must not reach into the console namespace at all: the edge
-  // route is what drops the session cookie Casdoor would otherwise mint, so
-  // there is no logout call to make afterwards.
-  expect(requests.some((request) => request.url.startsWith("/console/"))).toBe(false)
-})
-
-test("a pending account gets a closable dialog over the gallery, not a separate page", async () => {
-  ;(window as HappyWindow).happyDOM?.setURL("http://localhost:8444/axiomics?pending=1")
+test("signing out explains itself in a dialog, and dismissing it actually closes", async () => {
+  // The edge sends a signed-out visitor to `?signedout=1`. This is the only
+  // place that says the CAS session is still alive, so it has to be seen: a
+  // banner above the fold reads as decoration and gets skimmed past.
+  ;(window as HappyWindow).happyDOM?.setURL("http://localhost:8444/?signedout=1")
   serve({})
   const host = mount(() => gallery.default({ public: true }))
+  await ready(() => host.querySelector(".case-card") !== null)
 
-  await ready(() => host.querySelector(".login-dialog__tag") !== null)
-  expect(host.querySelector(".login-dialog__tag")?.textContent).toContain("In review")
-  expect(host.querySelector(".login-dialog__title")?.textContent).toContain(
-    "awaiting administrator approval",
-  )
-  // The gallery is still the page behind the dialog.
-  expect(host.querySelectorAll(".case-card").length).toBe(8)
+  const dialog = host.querySelector<HTMLElement>('[role="dialog"]')
+  expect(dialog).not.toBeNull()
+  expect(dialog!.getAttribute("aria-modal")).toBe("true")
+  expect(dialog!.textContent).toContain("Signed out")
+  // The gallery stays behind it: this is a message on the page, not a redirect.
+  expect(host.querySelectorAll(".case-card")).toHaveLength(8)
 
-  host.querySelector<HTMLButtonElement>(".login-dialog__submit")!.click()
-  await ready(() => host.querySelector(".login-dialog__panel") === null)
-  // Closing drops the marker so a refresh returns to the plain gallery.
+  const btn = host.querySelector<HTMLButtonElement>(".cases-dialog__primary")
+  expect(btn).not.toBeNull()
+  btn!.click()
+  await Promise.resolve()
+  expect(window.location.search).toBe("")
+  // Both halves matter. A dialog that only rewrites the URL stays on screen
+  // (a non-reactive flag), which looks like a button that does nothing.
+  expect(host.querySelector('[role="dialog"]')).toBeNull()
   expect(window.location.search).toBe("")
 })
 
-test("the pending dialog can be closed with its close button", async () => {
-  let closed = 0
-  const host = mount(() =>
-    loginDialog.LoginDialog({
-      open: true,
-      initialMode: "pending",
-      onClose() {
-        closed++
-      },
-    }),
+test("a login trigger navigates to the edge SSO entry instead of collecting a password", async () => {
+  const source = recording()
+  const fixture: { session: Session; recording: Recording } = JSON.parse(
+    JSON.stringify({ session: source.session, recording: source.messages }),
   )
+  serve(fixture)
 
-  await ready(() => host.querySelector(".login-dialog__tag") !== null)
-  host.querySelector<HTMLButtonElement>(".login-dialog__close")!.click()
-  expect(closed).toBe(1)
+  // The workspace shell's buttons used to open a dialog that POSTed credentials
+  // to /auth/api/firstfactor. There is no such endpoint behind CAS: the only
+  // correct action is leaving for the edge, which forwards to the identity
+  // provider. Capture the navigation instead of performing it.
+  const visited: string[] = []
+  const location = window.location as unknown as { assign: (url: string) => void }
+  const assign = location.assign
+  location.assign = (url: string) => void visited.push(url)
+
+  try {
+    const host = mount(() => publicReplay.default({ caseID: "scenic-action" }), true)
+    await ready(() => host.querySelector(".public-replay__login") !== null)
+
+    host.querySelector<HTMLButtonElement>(".public-replay__login")!.click()
+    await Promise.resolve()
+
+    expect(visited).toHaveLength(1)
+    const target = new URL(visited[0], "http://localhost:8444/")
+    expect(target.origin).toBe("http://localhost:8444")
+    expect(target.pathname).toBe("/auth")
+    // rd points at the authenticated entry, never back at the static shell:
+    // returning to cases.html after login would hit the app with no such route.
+    // A path, because the shim refuses an absolute URL and substitutes its own.
+    expect(target.searchParams.get("rd")).toBe("/axiomics")
+    // And nothing was posted to an auth endpoint: the only fetch here is the
+    // replay fixture the page loads for itself.
+    expect(calls.filter((url) => url.includes("/auth"))).toEqual([])
+  } finally {
+    location.assign = assign
+  }
 })
 
 test("the public replay renders the recorded transcript from one static fixture without tenant requests", async () => {

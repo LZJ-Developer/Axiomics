@@ -9,7 +9,6 @@ import {
 import { Wordmark } from "@/atlas/Wordmark"
 import { useLanguage } from "@/context/language"
 import { cases, cover, replay, select } from "./cases/catalog"
-import { LoginDialog } from "./cases/login-dialog"
 import "./cases/cases.css"
 
 /** Router links in the authenticated app; plain anchors on the public page so
@@ -63,32 +62,32 @@ export default function CasesGallery(props: { public?: boolean } = {}) {
   const filters = [...groups, ...new Set(cases.flatMap((item) => "series" in item ? [item.series] : []))]
   const tools = new Set(cases.flatMap((item) => item.tool.split(" + "))).size
   const shown = createMemo(() => select(state.query, state.filter))
-  // The edge sends a signed-in but not-yet-approved account to `?pending=1`.
-  // Keep the gallery as the page and open the pending view in the same dialog
-  // (closable), instead of replacing the whole page with a review screen.
-  const pendingEntry = (() => {
-    if (!props.public || typeof window === "undefined") return false
-    try {
-      return new URLSearchParams(window.location.search).get("pending") === "1"
-    } catch {
-      return false
-    }
-  })()
-  const [loginOpen, setLoginOpen] = createSignal(pendingEntry)
-  const [dialogMode, setDialogMode] = createSignal<"login" | "pending">(pendingEntry ? "pending" : "login")
-  const closeLogin = () => {
-    setLoginOpen(false)
-    setDialogMode("login")
-    if (pendingEntry) {
-      const url = new URL(window.location.href)
-      url.searchParams.delete("pending")
-      history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`)
-    }
-  }
   // "New research" opens the conversation first and asks for an account only
   // when the visitor submits: the static shell carries the empty workspace, so
   // the gallery links into it rather than to the login portal.
   const newHref = () => (props.public ? "#/new" : "/")
+
+  // 退出登录后回到这一页：本站的会话已经清掉，但统一认证（CAS）的会话还在，
+  // 所以再点"开始使用"会不输密码直接回来。这句话是唯一能把这件事讲清楚的地方，
+  // 它不是提示，是安全边界——不讲，用户会以为退出保护了更多。
+  const signedOutAtLoad = (() => {
+    if (!props.public || typeof window === "undefined") return false
+    try {
+      return new URLSearchParams(window.location.search).get("signedout") === "1"
+    } catch {
+      return false
+    }
+  })()
+  // A signal, not a constant: dismissing has to actually close the dialog.
+  // Dropping the query string alone leaves the component mounted with its
+  // original value and nothing visibly happens.
+  const [signedOut, setSignedOut] = createSignal(signedOutAtLoad)
+  const dismissSignedOut = () => {
+    setSignedOut(false)
+    const url = new URL(window.location.href)
+    url.searchParams.delete("signedout")
+    history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`)
+  }
 
   return (
     <main class="cases-shell">
@@ -109,6 +108,30 @@ export default function CasesGallery(props: { public?: boolean } = {}) {
       </aside>
 
       <section class="cases-page" aria-labelledby="cases-title">
+        <Show when={signedOut()}>
+          <div class="cases-dialog" onClick={dismissSignedOut}>
+            <div
+              class="cases-dialog__panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cases-signedout-title"
+              tabIndex={-1}
+              ref={(el) => queueMicrotask(() => el.focus())}
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") dismissSignedOut()
+              }}
+            >
+              <h2 class="cases-dialog__title" id="cases-signedout-title">
+                {language.t("cases.signedOut.title")}
+              </h2>
+              <p class="cases-dialog__note">{language.t("cases.signedOut.note")}</p>
+              <button type="button" class="cases-dialog__primary" onClick={dismissSignedOut}>
+                {language.t("cases.signedOut.close")}
+              </button>
+            </div>
+          </div>
+        </Show>
         <header class="cases-header">
           <div class="cases-heading">
             <span class="cases-eyebrow">{language.t("cases.eyebrow")}</span>
@@ -215,8 +238,6 @@ export default function CasesGallery(props: { public?: boolean } = {}) {
           </div>
         </Show>
       </section>
-
-      <LoginDialog open={loginOpen()} onClose={closeLogin} initialMode={dialogMode()} />
     </main>
   )
 }

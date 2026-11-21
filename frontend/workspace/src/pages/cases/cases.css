@@ -644,3 +644,85 @@
     transition: none;
   }
 }
+
+/* 退出后的说明。做成页内弹层而不是顶部条：它是这次退出唯一的一次解释，
+   压在页面中间才会被读到；顶部条会和标题抢注意力，然后被当作装饰划过。
+   语气必须是"陈述事实"，不能做成警告——用户没有做错事。 */
+.cases-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, #0b1220 46%, transparent);
+  animation: cases-dialog-fade 120ms ease-out;
+}
+
+.cases-dialog__panel {
+  width: min(30rem, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  padding: 24px 24px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--ax-line, rgba(127, 127, 127, 0.22));
+  background: var(--ax-surface, #fff);
+  color: var(--ax-text, inherit);
+  box-shadow: 0 24px 60px rgb(11 18 32 / 22%), 0 2px 8px rgb(11 18 32 / 10%);
+  animation: cases-dialog-rise 140ms ease-out;
+}
+
+.cases-dialog__panel:focus {
+  outline: none;
+}
+
+.cases-dialog__title {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.cases-dialog__note {
+  margin: 0;
+  color: var(--ax-text-dim, rgba(127, 127, 127, 1));
+  line-height: 1.6;
+}
+
+.cases-dialog__primary {
+  margin-top: 20px;
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--ax-accent, #1f6f5c);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cases-dialog__primary:focus-visible {
+  outline: 2px solid var(--ax-accent, #1f6f5c);
+  outline-offset: 2px;
+}
+
+@keyframes cases-dialog-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes cases-dialog-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cases-dialog,
+  .cases-dialog__panel {
+    animation: none;
+  }
+}

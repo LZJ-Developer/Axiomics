@@ -23,9 +23,9 @@ import "@/components/prompt-input.css"
 import { useLanguage } from "@/context/language"
 import { cases } from "./catalog"
 import { saveDraft } from "./draft"
-import { LoginDialog } from "./login-dialog"
 import { ReplayPlayer } from "./player"
 import { ReplayInspector, type ReplaySelection } from "./public-inspector"
+import { portalLoginHref } from "./public-route"
 import { replayArtifacts, replayFiles } from "./replay-results"
 import { timeline, type Recording } from "./timeline"
 import "./cases.css"
@@ -53,7 +53,9 @@ type Fixture = { session: Session; recording: Recording }
  */
 export default function PublicReplay(props: { caseID?: string; embedded?: boolean }) {
   const language = useLanguage()
-  const [loginOpen, setLoginOpen] = createSignal(false)
+  // 登录交给统一认证：整页跳转到 /auth，由边缘的 SSO shim 接到 CAS。
+  // 口令不再经过本站，所以这里没有任何可以打开的弹层。
+  const goLogin = () => location.assign(portalLoginHref(location.href) ?? "/auth")
   const [railOpen, setRailOpen] = createSignal(false)
   const [inspectorOpen, setInspectorOpen] = createSignal(false)
   const [selection, setSelection] = createSignal<ReplaySelection>()
@@ -139,9 +141,6 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
     setSelection(undefined)
     setDismissedAt(-1)
     setInspectorOpen(false)
-    // The hash route changes without a page load, so a dialog opened on the
-    // previous view would otherwise stay in front of the next one.
-    setLoginOpen(false)
   })
 
   // Seeking backwards unmakes results: drop a selection the playhead no longer
@@ -160,7 +159,7 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
     if (!value) return
     // The workspace picks this up after Authelia sends the visitor back.
     saveDraft(value)
-    setLoginOpen(true)
+    goLogin()
   }
 
   return (
@@ -255,7 +254,7 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
                   detail={language.t("workspace.sidebar.newDetail")}
                   ariaLabel={language.t("workspace.sidebar.newAria")}
                   shortcut="⌘N"
-                  onClick={() => setLoginOpen(true)}
+                  onClick={() => goLogin()}
                 >
                   <IconPlus size={15} strokeWidth={1.7} />
                 </SidebarAction>
@@ -264,7 +263,7 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
                   detail={language.t("workspace.sidebar.searchDetail")}
                   ariaLabel={language.t("workspace.sidebar.searchAria")}
                   shortcut="⌘K"
-                  onClick={() => setLoginOpen(true)}
+                  onClick={() => goLogin()}
                 >
                   <IconSearch size={15} strokeWidth={1.5} />
                 </SidebarAction>
@@ -272,7 +271,7 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
                   label={language.t("workspace.sidebar.customize")}
                   detail={language.t("workspace.sidebar.customizeDetail")}
                   ariaLabel={language.t("workspace.sidebar.customizeAria")}
-                  onClick={() => setLoginOpen(true)}
+                  onClick={() => goLogin()}
                 >
                   <IconSettings size={15} strokeWidth={1.5} />
                 </SidebarAction>
@@ -282,7 +281,7 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
                 context="files"
                 contextOpen={false}
                 terminal={false}
-                onContext={() => setLoginOpen(true)}
+                onContext={() => goLogin()}
                 copy={{
                   workspace: language.t("workspace.sidebar.workspace"),
                   files: language.t("workspace.sidebar.files"),
@@ -306,7 +305,7 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
             </nav>
           </Show>
 
-          <button type="button" class="public-replay__login" onClick={() => setLoginOpen(true)}>
+          <button type="button" class="public-replay__login" onClick={() => goLogin()}>
             {language.t("cases.rail.login")}
           </button>
         </aside>
@@ -423,7 +422,7 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
                             type="button"
                             variant="ghost"
                             class="workspace-composer__attach shrink-0"
-                            onClick={() => setLoginOpen(true)}
+                            onClick={() => goLogin()}
                             aria-label={language.t("prompt.action.attachFile")}
                           >
                             <Icon name="paperclip" class="size-4" />
@@ -431,7 +430,7 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
                           <button
                             type="button"
                             class="public-new__tools"
-                            onClick={() => setLoginOpen(true)}
+                            onClick={() => goLogin()}
                             aria-label={language.t("prompt.tools")}
                           >
                             <span>{language.t("prompt.tools")}</span>
@@ -449,7 +448,7 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
                             data-model-settings-trigger
                             data-model-settings-trigger-style="label"
                             class="min-w-0"
-                            onClick={() => setLoginOpen(true)}
+                            onClick={() => goLogin()}
                           >
                             <span class="truncate">{language.t("prompt.setup.title")}</span>
                             <Icon name="chevron-down" size="small" class="shrink-0 text-text-weak" />
@@ -518,8 +517,6 @@ export default function PublicReplay(props: { caseID?: string; embedded?: boolea
           onClose={closeInspector}
         />
       </Show>
-
-      <LoginDialog open={loginOpen()} onClose={() => setLoginOpen(false)} />
     </main>
   )
 }

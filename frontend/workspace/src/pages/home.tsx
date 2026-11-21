@@ -1,6 +1,8 @@
 import { Match, Show, Switch, createEffect, createMemo, type JSX } from "solid-js"
+import { createStore } from "solid-js/store"
 import { useNavigate } from "@solidjs/router"
 import { useDialog } from "@axiomics/ui/context/dialog"
+import { showToast } from "@axiomics/ui/toast"
 import { CommandPalette } from "@/atlas/CommandPalette"
 import { DisconnectedPanel } from "@/atlas/DisconnectedPanel"
 import { HelpOverlay } from "@/atlas/HelpOverlay"
@@ -35,8 +37,14 @@ import "./home-workbench.css"
  * the history, so Back returns to whatever preceded it instead of bouncing
  * through the launcher again. The effect runs once per mount and stops as soon
  * as the user acts (create, project list, cases), so an in-flight catalog
- * refresh cannot yank the page out from under an open dialog. Nothing here
- * creates a project, bootstraps a directory, or hides/unhides a preference.
+ * refresh cannot yank the page out from under an open dialog.
+ *
+ * An account with no projects at all gets one made for it instead of a dead end
+ * ("No projects yet" + a button). This is the only write on the launch path and
+ * it fires at most once per mount, only after the catalog has actually loaded
+ * and reported empty — a failed attempt falls back to the empty state, never a
+ * retry loop. The explicit create dialog is untouched: the launcher never opens
+ * it, and users still create, switch, and pin projects however they did before.
  */
 export default function Home(): JSX.Element {
   const sync = useGlobalSync()
@@ -46,7 +54,8 @@ export default function Home(): JSX.Element {
   const navigate = useNavigate()
   const commands = useCommand()
   const language = useLanguage()
-  const create = useProjectCreate(enterProject)
+  const projectCreate = useProjectCreate(enterProject)
+  const [bootstrap, setBootstrap] = createStore({ state: "idle" as "idle" | "creating" | "failed" })
 
   const hidden = () => projectPrefs.hidden()
   const project = createMemo(() => launchProject({ projects: sync.data.project, hidden: hidden() }))
@@ -98,19 +107,42 @@ export default function Home(): JSX.Element {
     userActed = true
   }
 
+  // Give a brand-new account somewhere to land. The name is the same one the
+  // create dialog suggests, so a user who renames it later does not have to
+  // undo a name they never chose.
+  function bootstrapProject() {
+    setBootstrap("state", "creating")
+    void projectCreate
+      .create({ name: language.t("home.workbench.defaultProject"), sources: [] })
+      .catch((error: unknown) => {
+        setBootstrap("state", "failed")
+        showToast({
+          title: language.t("home.workbench.createFailed.title"),
+          description: error instanceof Error ? error.message : String(error),
+        })
+      })
+  }
+
   createEffect(() => {
     const target = launch()
     if (autoLaunched || userActed) return
     // `phase` is the only gate: it waits for readiness, refuses a confirmed
     // unreachable server, and never enters from an empty catalog.
-    if (phase() !== "launching") return
+    if (phase() === "launching") {
+      autoLaunched = true
+      enter(target)
+      return
+    }
+    // Empty is a loaded catalog with nothing in it, so the one attempt here is
+    // made against server truth rather than a cache that has not arrived yet.
+    if (phase() !== "empty" || bootstrap.state !== "idle") return
     autoLaunched = true
-    enter(target)
+    bootstrapProject()
   })
 
   function showCreateProject() {
     act()
-    create.show()
+    projectCreate.show()
   }
 
   const openProjects = () => {
@@ -248,6 +280,16 @@ export default function Home(): JSX.Element {
                   <button class="science-home__button" type="button" onClick={() => void server.refresh()}>
                     {language.t("home.workbench.retry")}
                   </button>
+                </section>
+              </Match>
+
+              <Match when={phase() === "empty" && bootstrap.state === "creating"}>
+                <section class="science-home__state" role="status" aria-live="polite">
+                  <span class="science-home__spinner" aria-hidden="true" />
+                  <div>
+                    <strong>{language.t("home.workbench.creating.title")}</strong>
+                    <span>{language.t("home.workbench.creating.description")}</span>
+                  </div>
                 </section>
               </Match>
 

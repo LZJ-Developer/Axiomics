@@ -45,8 +45,9 @@ describe("portalLoginHref", () => {
     expect(url.origin).toBe("https://192.0.2.229:8444")
     expect(url.pathname).toBe("/auth")
     // rd must be the authenticated app, otherwise a successful login lands on
-    // cases.html and the app has no route for it.
-    expect(url.searchParams.get("rd")).toBe("https://192.0.2.229:8444/axiomics")
+    // cases.html and the app has no route for it. It is a path: the shim drops
+    // an absolute URL and substitutes its own default.
+    expect(url.searchParams.get("rd")).toBe("/axiomics")
   })
 
   test("drops the public path and hash from the origin", () => {
@@ -59,8 +60,8 @@ describe("portalLoginHref", () => {
     const url = new URL(portalLoginHref("http://127.0.0.1:4173/")!)
     expect(url.origin).toBe("http://127.0.0.1:4173")
     expect(url.pathname).toBe("/auth")
-    expect(url.searchParams.get("rd")).toBe("http://127.0.0.1:4173/axiomics")
-    expect(decodeURIComponent(url.search.split("rd=")[1]!)).toBe("http://127.0.0.1:4173/axiomics")
+    expect(url.searchParams.get("rd")).toBe("/axiomics")
+    expect(decodeURIComponent(url.search.split("rd=")[1]!)).toBe("/axiomics")
   })
 
   test("returns undefined for input that is not a URL", () => {

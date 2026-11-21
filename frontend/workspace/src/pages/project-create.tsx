@@ -17,9 +17,11 @@ import type { ProjectRecord } from "./home-projects"
  * project list so both entry points cannot drift (draft handling, the native
  * folder picker fallback, and the POST all live here).
  *
- * Creating is always user-initiated: the hook only opens the dialog when the
- * caller asks for it, and it never creates a project on its own. The caller
- * decides what happens to the returned project — both current callers open it.
+ * Creating is always caller-initiated: the hook never creates a project by
+ * itself. Two callers exist — the create dialog (`show`) and the launcher's
+ * empty-library bootstrap (`create`), which is itself a response to the server
+ * reporting no projects at all. The caller decides what happens to the
+ * returned project; every current caller opens it.
  */
 export function useProjectCreate(onCreated: (project: ProjectRecord) => void) {
   const dialog = useDialog()
@@ -104,5 +106,5 @@ export function useProjectCreate(onCreated: (project: ProjectRecord) => void) {
     openDialog()
   }
 
-  return { show }
+  return { show, create }
 }
