@@ -1,0 +1,13 @@
+title = "Axiomics secret detection"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Crossref citation IDs and browser storage identifiers, not credentials"
+regexTarget = "secret"
+regexes = [
+  '''^BFnature12373_CR[0-9]+$''',
+  '''^axiomics\.skills\.(pinned|recent)\.v1$''',
+  '''^axiomics-trace-expansion-v1$''',
+]
