@@ -49,7 +49,7 @@
       "@openauthjs/openauth": "0.0.0-20250322224806",
       "@pierre/diffs": "1.0.2",
       "@solid-primitives/storage": "4.3.3",
-      "@tailwindcss/vite": "4.1.11",
+      "@tailwindcss/vite": "4.3.5",
       "diff": "8.0.4",
       "dompurify": "3.4.14",
       "ai": "5.0.119",
@@ -66,14 +66,14 @@
       "remeda": "2.26.0",
       "shiki": "3.20.0",
       "solid-list": "0.3.0",
-      "tailwindcss": "4.1.11",
+      "tailwindcss": "4.3.5",
       "virtua": "0.42.3",
-      "vite": "7.3.6",
+      "vite": "6.4.6",
       "@solidjs/meta": "0.29.4",
       "@solidjs/router": "0.15.4",
       "@solidjs/start": "2.0.0-alpha.2",
       "solid-js": "1.9.15",
-      "vite-plugin-solid": "2.11.10"
+      "vite-plugin-solid": "2.11.17"
     }
   },
   "devDependencies": {
